@@ -1,0 +1,430 @@
+# ==========================================================================================
+# configs/rice-java.yml - case study: rice in Java
+# ==========================================================================================
+# One experiment file holds every setting of an xdssat run: where things are on this computer,
+# the area, the varieties, the fertilizer and water treatments, the planting calendar, the
+# scenarios (CO2, warming, calibration factors) and the years. You never need to edit Python.
+# This file is the reference: every setting is explained here. configs/README.md lists the
+# other files; configs/rice-java-all-options.yml shows every option in use.
+#
+# How to use it
+#   1. Copy this file to configs/xdssat.yml (your own file, never committed), or to
+#      configs/<study>.yml for a study you want to keep and share.
+#   2. In the copy, fill in the paths section for this computer, then change what you need.
+#      Leave this file as it is: it is the reference and the built-in default.
+#   3. Check it:  python scripts/check_setup.py             (add --config configs/<study>.yml)
+#                 python scripts/run_aoi.py --check         (lists the run folders, runs nothing)
+#   4. Run it:    python scripts/run_aoi.py                 (add --config configs/<study>.yml)
+#   A quick test of the same file on 30 cells and 2 years (about 35 s):
+#                 python scripts/run_aoi.py --sample 30 --years 2015 2016
+#   Without --config, scripts read configs/xdssat.yml (or the file named by XDSSAT_CONFIG).
+#
+# What one run produces
+#   Every combination of cultivar x nitrogen rate x scenario gets its own run folder, with the
+#   seasonal results (summary.csv, a netCDF file) and a copy of the settings that made them
+#   (experiment.yml). 2 cultivars x 3 N rates x 2 scenarios = 12 run folders.
+#
+# As written, this file reproduces the standard Java run: cultivar IR 58, 140 kg N/ha, uniform
+# calendar, agricultural years 1991-2020, no scenario changes. That run simulates 84,870
+# seasons (1,187 weather cells, 1,804 cell x water-regime strata, 3.37 million ha of rice)
+# and took 14.3 min on the reference machine (2 x Xeon Gold 6138, 32 workers).
+#
+# How to read the comments
+#   Every setting has a comment above it: what it means, the allowed range, a recommended
+#   range, what happens when the value is too low or too high, and the default.
+#   "Allowed" is what xdssat accepts; a value outside it stops the run with a message.
+#   "Recommended" is a sensible place to start, not a limit of the model.
+#   "Measured" numbers come from xdssat runs on Java and name the run; they show the size of
+#   an effect for this template and region, not a general rule. The rest is either a limit of
+#   the DSSAT engine (with its source file) or a plain consequence of how xdssat works.
+#
+# Rules of the format (YAML)
+#   - Indent with spaces, never tabs. Keep the indentation of the lines you edit.
+#   - Text after # is a comment and is ignored.
+#   - "null" means "not set". Put month-day dates like "11-15" in quotes.
+#   - A setting you delete takes the default shown in its comment.
+#   - Relative paths are read from the xdssat folder (the one that holds configs/).
+#   - A mistake stops the run before anything is simulated, with a message that names the
+#     line, the setting, what is wrong, and an example of a valid value.
+
+
+# ==========================================================================================
+# paths: where things are on this computer
+# ==========================================================================================
+# Seven folders. They have NO default, in this file or in xdssat: every computer sets its own.
+# Fill them in your own copy (configs/xdssat.yml), or set the environment variable named under
+# each one, which wins over the file. With the variables, one shared experiment file works on
+# several machines unchanged. A folder left null is fine until a step needs it; that step then
+# stops and says which line to fill. python scripts/check_setup.py lists all seven, where each
+# value came from, and the line to edit.
+#
+# The engine and work folders must be SHORT paths (under about 40 characters) on a local disk,
+# OUTSIDE OneDrive or any synced folder. The engine keeps file paths in fixed 80 to 102
+# character text buffers (docs/feasibility-review.md, section 4): a long path breaks runs,
+# often without a clear error, and a synced folder locks files while the engine writes them.
+#
+# The examples are the reference machine's folders, as a pattern to follow.
+# ------------------------------------------------------------------------------------------
+paths:
+  # The DSSAT engine folder: dscsm048.exe, DSCSM048.CTR, DSSATPRO.V48, Genotype/, StandardData/.
+  # Built by python scripts/build_engine.py, or an installed DSSAT 4.8 (e.g. C:/DSSAT48).
+  # Short and outside OneDrive (see above). Needed to run. Environment variable: XDSSAT_ENGINE.
+  # Example: C:/TEMP/dsn/dssat   Default: not set
+  engine: null
+  # Scratch folder for the engine: each run gets a subfolder, deleted when it finishes; the
+  # engine build also goes here (build/). Short, local, outside OneDrive (see above); a fast
+  # local disk (SSD) helps because every process writes and reads its weather and soil files
+  # here. Needed to run. Environment variable: XDSSAT_WORK.
+  # Example: C:/TEMP/dsn/work   Default: not set
+  work: null
+  # The AgERA5 daily weather archive: folders srad/, t2mmax/, t2mmin/, precip/ (required) and
+  # t2mdp/, ws10m/, each with one file per year (agera5_<folder>_<YYYY>.nc). Needed once, to
+  # build the weather cache (python scripts/build_agera5_cache.py). Any local disk.
+  # Environment variable: XDSSAT_AGERA5. Example: E:/temp/agera5   Default: not set
+  agera5: null
+  # The SoilGrids 2.0 mirror (<property>/<property>_<depth>_mean.vrt plus tiles), filled by
+  # python scripts/fetch_soilgrids.py. Needed to build the soil profiles. Any local disk.
+  # Environment variable: XDSSAT_SOILGRIDS. Example: E:/temp/soilgrids   Default: not set
+  soilgrids: null
+  # Source maps: idn-lbs/ (rice fields, MoA irrigation classes) and idn-soil/ (soil map,
+  # agro-ecological zones). Needed by python scripts/prepare_rasters.py. Any local disk.
+  # Environment variable: XDSSAT_INPUTS. Example: E:/temp   Default: not set
+  inputs: null
+  # Where xdssat keeps what it prepares (weather cache, 100 m rasters, soil profiles; about
+  # 5 GB for Indonesia) and its runs (runs/, unless run > output_folder says otherwise).
+  # Any local disk with room; outside OneDrive is better (large files that change often).
+  # Needed to run. Environment variable: XDSSAT_CACHE. Example: E:/temp/xdssat   Default: not set
+  cache: null
+  # Admin boundaries with BPS codes: idn_bnd_adm1.shp (provinces) and idn_bnd_adm2.shp
+  # (districts). Needed only for the district and province layers and comparisons
+  # (prepare_rasters.py --layers adm2 ..., clean_moa_yields.py, docs/scripts/export_data.py).
+  # Environment variable: XDSSAT_BOUNDARIES.
+  # Example: F:/temp/hybrid-bias-correction/data/subset/bnd   Default: not set
+  boundaries: null
+
+
+# ==========================================================================================
+# aoi: the area of interest
+# ==========================================================================================
+# Which rice is simulated. The box picks the part of the national 100 m grid to read; the
+# region then keeps only the rice inside it. Rice is grouped by AgERA5 weather cell (0.1
+# degree, about 11 km), and each cell is simulated once per water regime.
+#
+# Limits today: the irrigation classes come from the Ministry of Agriculture map, which covers
+# Java only, so the area must lie in Java (a province, a district group). Rice with no
+# irrigation class stops the run with a message. A new area also needs its soil profiles once:
+#   python scripts/prepare_soils.py --config <this file> --aoi <name>
+# ------------------------------------------------------------------------------------------
+aoi:
+  # Short name, used in file and folder names (soils/<name>.SOL, runs/<name>_...).
+  # Allowed: letters, digits, _ or -, at most 20 characters, no spaces.
+  # Changing it needs a matching soils/<name>.SOL (prepare_soils.py, see above). Default: java
+  name: java
+  # Box around the area in degrees:
+  #   [west longitude, south latitude, east longitude, north latitude]
+  # Allowed: west < east within -180..180, south < north within -90..90.
+  # Too small: rice outside the box is left out, even inside the region.
+  # Too large: only slower to prepare (more of the grid is read); the region still decides.
+  # Default (all of Java): [105.0, -9.0, 114.7, -5.0]
+  bbox: [105.0, -9.0, 114.7, -5.0]
+  # Region name as listed in <cache>/rasters/idn_region_classes.csv (island groups of the
+  # agro-ecological zone map, e.g. Jawa). Only rice inside this region is simulated.
+  # A name not in that file stops the run and lists the valid names. Default: Jawa
+  region: Jawa
+
+
+# ==========================================================================================
+# template: the DSSAT experiment every season copies
+# ==========================================================================================
+# A template is an ordinary DSSAT experiment file (FileX). Each simulated season copies one of
+# its treatments and changes only the field (weather cell, soil profile, coordinates) and the
+# dates (every date moves with the planting date), so its crop management is kept exactly:
+# transplanting, seedling age, plant population, puddling, bunds, flood depth, fertilizer
+# timing, residue. To change management that has no setting in this file, edit (a copy of)
+# the template in DSSAT's own tools and point 'file' at it.
+#
+# The default, XDRI8601.RIX (written by python scripts/make_templates.py), is IRRI's
+# IRMZ8601 experiment (Munoz, 1986, transplanted IR 58) plus a rainfed bunded water level,
+# IR 64 as a second cultivar, and one treatment per cultivar x water level x N rate.
+# ------------------------------------------------------------------------------------------
+template:
+  # The FileX. It needs fertilizer and irrigation levels for the N rates and water regimes of
+  # the treatments section (check_setup.py and run_aoi.py --check say which are missing).
+  # Default: templates/XDRI8601.RIX
+  file: templates/XDRI8601.RIX
+  # The crop model's cultivar file in <engine>/Genotype, without .CUL; it must match the crop
+  # of the template. Default: RICER048 (CERES-Rice).
+  crop_model: RICER048
+
+
+# ==========================================================================================
+# cultivars: the varieties to run
+# ==========================================================================================
+# One line per variety, as   name: code
+# The code is the 6-character cultivar number (INGENO, first column) in the cultivar file,
+# <engine>/Genotype/RICER048.CUL. The name is a label (at most 16 characters) used in folder
+# names and outputs. Every cultivar listed gets its own run folders.
+#
+# A cultivar the template lists (IR 58, IR 64) uses its own template level. Any other code is
+# put into the template's cultivar level, so a new variety needs only its line in the
+# cultivar file (calibrated coefficients), no FileX edit.
+#
+# How different they are (measured on a 30-cell sample of Java, 2015-2016, uniform calendar,
+# SLPF 1 = uncalibrated, 140 kg N): irrigated IR 58 took 92 days from transplanting to
+# maturity and gave 7,510 kg/ha, IR 64 took 108 days and gave 8,480 kg/ha (rainfed: 107 and
+# 126 days, 8,220 and 9,370 kg/ha). The longer cultivar gave more yield, needs a longer gap
+# before the next season (seasons section), and lost more to warming (scenarios section).
+#
+# Default: IR 58 only. To run IR 64 as well, add the line   "IR 64": IB0015
+# ------------------------------------------------------------------------------------------
+cultivars:
+  "IR 58": IB0012
+
+
+# ==========================================================================================
+# treatments: fertilizer and water
+# ==========================================================================================
+# Nitrogen rates are run as separate folders (every rate x every cultivar x every scenario).
+# Water regimes are not chosen per run: every rice field gets the regime of its irrigation
+# class in the MoA map, and one run covers both regimes.
+# ------------------------------------------------------------------------------------------
+treatments:
+  # Nitrogen rates to run, in kg N/ha (urea, 2/3 at 18 and 1/3 at 41 days after transplanting,
+  # as in the template). Allowed: the rates listed under nitrogen_levels.
+  # More rates: more run folders, each about as long as the first.
+  # Measured (on a 30-cell sample of Java, 2015-2016, uniform calendar, SLPF 1 = uncalibrated,
+  # IR 58): irrigated 4,710 / 7,020 / 7,510 kg/ha and rainfed 3,260 / 6,770 / 8,220 kg/ha at
+  # 0 / 70 / 140 kg N. The response flattens towards 140 kg N, most in irrigated rice.
+  # Example: [0, 70, 140]. Default: [140]
+  nitrogen_kg: [140]
+  # Which fertilizer level (MF) of the template gives each rate:   kg N/ha: level.
+  # Level 0 means no fertilizer. Only change this together with the template: to add a rate,
+  # add a fertilizer level to the template FileX first, then list it here.
+  # Default: {0: 0, 35: 1, 70: 2, 105: 3, 140: 4}
+  nitrogen_levels: {0: 0, 35: 1, 70: 2, 105: 3, 140: 4}
+  # Water regimes. Each rice field gets the regime of its MoA irrigation class
+  # (1 technical, 2 semi-technical, 3 simple irrigation, 4 rainfed). template_level is the
+  # irrigation level (MI) of the template: 1 = constant 50 mm flood (fully irrigated),
+  # 3 = rainfed with 150 mm bunds (holds only rain). Each class belongs to exactly one regime.
+  # Moving class 3 (simple irrigation) to rainfed, say, tests how much the weakest irrigation
+  # matters. A regime name not used by any season in the calendar is never planted.
+  # Default: irrigated = level 1, classes [1, 2, 3]; rainfed = level 3, class [4]
+  water_regimes:
+    irrigated: {template_level: 1, irrigation_classes: [1, 2, 3]}
+    rainfed: {template_level: 3, irrigation_classes: [4]}
+  # Soil water at the start of each season, as a share of the plant-available water of every
+  # soil layer: 0 = wilting point (dry), 1 = field capacity (wet). Applied to every season.
+  # Allowed 0 to 1. Recommended 0.5 to 1.
+  # Too low: rainfed rice starts in a dry soil; the cost measured below was small.
+  # Too high: no harm seen. Irrigated rice did not respond at all in the runs below.
+  # Measured (on a 30-cell sample of Java, 2015-2016, uniform calendar, SLPF 1 = uncalibrated):
+  # irrigated yields the same at 0.5, 0.7 and 0.9; rainfed wet season 8,120 / 8,180 / 8,220
+  # kg/ha, so 1.3% lower at 0.5 than at 0.9.
+  # Default: 0.9
+  initial_soil_water: 0.9
+
+
+# ==========================================================================================
+# seasons: when rice is planted
+# ==========================================================================================
+# The planting (transplanting) date of every season, in every weather cell and year.
+# Years are agricultural years: year 2015 runs from year_starts in 2015 to the day before
+# it in 2016, so the wet season of late 2015 and the dry season of early 2016 are both "2015".
+# ------------------------------------------------------------------------------------------
+seasons:
+  # How planting dates are chosen.
+  #   uniform   the calendar below, the same date everywhere and every year. Simple and fast;
+  #             good for comparing scenarios, but ignores that the rains start at different
+  #             times across Java.
+  #   per_cell  the wet season starts from the rainfall onset of each weather cell (the onset
+  #             rule below, median over years); later seasons follow it.
+  #   by_zone   one date per agro-ecological zone, from zone_table, or, without a table, the
+  #             median onset of each zone's cells.
+  # per_cell and by_zone read the rain of every cell first (a few seconds for a sample, longer
+  # for all of Java). Default: uniform
+  mode: uniform
+  # First day of the agricultural year, "MM-DD". It must fall after the last harvest of one
+  # crop year and before the first planting of the next; the onset search also runs from this
+  # day for one year. Too late (after the onset): onset is found in the following rains and the
+  # wet season shifts by a year. For Java "08-01" sits in the dry season, before every onset
+  # found (earliest: 1 October). Default: "08-01"
+  year_starts: "08-01"
+  # The seasons: a name, a date "MM-DD", and the water regimes that plant in that season.
+  # The first season is the one the onset rule moves; later seasons follow it.
+  # A rainfed regime in a dry-season line would plant rainfed rice into the dry months.
+  # Default: wet on "11-15" for irrigated and rainfed rice, dry on "04-01" for irrigated rice
+  # only. These defaults are placeholders, not an agronomic calendar. For comparison, the
+  # median onset over Java's 1,187 cells (1991-2020, rule below) is 1 November (10% of cells
+  # before 11 October, 10% after 21 November), so transplanting 20 days later falls around
+  # 21 November (measured, runs/java_per_cell_1991-2020/onset.csv).
+  calendar:
+    - {name: wet, date: "11-15", regimes: [irrigated, rainfed]}
+    - {name: dry, date: "04-01", regimes: [irrigated]}
+  # Rainfall onset rule, for per_cell and for by_zone without a zone table. Onset is the first
+  # dasarian (10-day period: days 1-10, 11-20, 21-end of month) with at least rain_mm of rain
+  # that starts a run of `dasarian` such periods in a row (BMKG rule; sources in
+  # src/management.py). Cells with no onset in a year leave that year out of their median;
+  # cells with no onset at all use the calendar date.
+  onset:
+    # Rain needed in one dasarian, mm. Allowed: more than 0. Recommended 40 to 60.
+    # Too low: early showers count as the start of the rains (false starts), so planting
+    # comes too early. Too high: onset comes late or not at all in drier cells.
+    # With 50 mm every Java cell had an onset in at least 25 of 30 years (measured, 1991-2020).
+    # Default: 50
+    rain_mm: 50
+    # How many wet dasarian in a row make an onset. Allowed 1 to 36. Recommended 2 to 3.
+    # 1: the first wet dasarian counts (prone to false starts). Higher: the rains must hold
+    # longer, so onset is later and more reliable. Default: 3
+    dasarian: 3
+    # Days from onset to transplanting of the first season: the seedbed is sown at onset and
+    # the template transplants 23-day-old seedlings. Allowed 0 to 120. Recommended 15 to 30.
+    # Too low: transplanting before the field holds water (rainfed rice suffers first).
+    # Too high: the season moves into the end of the rains. Default: 20
+    transplant_after_days: 20
+    # Days from one season's planting to the next season's planting (wet to dry). Allowed 0 to
+    # 300. It should be at least the field duration of the cultivar plus land preparation:
+    # irrigated IR 58 took about 92 days from transplanting to maturity, IR 64 about 108,
+    # rainfed about 107 and 126 (measured, see cultivars). Recommended 110 to 150.
+    # Too low: the seasons overlap in time (the engine runs them apart, so no error, but no
+    # farm could). Too high: the dry season starts late into the dry months. Default: 120
+    next_season_after_days: 120
+    # Years used for the onset climatology (median onset), [first, last]. null = the run years.
+    # More years give a steadier median. Default: null
+    years: null
+  # by_zone only: planting date per zone and season. null = take the median onset of each
+  # zone's cells. Either a CSV file with columns zone, season, month_day, or rows here:
+  #   zone_table:
+  #     - {zone: 5, season: wet, date: "12-01"}
+  # Zones not listed use the calendar date. Default: null
+  zone_table: null
+  # by_zone only: the zone layer. Default: aez (agro-ecological zone codes,
+  # <cache>/rasters/idn_aez_classes.csv)
+  zone_column: aez
+
+
+# ==========================================================================================
+# scenarios: variations to run
+# ==========================================================================================
+# Each scenario gets its own run folders (combined with every cultivar and N rate). A scenario
+# has a name and any of the settings below; a setting left out keeps the template, the
+# weather and the cultivar file as they are. Keep a "baseline" scenario to compare against.
+#
+#   name                   letters, digits, . _ or -, at most 30; used in the folder name.
+#                          The scenario named "baseline" adds nothing to the folder name.
+#   description            free text, kept in the run folder's experiment.yml
+#
+#   environment            weather changes for the whole of every season, written to the FileX
+#                          ENVIRONMENT MODIFICATIONS. For each of
+#                            daylength (h), radiation (MJ/m2/d), tmax (C), tmin (C),
+#                            rain (mm/d), co2 (ppm), dewpoint (C), wind (km/d)
+#                          give one way to change it, with a number of at most 4 characters
+#                          (the engine reads 4, IPENV.for:1000):
+#                            add / subtract  a fixed amount        tmax: {add: 2}
+#                            multiply        a factor              rain: {multiply: 0.8}
+#                            replace         a fixed value         co2: {replace: 550}
+#                          Recommended ranges for climate change tests: tmax and tmin add 0 to
+#                          4 C; rain multiply 0.7 to 1.3; co2 replace 400 to 800 ppm. Without a
+#                          change the template takes CO2 from the engine's Mauna Loa record
+#                          (StandardData/CO2048.WDA: about 400 ppm in 2015).
+#                          Measured (a 30-cell sample of Java, 2015-2016, uniform calendar,
+#                          SLPF 1 = uncalibrated, 140 kg N, against baseline):
+#                            co2 replace 550: IR 58 +12% irrigated, +8% rainfed; IR 64 +10%, +7%
+#                            tmax and tmin add 2: IR 58 -12% irrigated, -10% rainfed; IR 64 -26%,
+#                              -12%; seasons 5 to 10 days shorter
+#                            rain multiply 0.8: under 1% (season rain of rainfed rice fell from
+#                              1,265 to 1,023 mm, still enough; irrigation made up the rest)
+#                          A drier sample, the dry season or rainfed rice without bunds may
+#                          respond more to rain.
+#
+#   cultivar_coefficients  coefficients of the cultivar file to change, by their header name in
+#                          RICER048.CUL: {TCLDF: 19} for every cultivar of the run, or
+#                          {"IR 64": {TCLDF: 18}} for one. The engine's own file is never
+#                          changed; each run writes its own copy.
+#                          TCLDF is the cold-sterility threshold (C): canopy temperature below
+#                          it around heading cuts spikelet fertility (RI_Phenol.for:600-648).
+#                          RICER048.CUL has 15.0 for IR 58 and IR 64. 19 lowered yields of cool
+#                          highland cells (Tmin under 20 C) by about 40% and left the lowlands
+#                          as they were (measured, Java calibration, docs/getting-started.md).
+#
+#   slpf                   soil fertility factor, more than 0 and at most 1. CERES-Rice
+#                          multiplies daily carbohydrate production by it (RI_Grosub.for:648-649),
+#                          so it stands for every yield loss the model does not simulate (pests,
+#                          weeds, nutrient limits, management). It is the main calibration
+#                          factor against observed yields. Yield falls faster than SLPF: 0.8 gave
+#                          71% and 0.7 gave 55% of the SLPF 1 yield (measured, 40-cell sample).
+#                          Calibrated for Java: 0.76 with slpf_rainfed 0.58 and TCLDF 19, fitted
+#                          to district yields 1992-2020 (scripts/fit_slpf.py). Default: 1.0
+#   slpf_rainfed           SLPF for rainfed rice only. Default: the same as slpf
+#   slpf_table             CSV with columns iy, ix, water, slpf (from scripts/fit_slpf.py): SLPF
+#                          per weather cell and regime. Replaces slpf and slpf_rainfed (give only
+#                          one of them).
+#
+# Examples (remove the # to use them):
+#   - name: co2_550
+#     description: "CO2 at 550 ppm all season"
+#     environment: {co2: {replace: 550}}
+#   - name: warmer2
+#     description: "2 C warmer days and nights"
+#     environment: {tmax: {add: 2}, tmin: {add: 2}}
+#   - name: calibrated
+#     slpf: 0.76
+#     slpf_rainfed: 0.58
+#     cultivar_coefficients: {TCLDF: 19}
+# Default: one scenario, baseline, with no changes.
+# ------------------------------------------------------------------------------------------
+scenarios:
+  - name: baseline
+
+
+# ==========================================================================================
+# years: the agricultural years to simulate
+# ==========================================================================================
+# [first, last], both included. Allowed 1900 to 2100, first not after last; in practice the
+# years the AgERA5 archive covers (1979 onward on the reference machine). The first year needs
+# weather from about 40 days before its first planting. Seasons that need weather after the
+# last AgERA5 day are left out, with a message. Run time grows in step with the number of
+# years (the full Java run: 30 years in 14.3 min). Default: [1991, 2020]
+# ------------------------------------------------------------------------------------------
+years: [1991, 2020]
+
+
+# ==========================================================================================
+# run: how the work is split
+# ==========================================================================================
+# These settings change speed and memory, not results, except sample and seed (which pick the
+# cells) and season_days (which can make seasons fail when too low).
+# ------------------------------------------------------------------------------------------
+run:
+  # Engine processes running at the same time. Allowed 1 or more. Recommended: the number of
+  # CPU cores, or a few less to keep the machine usable. Separate engine processes scale
+  # almost linearly (measured: 8 processes x 50 cells in 7.5 s against 9.0 s for one).
+  # Too low: slow. Too high (more than the cores): no faster, and each process needs its own
+  # folder of weather files in the work folder. Default: 32
+  workers: 32
+  # Seasons per engine process (one FileX). Allowed 1 to 999 (the engine's treatment limit,
+  # IPEXP.for:865). Recommended 50 to 200. Too low: many small processes and folders, the
+  # start-up cost dominates. Too high: slower per season, because the engine slows with many
+  # treatments in one file (measured: 0.18 s per season with 50, 0.24 s with 500), and fewer
+  # chunks than workers leaves cores idle. Default: 200
+  chunk_size: 200
+  # Agricultural years whose weather is held in memory at once. Allowed 1 or more.
+  # Recommended 5 to 10. Too low: the weather cache is read more often (slower). Too high:
+  # more memory; for all of Java one year of weather is about 1,187 cells x 365 days x 6
+  # variables, some tens of MB (estimate, not measured). Default: 5
+  years_per_batch: 5
+  # Run only this many weather cells, drawn at random weighted by rice area: a quick test of
+  # a new experiment file. null = all cells. Example: 30 (about 35 s for 2 years, 156
+  # seasons, measured). Results of a sample are for checking, not for reporting. Default: null
+  sample: null
+  # Random seed of the sample: the same seed and sample size draw the same cells, so sampled
+  # runs of different scenarios are comparable. Any whole number. Default: 1
+  seed: 1
+  # Days of weather given to each season after planting. Allowed 60 to 400. Recommended 200
+  # to 250. It must cover the longest season: the longest seen in the Java runs is 162 days.
+  # Too low: seasons not mature when the weather ends fail (listed in failed.csv). Too high:
+  # more seasons at the end of the weather record are left out, and more weather is read.
+  # Default: 220
+  season_days: 220
+  # Parent folder of the run folders. null = <cache>/runs. A folder per study (e.g.
+  # E:/temp/xdssat/runs/co2_study) keeps studies apart. Default: null
+  output_folder: null

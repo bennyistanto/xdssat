@@ -1,0 +1,168 @@
+# ==========================================================================================
+# configs/rice-java-all-options.yml - every option of an experiment file, in use
+# ==========================================================================================
+# The same case as configs/rice-java.yml (rice in Java), but with every setting written out
+# and every kind of option used at least once: three cultivars (one of them not in the
+# template), two N rates, the per_cell calendar with all onset settings, an inline zone table,
+# and scenarios that use all eight weather variables, all four kinds of change, cultivar
+# coefficients for all cultivars and for one, and both SLPF forms.
+#
+# Use it as a menu: copy the parts you need into your own file. What each setting means, its
+# range, and what happens when it is too low or too high is explained in configs/rice-java.yml;
+# the comments here only say what this file does with it.
+#
+# Size: 3 cultivars x 2 N rates x 6 scenarios = 36 run folders. A full per_cell run of Java
+# took 15.5 min on the reference machine, so all 36 take most of a day. Try it first on a
+# sample (about 20 s per run folder):
+#     python scripts/run_aoi.py --config configs/rice-java-all-options.yml --sample 30 --years 2015 2016
+#
+# The values are examples that show the format, not recommendations or projections.
+# ------------------------------------------------------------------------------------------
+
+# Folders of this computer: fill them here, or set the environment variables
+# (XDSSAT_ENGINE, XDSSAT_WORK, ...), which win over the file. See configs/rice-java.yml.
+paths:
+  # needed to run
+  engine: null
+  # needed to run
+  work: null
+  # needed to build the weather cache
+  agera5: null
+  # needed to build the soil profiles
+  soilgrids: null
+  # needed to build the rasters
+  inputs: null
+  # needed to run (the prepared inputs and the run folders live here)
+  cache: null
+  # needed only for district and province layers and comparisons
+  boundaries: null
+
+# The whole of Java.
+aoi:
+  # used in file and folder names; soils/java.SOL must exist
+  name: java
+  # [west, south, east, north] in degrees
+  bbox: [105.0, -9.0, 114.7, -5.0]
+  # island group of the agro-ecological zone map
+  region: Jawa
+
+# The standard template and crop model.
+template:
+  # the FileX every season copies
+  file: templates/XDRI8601.RIX
+  # cultivar file in <engine>/Genotype
+  crop_model: RICER048
+
+# Three cultivars, by their code (INGENO) in RICER048.CUL. IR 58 and IR 64 are listed in the
+# template; IR 36 (IB0003) is not, so its code is put into the template's cultivar level:
+# any cultivar of the cultivar file can be run this way, without editing the FileX.
+cultivars:
+  "IR 58": IB0012
+  "IR 64": IB0015
+  "IR 36": IB0003
+
+treatments:
+  # two N rates: none, and the template's full rate
+  nitrogen_kg: [0, 140]
+  # kg N/ha -> fertilizer level (MF) of the template; 0 = none
+  nitrogen_levels: {0: 0, 35: 1, 70: 2, 105: 3, 140: 4}
+  # MoA irrigation classes -> water regime and template irrigation level (MI). To treat simple
+  # irrigation (class 3) as rainfed instead, use irrigation_classes [1, 2] and [3, 4].
+  water_regimes:
+    irrigated: {template_level: 1, irrigation_classes: [1, 2, 3]}
+    rainfed: {template_level: 3, irrigation_classes: [4]}
+  # soil water at the start of each season, share of plant-available water
+  initial_soil_water: 0.9
+
+seasons:
+  # planting from the rainfall onset of each weather cell
+  mode: per_cell
+  # agricultural year starts 1 August
+  year_starts: "08-01"
+  # used where a cell has no onset, and by uniform; the first season follows the onset
+  calendar:
+    - {name: wet, date: "11-15", regimes: [irrigated, rainfed]}
+    - {name: dry, date: "04-01", regimes: [irrigated]}
+  # the onset rule, every setting written out
+  onset:
+    # mm of rain in one dasarian
+    rain_mm: 50
+    # wet dasarian in a row
+    dasarian: 3
+    # onset to transplanting of the first season, days
+    transplant_after_days: 20
+    # one season's planting to the next one's, days
+    next_season_after_days: 120
+    # onset climatology over these years (null = the run years)
+    years: [1991, 2020]
+  # used only with mode: by_zone. Zone codes are those of
+  # <cache>/rasters/idn_aez_classes.csv (e.g. 3 = IIIax, 4 = IIIay); zones not listed use the
+  # calendar. Instead of rows, a CSV file with columns zone, season, month_day also works.
+  zone_table:
+    - {zone: 3, season: wet, date: "11-20"}
+    - {zone: 3, season: dry, date: "03-20"}
+    - {zone: 4, season: wet, date: "12-01"}
+  # the zone layer for by_zone
+  zone_column: aez
+
+# Six scenarios. Each is run for every cultivar and N rate.
+scenarios:
+  # no change: the reference to compare against
+  - name: baseline
+  # one weather variable replaced by a fixed value
+  - name: co2_550
+    description: "CO2 at 550 ppm all season"
+    environment: {co2: {replace: 550}}
+  # two variables changed by a fixed amount
+  - name: warmer2
+    description: "2 C warmer days and nights"
+    environment: {tmax: {add: 2}, tmin: {add: 2}}
+  # all eight weather variables and all four kinds of change (add, subtract, multiply,
+  # replace); illustrative values only
+  - name: all_weather
+    description: "every environment variable, for the format"
+    environment:
+      daylength: {add: 0.2}
+      radiation: {multiply: 0.95}
+      tmax: {add: 1.5}
+      tmin: {add: 2}
+      rain: {multiply: 1.1}
+      co2: {replace: 500}
+      dewpoint: {add: 1}
+      wind: {subtract: 10}
+  # the Java calibration: soil fertility factor per water regime and a cold-sterility
+  # threshold for every cultivar (configs/rice-java.yml explains both)
+  - name: calibrated
+    description: "SLPF 0.76 irrigated, 0.58 rainfed, TCLDF 19"
+    slpf: 0.76
+    slpf_rainfed: 0.58
+    cultivar_coefficients: {TCLDF: 19}
+  # a coefficient for one cultivar only, together with one for all cultivars
+  - name: ir64_cold_tolerant
+    description: "TCLDF 19 for all cultivars but 17 for IR 64"
+    cultivar_coefficients: {TCLDF: 19, "IR 64": {TCLDF: 17}}
+  # SLPF per weather cell and regime from a table (scripts/fit_slpf.py writes one). It needs
+  # the CSV on this computer, so it is left out here; to use it, add a scenario such as:
+  #   - name: slpf_temperature
+  #     slpf_table: E:/temp/xdssat/checks/districts/slpf_temp_v1.csv
+  #     cultivar_coefficients: {TCLDF: 19}
+
+# agricultural years 1991 (planted from August 1991) to 2020
+years: [1991, 2020]
+
+run:
+  # engine processes at once
+  workers: 32
+  # seasons per engine process
+  chunk_size: 200
+  # agricultural years of weather held in memory at once
+  years_per_batch: 5
+  # all cells (use --sample 30 for a quick test)
+  sample: null
+  # random seed of a sample
+  seed: 1
+  # days of weather after each planting
+  season_days: 220
+  # parent folder of the 36 run folders (null = <cache>/runs). A folder of its own keeps this
+  # study apart; a relative path is read from the xdssat folder.
+  output_folder: null
