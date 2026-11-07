@@ -219,6 +219,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# Your own experiment file (a copy of configs/rice-java.yml with this machine's folders)
+/configs/xdssat.yml
+
 # Session scratch (see ~/.claude/CLAUDE.md temp convention)
 temp/
 
