@@ -50,6 +50,8 @@ from rasterio.features import rasterize
 from rasterio.transform import Affine
 from rasterio.windows import Window
 
+import config
+
 CRS = "ESRI:54034"
 RES = 100.0
 TILE = 1024
@@ -111,10 +113,10 @@ class Grid:
 
 IDN = Grid.from_lonlat(94.9, -11.1, 141.1, 6.2)
 
-# Approximate boxes for areas of interest; the region raster decides membership.
-AOI = {
-    "java": (105.0, -9.0, 114.7, -5.0),
-}
+# Area of interest of the experiment file (aoi > name and aoi > bbox, lon/lat
+# west, south, east, north; default Java 105.0, -9.0, 114.7, -5.0). The box is
+# approximate; the region raster decides membership.
+AOI = {config.CURRENT.aoi: config.CURRENT.bbox}
 
 # JSWH (rice field type) in the ATR/BPN 2024 rice-field map, coded for the raster.
 RICE_CLASSES = {

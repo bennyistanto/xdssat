@@ -43,7 +43,8 @@ import pandas as pd
 
 import config
 
-AGERA5_DIR = Path(os.environ.get("XDSSAT_AGERA5", config.AGERA5_DIR))
+# The AgERA5 archive folder is config.AGERA5_DIR (paths > agera5 in the experiment file,
+# or XDSSAT_AGERA5), looked up at each call so a --config file takes effect.
 RES = 0.1
 WIND_HEIGHT = 10.0
 PACK_SCALE = 0.1
@@ -88,7 +89,7 @@ REGIONS = {
 
 def source_path(var: str, year: int, root: Path | None = None) -> Path:
     v = VARIABLES[var]
-    return Path(root or AGERA5_DIR) / v.folder / f"agera5_{v.folder}_{year}.nc"
+    return Path(root or config.AGERA5_DIR) / v.folder / f"agera5_{v.folder}_{year}.nc"
 
 
 def cache_path(region: str, var: str, year: int, cache_dir: Path | None = None) -> Path:
@@ -105,7 +106,7 @@ def _index(coord: np.ndarray, lo: float, hi: float) -> slice:
 
 
 def available_years(var: str, root: Path | None = None) -> list[int]:
-    folder = Path(root or AGERA5_DIR) / VARIABLES[var].folder
+    folder = Path(root or config.AGERA5_DIR) / VARIABLES[var].folder
     return sorted(int(p.stem.rsplit("_", 1)[1]) for p in folder.glob("agera5_*_*.nc"))
 
 

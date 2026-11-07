@@ -32,6 +32,11 @@ Format facts used here (dssat-csm-os, verified 2026-11-05):
   header name (e.g. ``IPMAN.for:228,616``; ``IPSLIN.for:206-207``). The level
   number is ``I3`` in characters 1-3.
 * Two-digit years: ``YY <= 40`` is 20YY, otherwise 19YY (``DATES.for:84-87``).
+* Environment modifications: ``FORMAT (I3,I5,5(1X,A1,F4.0),1X,A1,F4.0,
+  2(1X,A1,F4.0))`` (``IPENV.for:1000``), i.e. level, ODATE, then eight
+  (code, amount) pairs EDAY ERAD EMAX EMIN ERAIN ECO2 EDEW EWIND. Codes A add,
+  S subtract, M multiply, R replace (``Weather/WTHMOD.for`` ``WTHSET``); a row
+  applies from ODATE on (``WTHMOD.for``, ``YYDDD .GE. WMDATE``).
 """
 from __future__ import annotations
 
@@ -62,7 +67,7 @@ FACTOR_SECTION = {
     "SM": "SIMULATION CONTROLS",
 }
 # Factors whose dates we do not shift yet; templates must leave them at 0.
-UNSUPPORTED = ("SA", "MC", "MT", "ME")
+UNSUPPORTED = ("SA", "MC", "MT")
 
 # Header names that hold dates (YYDDD or YYYYDDD).
 DATE_COLUMNS = {"PDATE", "EDATE", "IDATE", "FDATE", "RDATE", "ICDAT", "SDATE",
@@ -353,6 +358,67 @@ def field_rows(template_block: list[str], level: int, field_id: str, wsta: str,
     if elev is not None and elev == elev:
         r2 = _put(r2, 36, 44, f"{elev:.0f}")
     return r1, r2
+
+
+# ----------------------------------------------------------------------------
+# environment modifications (scenarios)
+# ----------------------------------------------------------------------------
+ENV_COLUMNS = ("EDAY", "ERAD", "EMAX", "EMIN", "ERAIN", "ECO2", "EDEW", "EWIND")
+ENV_HEADER = "@E ODATE EDAY  ERAD  EMAX  EMIN  ERAIN ECO2  EDEW  EWIND ENVNAME"
+_SECTION_ORDER = ["TREATMENTS", "CULTIVARS", "FIELDS", "SOIL ANALYSIS", "INITIAL CONDITIONS",
+                  "PLANTING DETAILS", "IRRIGATION", "FERTILIZERS", "RESIDUES", "CHEMICAL",
+                  "TILLAGE", "ENVIRONMENT", "HARVEST", "SIMULATION"]
+
+
+def with_environment(template: FileX, changes: dict, name: str = "") -> FileX:
+    """A copy of ``template`` whose every treatment uses one environment modification level.
+
+    ``changes`` maps a column of ``ENV_COLUMNS`` to ``(code, amount)``, e.g.
+    ``{"ECO2": ("R", 550), "EMAX": ("A", 2)}``; columns left out are ``A 0``
+    (no change). The modification starts on the earliest simulation start
+    date (SDATE) of the template, and moves with each treatment's dates like
+    every other date, so it covers the whole season. Refuses a template whose
+    treatments already use environment modifications.
+    """
+    import copy
+
+    trt = template.treatments()
+    if (trt["ME"] != 0).any():
+        raise ValueError("template treatments already use ENVIRONMENT MODIFICATIONS")
+    bad = set(changes) - set(ENV_COLUMNS)
+    if bad:
+        raise ValueError(f"unknown environment columns {sorted(bad)}; use {ENV_COLUMNS}")
+    starts = []
+    for block in template.blocks("SM").values():
+        for hdr, row in _rows_with_header(block):
+            cols = {c.name: c for c in parse_header(hdr)} if hdr else {}
+            if "SDATE" in cols:
+                d = decode_date(_span(row, cols["SDATE"]).strip())
+                if d:
+                    starts.append(d)
+    if not starts:
+        raise ValueError("template has no simulation start date (SDATE)")
+    row = f"{1:>2} {encode_date(min(starts))}"
+    for col in ENV_COLUMNS:
+        code, amount = changes.get(col, ("A", 0))
+        if code not in "ASMR" or len(code) != 1:
+            raise ValueError(f"{col}: code must be A, S, M or R, got {code!r}")
+        row += f" {code}{_fmt_num(amount, 4):>4}"
+    row += f" {name[:20]}".rstrip()
+    out = copy.deepcopy(template)
+    sec = out.section("TREATMENTS")
+    sec.body = [(_put(ln.ljust(34 + 3 * 13), 65, 67, f"{1:>3}") if _is_data(ln) else ln) for ln in sec.body]
+    new = Section("*ENVIRONMENT MODIFICATIONS", [ENV_HEADER, row, ""])
+    old = next((i for i, s in enumerate(out.sections) if s.matches("ENVIRONMENT")), None)
+    if old is not None:
+        out.sections[old] = new
+    else:
+        rank = {k: i for i, k in enumerate(_SECTION_ORDER)}
+        me = rank["ENVIRONMENT"]
+        pos = next((i for i, s in enumerate(out.sections)
+                    if next((r for k, r in rank.items() if s.matches(k)), -1) > me), len(out.sections))
+        out.sections.insert(pos, new)
+    return out
 
 
 # ----------------------------------------------------------------------------

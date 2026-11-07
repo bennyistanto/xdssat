@@ -62,7 +62,6 @@ import config
 import rasters
 from sol import SoilProfile
 
-SOILGRIDS_DIR = config.SOILGRIDS_DIR
 HOMOLOSINE = "+proj=igh +lat_0=0 +lon_0=0 +datum=WGS84 +units=m +no_defs"
 NODATA = -32768
 
@@ -94,7 +93,7 @@ _to_igh = pyproj.Transformer.from_crs("EPSG:4326", HOMOLOSINE, always_xy=True)
 
 
 def vrt_path(prop: str, depth: str, root: Path | None = None) -> Path:
-    return Path(root or SOILGRIDS_DIR) / prop / f"{prop}_{depth}_mean.vrt"
+    return Path(root or config.SOILGRIDS_DIR) / prop / f"{prop}_{depth}_mean.vrt"
 
 
 # ------------------------------------------------------------ pedotransfer

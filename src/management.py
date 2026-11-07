@@ -26,47 +26,32 @@ All three return the units table that ``runner.run_units`` takes (``cell``,
 - ``per_cell``: planting days per cell, e.g. from ``onset`` (rainfall onset
   computed from AgERA5 per cell).
 
-Template treatments: ``templates/XDRI8601.RIX`` treatment 5 (irrigated,
-constant 50 mm flood) and 11 (rainfed, bunded), see ``scripts/make_templates.py``.
+Settings
+--------
+Calendar, agricultural year start, irrigation classes and the template come
+from the experiment file (``config.CURRENT``, see configs/rice-java.yml); the
+module attributes below are its values and the functions take them as
+arguments where a run may differ. Template treatments are found by their
+irrigation (MI) and fertilizer (MF) levels (``template_treatment``); in
+``templates/XDRI8601.RIX`` water level 1 is a constant 50 mm flood and 3 is
+rainfed, bunded (``scripts/make_templates.py``).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-ANCHOR = (8, 1)                       # agricultural year starts 1 Aug
-TEMPLATE = Path(__file__).resolve().parents[1] / "templates" / "XDRI8601.RIX"
-TRNO = {"irrigated": 5, "rainfed": 11}
-# Template cultivar levels and the N rates of its fertilizer levels (MF 0-4: 0, 35, 70, 105,
-# 140 kg N, 2/3 at 18 and 1/3 at 41 days after transplanting, IRMZ8601).
-CULTIVARS = {"IR 58": (1, "IB0012"), "IR 64": (2, "IB0015")}
-N_LEVELS = {0: 0, 35: 1, 70: 2, 105: 3, 140: 4}
-WATER_LEVEL = {"irrigated": 1, "rainfed": 3}
+import config
+from filex import FileX
 
-
-def _grid():
-    g, k = {}, 12
-    for cv in CULTIVARS:
-        for water in WATER_LEVEL:
-            for n in N_LEVELS:
-                g[(cv, water, n)] = k
-                k += 1
-    return g
-
-
-# Template treatment number of every (cultivar, water regime, kg N), from 12 up
-# (scripts/make_templates.py writes them). 1-11 keep IRMZ8601's numbering.
-TREATMENT_GRID = _grid()
-
-
-def trno(water: str, cultivar: str = "IR 58", n: int = 140) -> int:
-    return TREATMENT_GRID[(cultivar, water, n)]
-# MoA irrigation classes (scripts/prepare_rasters.py MOA_CLASSES) -> water regime.
-# All three irrigated classes are treated as fully irrigated for now.
-REGIME = {1: "irrigated", 2: "irrigated", 3: "irrigated", 4: "rainfed"}
+ANCHOR = config.CURRENT.anchor        # agricultural year start (seasons > year_starts), default 1 Aug
+TEMPLATE = config.CURRENT.template_file
+# MoA irrigation classes (scripts/prepare_rasters.py MOA_CLASSES) -> water regime
+# (treatments > water_regimes > irrigation_classes). By default all three
+# irrigated classes are treated as fully irrigated.
+REGIME = config.CURRENT.regime_of_class()
 
 
 @dataclass(frozen=True)
@@ -76,28 +61,75 @@ class Season:
     month_day: str | None = None          # "MM-DD" for uniform calendars
 
 
-# Placeholders, not an agronomic calendar: wet season (MT-I) for all rice,
-# dry season (MT-II) for irrigated rice only. Set your own.
-DEFAULT_SEASONS = (Season("wet", ("irrigated", "rainfed"), "11-15"),
-                   Season("dry", ("irrigated",), "04-01"))
+def seasons_from(exp: "config.Experiment") -> tuple[Season, ...]:
+    """The calendar of an experiment (seasons > calendar)."""
+    return tuple(Season(s["name"], tuple(s["regimes"]), s["date"]) for s in exp.data["seasons"]["calendar"])
+
+
+# Placeholders, not an agronomic calendar: by default wet season (MT-I) on 15 Nov
+# for all rice, dry season (MT-II) on 1 Apr for irrigated rice only.
+DEFAULT_SEASONS = seasons_from(config.CURRENT)
+
+
+# ------------------------------------------------------------ template treatments
+
+
+def template_cultivars(template: FileX) -> dict[str, tuple[int, str]]:
+    """Cultivars of the template's *CULTIVARS section: CNAME -> (level, INGENO)."""
+    out = {}
+    for lv, block in template.blocks("CU").items():
+        row = next(ln for ln in block if not ln.startswith("@"))
+        out[row[13:].strip()] = (lv, row[6:12].strip())
+    return out
+
+
+def template_treatment(template: FileX, water_level: int, n_level: int, ingeno: str | None = None,
+                       name: str | None = None):
+    """The template treatment to copy for a water level (MI), N level (MF) and cultivar.
+
+    Returns ``(treatment number, overrides)``. A cultivar that the template
+    lists keeps its own cultivar level; any other cultivar takes a treatment
+    of the first matching level and the overrides ``CU.INGENO`` (and
+    ``CU.CNAME``) put its code in. When several treatments match, the last one
+    is used: in ``templates/XDRI8601.RIX`` that is the generated grid (treatments
+    12 onward), the treatments xdssat ran before the experiment file existed.
+    """
+    trt = template.treatments()
+    sel = trt[(trt.MI == water_level) & (trt.MF == n_level)]
+    if sel.empty:
+        raise ValueError(f"template has no treatment with MI {water_level} and MF {n_level}")
+    levels = {code: lv for lv, code in template_cultivars(template).values()}
+    if ingeno in levels and (sel.CU == levels[ingeno]).any():
+        return int(sel.index[sel.CU == levels[ingeno]][-1]), {}
+    over = {"CU.INGENO": ingeno} if ingeno else {}
+    if ingeno and name:
+        over["CU.CNAME"] = name
+    return int(sel.index[-1]), over
 
 
 # ------------------------------------------------------------ strata
 
 
-def strata(stats: pd.DataFrame, region_codes: dict, region: str = "Jawa",
-           zone_col: str | None = "aez") -> pd.DataFrame:
+def strata(stats: pd.DataFrame, region_codes: dict, region: str | None = None,
+           zone_col: str | None = "aez", regime: dict | None = None) -> pd.DataFrame:
     """Strata from a ``rasters.aggregate`` table with ``region`` and ``irr`` columns.
 
     ``region_codes`` maps region name to its raster code. Rice outside
     ``region`` is dropped; rice with irrigation class 0 (no MoA data) raises,
-    because the regime would be unknown.
+    because the regime would be unknown. ``region`` defaults to aoi > region and
+    ``regime`` (irrigation class -> water regime) to ``REGIME``.
     """
+    region = region or config.CURRENT.region
+    regime = REGIME if regime is None else regime
     s = stats[stats["region"] == region_codes[region]].copy()
     if (s["irr"] == 0).any():
         raise ValueError(f"{(s['irr'] == 0).sum()} strata have no irrigation class; "
                          "use the filled irrigation raster")
-    s["water"] = s["irr"].map(REGIME)
+    s["water"] = s["irr"].map(regime)
+    if s["water"].isna().any():
+        bad = sorted(s.loc[s["water"].isna(), "irr"].unique())
+        raise ValueError(f"irrigation classes {bad} have no water regime "
+                         "(treatments > water_regimes > irrigation_classes)")
     keys = ["iy", "ix", "lat", "lon"]
     out = s.groupby(keys + ["water"], as_index=False).agg(ha=("ha", "sum"))
     if zone_col and zone_col in s:
@@ -128,15 +160,15 @@ def date_in_year(season_year: int, month_day: str) -> pd.Timestamp:
 def _units(rows: list[dict], strata_df: pd.DataFrame) -> pd.DataFrame:
     u = pd.DataFrame(rows)
     u = u.merge(strata_df, on="stratum", how="left")
-    u["trno_template"] = u["water"].map(TRNO)
     return u.sort_values(["season_year", "iy", "ix", "pdate"]).reset_index(drop=True)
 
 
 # ------------------------------------------------------------ modes
 
 
-def uniform(strata_df: pd.DataFrame, years, seasons=DEFAULT_SEASONS) -> pd.DataFrame:
+def uniform(strata_df: pd.DataFrame, years, seasons=None) -> pd.DataFrame:
     """Same calendar for every stratum."""
+    seasons = seasons or DEFAULT_SEASONS
     rows = []
     for st in strata_df.itertuples():
         for y in years:
@@ -148,11 +180,12 @@ def uniform(strata_df: pd.DataFrame, years, seasons=DEFAULT_SEASONS) -> pd.DataF
 
 
 def by_zone(strata_df: pd.DataFrame, years, table: pd.DataFrame, zone_col: str = "aez",
-            seasons=DEFAULT_SEASONS) -> pd.DataFrame:
+            seasons=None) -> pd.DataFrame:
     """Calendar per zone. ``table`` has columns ``zone``, ``season``, ``month_day``.
 
     Zones absent from ``table`` use the ``month_day`` of ``seasons``.
     """
+    seasons = seasons or DEFAULT_SEASONS
     look = {(z, s): md for z, s, md in table[["zone", "season", "month_day"]].itertuples(index=False)}
     rows = []
     for st in strata_df.itertuples():
@@ -167,12 +200,13 @@ def by_zone(strata_df: pd.DataFrame, years, table: pd.DataFrame, zone_col: str =
 
 
 def per_cell(strata_df: pd.DataFrame, years, plant_days: dict[str, pd.Series],
-             seasons=DEFAULT_SEASONS) -> pd.DataFrame:
+             seasons=None) -> pd.DataFrame:
     """Planting day per cell and season, as days after the 1 Aug anchor.
 
     ``plant_days[season]`` is a Series indexed by (iy, ix). Cells missing from
     a season's Series fall back to that season's ``month_day``.
     """
+    seasons = seasons or DEFAULT_SEASONS
     rows = []
     for st in strata_df.itertuples():
         for y in years:
@@ -205,7 +239,7 @@ def dasarian_totals(dates: pd.DatetimeIndex, rain: np.ndarray):
 
 
 def onset(dates, rain, season_year: int, threshold: float = 50.0, n: int = 3) -> np.ndarray:
-    """Wet-season onset per cell for one agricultural year, as days after 1 Aug.
+    """Wet-season onset per cell for one agricultural year, as days after the year start (1 Aug).
 
     BMKG rule: the first dasarian with at least ``threshold`` mm of rain that is
     followed by ``n - 1`` more dasarian also at least ``threshold`` (BMKG
@@ -234,32 +268,41 @@ def onset_climatology(dates, rain, years, **kw) -> tuple[np.ndarray, np.ndarray]
     return per_year, med
 
 
+def _names(seasons) -> list[str]:
+    return [s.name for s in (seasons or DEFAULT_SEASONS)]
+
+
 def planting_from_onset(cells: pd.DataFrame, onset_days: np.ndarray, transplant_after: int = 20,
-                        dry_gap: int = 120) -> dict[str, pd.Series]:
-    """Planting days per cell: wet = onset + ``transplant_after``; dry = wet + ``dry_gap``.
+                        dry_gap: int = 120, seasons=None) -> dict[str, pd.Series]:
+    """Planting days per cell: the first season of the calendar (wet) = onset +
+    ``transplant_after``; each later season (dry) ``dry_gap`` days after the one before.
 
     ``transplant_after``: seedbed sown at onset, transplanted about 20 days
     later (the template transplants 23-day-old seedlings). ``dry_gap``: wet
-    season field duration plus turnaround. Both are assumptions to tune.
+    season field duration plus turnaround. Both are assumptions to tune
+    (seasons > onset in the experiment file).
     """
     idx = pd.MultiIndex.from_arrays([cells.iy.to_numpy(), cells.ix.to_numpy()])
-    wet = pd.Series(np.round(onset_days + transplant_after), index=idx)
-    return {"wet": wet, "dry": wet + dry_gap}
+    day = pd.Series(np.round(onset_days + transplant_after), index=idx)
+    out = {}
+    for k, name in enumerate(_names(seasons)):
+        out[name] = day + k * dry_gap
+    return out
 
 
 def zone_table_from_onset(cells: pd.DataFrame, zone_col: str = "aez", transplant_after: int = 20,
-                          dry_gap: int = 120, ref_year: int = 2001) -> pd.DataFrame:
+                          dry_gap: int = 120, ref_year: int = 2001, seasons=None) -> pd.DataFrame:
     """A by-zone calendar from per-cell onset: the median onset of each zone's cells.
 
-    ``cells`` has ``onset_days`` (days after 1 Aug) and ``zone_col``. Returns
-    columns zone, season, month_day, onset_days, cells (for ``by_zone``).
+    ``cells`` has ``onset_days`` (days after the year start) and ``zone_col``.
+    Returns columns zone, season, month_day, onset_days, cells (for ``by_zone``).
     """
     g = cells.dropna(subset=["onset_days"]).groupby(zone_col).onset_days.agg(["median", "size"])
     rows = []
     for z, r in g.iterrows():
-        wet = anchor_date(ref_year) + pd.Timedelta(days=int(round(r["median"])) + transplant_after)
-        dry = wet + pd.Timedelta(days=dry_gap)
-        for name, d in (("wet", wet), ("dry", dry)):
+        first = anchor_date(ref_year) + pd.Timedelta(days=int(round(r["median"])) + transplant_after)
+        for k, name in enumerate(_names(seasons)):
+            d = first + pd.Timedelta(days=k * dry_gap)
             rows.append(dict(zone=z, season=name, month_day=d.strftime("%m-%d"),
                              onset_days=r["median"], cells=int(r["size"])))
     return pd.DataFrame(rows)
