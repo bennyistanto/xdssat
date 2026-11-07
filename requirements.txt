@@ -9,6 +9,7 @@ pandas>=2.1
 xarray>=2024.1
 netCDF4>=1.6          # CF netCDF read/write backend
 cftime>=1.6
+pyyaml>=6.0           # reads the experiment files (configs/*.yml)
 
 # --- Gridded inputs (agera5.py, rasters.py, scripts/prepare_rasters.py) ------
 geopandas>=1.0
