@@ -9,8 +9,23 @@ $link-color: $xd-green;
 $body-bg: $xd-paper;
 $navbar-bg: #141714;
 $navbar-hl: $xd-orange;
+// darkly pads the navbar 1rem top and bottom, cosmo 0.5rem; use cosmo's so the header (and the
+// space above each page title) has the same height in both modes
+$navbar-padding-y: 0.5rem;
+// darkly's font is Lato, cosmo's Source Sans Pro; use cosmo's so text wraps the same in both modes
+$font-family-sans-serif: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+$web-font-path: "https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;700&display=swap";
+// darkly draws the breadcrumbs as a padded, shaded box, which moves every page title down 13 px;
+// use Bootstrap's defaults, as cosmo does
+$breadcrumb-padding-y: 0;
+$breadcrumb-padding-x: 0;
+$breadcrumb-bg: transparent;           // not null: darkly's "!default" would replace a null
+$breadcrumb-border-radius: 0;
 
 /*-- scss:rules --*/
+// In dark mode Quarto keeps the light stylesheet active and layers this one on top, so every colour the
+// light layer sets must be set here too. The light layer colours page titles and h2 with its dark ink.
+h1.title, .title.h1, h2, .h2 { color: $body-color; }
 .navbar { border-bottom: 3px solid $xd-orange; }
 .navbar-brand img { max-height: 40px; }
 h2 { border-bottom: 2px solid rgba($xd-orange, 0.35); padding-bottom: 0.2rem; }
