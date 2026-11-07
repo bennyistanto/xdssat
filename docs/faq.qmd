@@ -25,6 +25,13 @@ DSSAT one field at a time.
 No. xdssat is an independent project, not developed, endorsed or supported by the DSSAT Foundation. It uses the
 DSSAT engine as it is published. See [Acknowledgements and how to cite](acknowledgements.qmd).
 
+### Is xdssat ready to rely on?
+
+Not yet: it is experimental. So far it has been tested on one case, rice in Java, and on the examples of the
+training modules; the repository has one template experiment, for rice. Use it at your own risk, and check its
+results against your own observations before relying on them. The licence (MPL-2.0) provides it "as is", without
+warranty.
+
 ### Does xdssat change the crop models?
 
 No. It does not reimplement or patch the models: every simulated number comes from the unmodified DSSAT-CSM
