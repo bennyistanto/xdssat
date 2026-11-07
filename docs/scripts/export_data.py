@@ -241,7 +241,7 @@ def export_grid(run: Path):
 
 
 # -------------------------------------------------------------- boundaries
-# Box the admin lines are cut to: the Java AOI (rasters.AOI["java"], 105.0, -9.0, 114.7, -5.0) plus
+# Box the admin lines are cut to: the Java AOI (config.DEFAULTS aoi bbox, 105.0, -9.0, 114.7, -5.0) plus
 # 1 degree, so the cut edges fall outside every map frame (the OJS maps also clip to the frame).
 ADMIN_BOX = (104.0, -10.0, 115.7, -4.0)
 SIMPLIFY_DEG = 0.002
@@ -605,7 +605,7 @@ def export_rasters(adm1=None, adm2=None):
     import rasters  # src/rasters.py, read only
     log("100 m rasters (Java window)")
     R = CACHE / "rasters"
-    grid, _ = rasters.IDN.window(*rasters.AOI["java"])
+    grid, _ = rasters.IDN.window(*config.DEFAULTS["aoi"]["bbox"])
     region = rasters.read(R / "idn_region.tif", grid)
     jawa = int(pd.read_csv(R / "idn_region_classes.csv").set_index("name").code["Jawa"])
     share = rasters.read(R / "idn_rice.tif", grid).astype(np.float32)
@@ -685,11 +685,13 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", default="java_per_cell_1991-2020_slpf_temp_v1_tcldf19",
                     help="run folder under XDSSAT_CACHE/runs that the pages treat as current")
-    ap.add_argument("--adm1", type=Path, default=Path("F:/temp/hybrid-bias-correction/data/subset/bnd/idn_bnd_adm1.shp"))
-    ap.add_argument("--adm2", type=Path, default=Path("F:/temp/hybrid-bias-correction/data/subset/bnd/idn_bnd_adm2.shp"))
+    ap.add_argument("--adm1", type=Path, help="default <paths > boundaries>/idn_bnd_adm1.shp")
+    ap.add_argument("--adm2", type=Path, help="default <paths > boundaries>/idn_bnd_adm2.shp")
     ap.add_argument("--skip-rasters", action="store_true", help="skip the 100 m PNGs and the irrigation class table")
     ap.add_argument("--skip-cli", action="store_true", help="do not refresh the --help texts")
     a = ap.parse_args()
+    a.adm1 = a.adm1 or config.BOUNDARIES_DIR / "idn_bnd_adm1.shp"
+    a.adm2 = a.adm2 or config.BOUNDARIES_DIR / "idn_bnd_adm2.shp"
     DATA.mkdir(parents=True, exist_ok=True)
     IMAGES.mkdir(exist_ok=True)
     t0 = time.time()
