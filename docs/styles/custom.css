@@ -106,3 +106,7 @@ mjx-container[display="true"] {
   overflow-y: hidden;
   padding: 2px 0;
 }
+
+/* navbar logo: a fixed height (not only max-height) so the header has its final height before the image
+   loads; Quarto sets the page's top padding from the header height at load, and a late image left it short */
+.navbar-brand img.navbar-logo { height: 40px; width: auto; }
