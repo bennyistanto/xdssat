@@ -10,6 +10,7 @@ import pytest
 import shapely
 
 import agera5
+import config
 import rasters
 
 
@@ -99,7 +100,7 @@ def test_grid_pixel_is_one_hectare():
 
 
 def test_window_is_aligned_with_national_grid():
-    sub, win = rasters.IDN.window(*rasters.AOI["java"])
+    sub, win = rasters.IDN.window(*config.DEFAULTS["aoi"]["bbox"])
     assert (sub.left - rasters.IDN.left) % 100 == 0
     assert (rasters.IDN.top - sub.top) % 100 == 0
     assert win.col_off == (sub.left - rasters.IDN.left) / 100

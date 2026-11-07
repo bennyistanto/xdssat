@@ -42,8 +42,32 @@ def test_uniform_gives_dry_season_to_irrigated_only():
     # 2 irrigated strata x 2 seasons x 2 years + 1 rainfed x 1 season x 2 years
     assert len(u) == 10
     assert set(u[u.water == "rainfed"].season) == {"wet"}
-    assert set(u.trno_template) == {5, 11}
-    assert {"cell", "wsta", "soil_id", "pdate", "trno_template", "ha"} <= set(u.columns)
+    assert {"cell", "wsta", "soil_id", "pdate", "ha"} <= set(u.columns)
+
+
+def test_template_treatment_found_by_levels():
+    from filex import FileX
+    t = FileX.read(mg.TEMPLATE)
+    assert mg.template_cultivars(t) == {"IR 58": (1, "IB0012"), "IR 64": (2, "IB0015")}
+    # the generated grid rows (12 onward) that the runner used before the experiment file
+    assert mg.template_treatment(t, 1, 4, "IB0012") == (16, {})
+    assert mg.template_treatment(t, 3, 4, "IB0012") == (21, {})
+    assert mg.template_treatment(t, 3, 3, "IB0015") == (30, {})
+    k, over = mg.template_treatment(t, 1, 2, "IB0099", "My rice")
+    assert over == {"CU.INGENO": "IB0099", "CU.CNAME": "My rice"}
+    with pytest.raises(ValueError):
+        mg.template_treatment(t, 2, 9)
+
+
+def test_seasons_and_regime_from_experiment():
+    import config
+    exp = config.load_defaults()
+    assert mg.seasons_from(exp) == (mg.Season("wet", ("irrigated", "rainfed"), "11-15"),
+                                    mg.Season("dry", ("irrigated",), "04-01"))
+    assert exp.regime_of_class() == {1: "irrigated", 2: "irrigated", 3: "irrigated", 4: "rainfed"}
+    s = mg.strata(_stats(), {"Jawa": 2}, "Jawa", regime={1: "rainfed", 2: "rainfed", 3: "rainfed",
+                                                         4: "rainfed"})
+    assert set(s.water) == {"rainfed"}
 
 
 def test_by_zone_uses_table_and_falls_back():

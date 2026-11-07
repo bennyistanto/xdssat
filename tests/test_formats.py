@@ -1,5 +1,6 @@
 """File-format tests that do not need the engine."""
 import datetime as dt
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -228,7 +229,8 @@ def test_ic_from_soil_keeps_template_mineral_n_by_depth():
 def test_cultivar_override_changes_one_field():
     import config
     import genotype
-    if not (config.ENGINE_DIR / "Genotype" / "RICER048.CUL").exists():
+    from conftest import has_engine
+    if not has_engine or not (config.ENGINE_DIR / "Genotype" / "RICER048.CUL").exists():
         pytest.skip("engine Genotype folder not found")
     base = genotype.cultivar_text().splitlines()
     new = genotype.cultivar_text({"IB0012": {"TCLDF": 19.0}}).splitlines()
@@ -241,3 +243,29 @@ def test_cultivar_override_changes_one_field():
     assert b[end - 5:end] == " 19.0" and a[end - 5:end] == " 15.0"
     with pytest.raises(KeyError):
         genotype.cultivar_text({"XX9999": {"TCLDF": 19.0}})
+
+
+TEMPLATE = Path(__file__).resolve().parents[1] / "templates" / "XDRI8601.RIX"
+
+
+def test_environment_section_layout_and_dates_move_with_planting():
+    from filex import with_environment
+    fx = with_environment(FileX.read(TEMPLATE), {"ECO2": ("R", 550), "EMAX": ("A", 1.5)}, "co2")
+    assert (fx.treatments()["ME"] == 1).all()
+    names = [s.name for s in fx.sections]
+    assert names.index("ENVIRONMENT MODIFICATIONS") == names.index("SIMULATION CONTROLS") - 1
+    row = fx.section("ENVIRONMENT").body[1]
+    # FORMAT (I3,I5,5(1X,A1,F4.0),1X,A1,F4.0,2(1X,A1,F4.0)) (IPENV.for:1000)
+    assert row[:8] == " 1 86033"
+    pairs = [(row[9 + 6 * i], row[10 + 6 * i:14 + 6 * i]) for i in range(8)]
+    assert pairs == [("A", "   0"), ("A", "   0"), ("A", " 1.5"), ("A", "   0"), ("A", "   0"),
+                     ("R", " 550"), ("A", "   0"), ("A", "   0")]
+    units = pd.DataFrame({"cell": [1, 2], "wsta": ["GR000001", "GR000002"], "soil_id": "IBRI910002",
+                          "trno_template": 16, "pdate": pd.to_datetime(["2000-02-26", "2001-03-08"])})
+    text = build_filex(fx, units).text
+    env = text.split("*ENVIRONMENT MODIFICATIONS")[1].split("*")[0].splitlines()
+    odates = [ln[3:8] for ln in env if ln[:2].strip().isdigit()]
+    # template: SDATE 86033 is 3 days before PDATE 86036; ODATE keeps that offset for every unit
+    assert odates == [encode_date((d - pd.Timedelta(days=3)).date()) for d in units.pdate]
+    with pytest.raises(ValueError):
+        with_environment(fx, {"ECO2": ("R", 600)})       # already has environment modifications

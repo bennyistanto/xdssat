@@ -169,3 +169,41 @@ def test_rice_template_matches_source_and_rainfed_gets_no_irrigation(short_tmp):
     t5, t11 = res["tpl"].loc[5], res["tpl"].loc[11]
     assert float(t11["IRCM"]) == 0 and float(t5["IRCM"]) > 0
     assert float(t11["NICM"]) == float(t5["NICM"])        # same fertiliser
+
+
+def _template_runs(short_tmp, template, units, name):
+    write_inputs, soils = _toy_inputs()
+    d = short_tmp / name
+    d.mkdir()
+    res = run_chunk(1, units, template, write_inputs, work_root=d, soils=soils, ic_water=0.9)
+    assert len(res.failed) == 0, res.failed.get("error")
+    return res.summary.set_index("cell")[["PDAT", "ADAT", "MDAT", "HWAH", "CWAM"]].astype(float)
+
+
+def test_environment_modifications_change_the_season(short_tmp):
+    """Scenario environment: A 0 changes nothing, CO2 raises yield, warming shortens the season."""
+    from filex import with_environment
+    tpl = FileX.read(TEMPLATE)
+    units = pd.DataFrame({"cell": [1, 2], "wsta": ["GR000001", "GR000002"], "soil_id": "IBRI910002",
+                          "trno_template": 16, "pdate": pd.to_datetime(["2000-02-10", "2001-02-20"])})
+    base = _template_runs(short_tmp, tpl, units, "base")
+    same = _template_runs(short_tmp, with_environment(tpl, {"EMAX": ("A", 0)}), units, "same")
+    co2 = _template_runs(short_tmp, with_environment(tpl, {"ECO2": ("R", 700)}), units, "co2")
+    warm = _template_runs(short_tmp, with_environment(tpl, {"EMAX": ("A", 3), "EMIN": ("A", 3)}),
+                          units, "warm")
+    pd.testing.assert_frame_equal(same, base)
+    assert (co2.PDAT == base.PDAT).all() and (co2.HWAH > base.HWAH).all()
+    assert (warm.MDAT < base.MDAT).all()
+
+
+def test_cultivar_override_equals_template_cultivar_level(short_tmp):
+    """IR 64 by CU.INGENO override on cultivar level 1 = IR 64 from its own level (treatment 26)."""
+    tpl = FileX.read(TEMPLATE)
+    units = pd.DataFrame({"cell": [1], "wsta": ["GR000001"], "soil_id": "IBRI910002",
+                          "pdate": pd.to_datetime(["2000-02-10"])})
+    own = _template_runs(short_tmp, tpl, units.assign(trno_template=26), "own")
+    over = _template_runs(short_tmp, tpl, units.assign(trno_template=16, **{"CU.INGENO": "IB0015",
+                                                                           "CU.CNAME": "IR 64"}), "over")
+    ir58 = _template_runs(short_tmp, tpl, units.assign(trno_template=16), "ir58")
+    pd.testing.assert_frame_equal(over, own)
+    assert not own.equals(ir58)

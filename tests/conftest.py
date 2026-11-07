@@ -19,7 +19,10 @@ import config  # noqa: E402
 DATA = Path(ROOT.parent / "dssat-csm-data")
 
 has_data = DATA.is_dir()
-has_engine = (config.ENGINE_DIR / config.EXE_NAME).is_file()
+try:
+    has_engine = (config.ENGINE_DIR / config.EXE_NAME).is_file()
+except config.PathNotSet:              # paths > engine not set on this machine
+    has_engine = False
 
 needs_data = pytest.mark.skipif(not has_data, reason=f"fixture data not found at {DATA}")
 needs_engine = pytest.mark.skipif(not (has_data and has_engine),
