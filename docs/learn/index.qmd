@@ -1,0 +1,85 @@
+---
+title: "DSSAT itself, through xdssat"
+subtitle: "Six training modules, adapted from the International Training Program on DSSAT, with the real engine behind every chart"
+---
+
+```{ojs}
+import {withDownload} from "../assets/js/dl.js"
+```
+
+## From the case study to the whole model
+
+The [rice case study](../java/index.qmd) uses a narrow slice of DSSAT: one crop model, two water regimes, one
+cultivar and a calibration of a single soil fertility factor. DSSAT does far more: its engine carries cultivar
+files for 48 crop codes (59 files in the engine's `Genotype` folder), and it simulates phenology and growth, the water and nitrogen balance of the soil, the effect of management, and
+seasons, risks and rotations over many years. The bridge that xdssat builds between DSSAT and Python is just as
+useful for exploring all of that. The modules below do it with the course material of a DSSAT training, one
+module per training day, every exercise rebuilt in Python on top of xdssat's modules.
+
+::: {.callout-note appearance="simple"}
+**Based on the DSSAT training in Chiang Mai, 2018.** The following material is based on the DSSAT
+training I attended in Chiang Mai, Thailand, in 2018. The trainers were
+[Prof. Gerrit Hoogenboom](https://scholar.google.com/citations?hl=en&user=6t7Zm4oAAAAJ) from the University
+of Florida, USA, and [Prof. Attachai Jintrawet](https://scholar.google.com/citations?hl=en&user=HHRpPm4AAAAJ)
+from Chiang Mai University.
+:::
+
+The training ran from 27 August to 1 September 2018, as described in my
+[blog post about it](https://benny.istan.to/blog/20180911-dssat-training-in-chiang-mai-2018.html). The
+modules follow its day-by-day syllabus and its exercises. They are written for this site: the course's slides
+and exercise sheets are not reproduced. Where the course handed out data files for an exercise, the notebooks use
+them (they are in `docs/notebooks/course-data/`); everything else comes from DSSAT's openly published example
+data, [DSSAT/dssat-csm-data](https://github.com/DSSAT/dssat-csm-data). Two parts of the syllabus are handled
+differently: day 5's demonstration of a spatial decision support tool (MWCropDSS) is replaced by the sections
+"From one field to a grid: xdssat" at the end of modules 1, 2, 3 and 5, and day 6, for which no course material
+is used here, follows DSSAT's own sequence examples and documentation (module 6). The course worked in the DSSAT shell;
+here every step is code that can be read, rerun and changed:
+
+| DSSAT shell tool | Here |
+|---|---|
+| XBuild (experiment files) | `filex.FileX` and `filex.build_filex` from xdssat, or the file's sections edited in code |
+| WeatherMan (weather files) | pandas and `wth.write_wth` / `wth.read_wth` (module 2) |
+| SBuild (soil profiles) | `sol.SoilProfile`, `soils.saxton_rawls` (module 3) |
+| Sensitivity Analysis tool | one FileX with a treatment per value, `learnlib.write_cultivar_variants` |
+| GBuild (graphs) | the interactive charts on these pages, matplotlib in the notebooks |
+| GLUE (cultivar calibration) | `glue.py`, a Python port of DSSAT's GLUE method (module 3) |
+| ATCreate (observed data files) | `learnlib.write_observed` (module 4) |
+| Seasonal and Sequence analysis | multi-season runs, the engine's sequence mode and pandas (modules 5 and 6) |
+
+## Modules
+
+```{ojs}
+modules = [
+  {n: 1, day: "1", title: "Running a crop model, phenology, sensitivity, potential production", data: "Maize UFGA8201 (Gainesville 1982)", level: "potential"},
+  {n: 2, day: "2", title: "Growth processes, weather data, the DSSAT file system, cultivar coefficients", data: "Soybean UFGA7901; Griffin, Georgia weather (course data)", level: "potential"},
+  {n: 3, day: "3", title: "Calibration: GLUE and in-season data; soil data; water-limited production", data: "Soybean Williams-82, peanut UFGA8401, Colorado maize and two soil sheets (course data)", level: "water-limited"},
+  {n: 4, day: "4", title: "Creating crop measurement files; soil and plant nitrogen; N-limited production", data: "Peanut shading study 1976 (course data), maize UFGA8213", level: "water and N limited"},
+  {n: 5, day: "5", title: "Uncertainty and risk; seasonal analysis", data: "Seasonal UFGA7812, Kadoma maize N, Niger millet (course data)", level: "over many seasons"},
+  {n: 6, day: "6", title: "Cropping systems: simulating crop rotations", data: "Sequences UFGA7803 and ITHY7501", level: "over many seasons"}
+].map(d => ({...d, href: `module${d.n}.qmd`, notebook: `../notebooks/module${d.n}.ipynb`}))
+Inputs.table(modules, {columns: ["n", "day", "title", "data"], header: {n: "Module", day: "Training day", title: "Topics", data: "Example data"},
+  format: {title: t => { const m = modules.find(d => d.title === t); return htl.html`<a href="${m.href}">${t}</a>`; }}, layout: "auto"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(width, 760), height: 260, marginLeft: 70,
+  x: {label: "Production level the module adds", domain: ["potential", "water-limited", "water and N limited", "over many seasons"]},
+  y: {label: null, domain: modules.map(d => `Module ${d.n}`)},
+  marks: [Plot.cell(modules.map(d => ({m: `Module ${d.n}`, x: d.level, topics: d.title, example: d.data})),
+    {x: "x", y: "m", fill: "#3f7a34", inset: 2, rx: 4, tip: true, channels: {topics: "topics", example: "example"}})]
+}), "learn-dssat-modules")
+```
+
+Every module has a reading page (the links above) and a notebook in the [Notebooks](../notebooks/index.qmd)
+section. The pages never run the engine: their charts read the small CSV files the notebooks wrote.
+
+## What you need to run the notebooks
+
+- The DSSAT engine (`dscsm048`, version 4.8), built or installed as in [Getting started](../getting-started.md).
+- A short work folder outside OneDrive (`XDSSAT_WORK`, default `C:/TEMP/dsn/work`); the engine keeps
+  file paths in fixed-length buffers.
+- [DSSAT/dssat-csm-data](https://github.com/DSSAT/dssat-csm-data) cloned next to the xdssat folder; the
+  notebooks pin one commit.
+- A Python environment with pandas, numpy and matplotlib (the one used for xdssat), and `xlrd` for the course's
+  spreadsheets.

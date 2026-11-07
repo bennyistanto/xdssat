@@ -1,0 +1,302 @@
+[
+ {
+  "page": "learn/index",
+  "file": "index/learn-dssat-modules"
+ },
+ {
+  "page": "learn/module1",
+  "file": "module1/module1-csm-modules"
+ },
+ {
+  "page": "learn/module1",
+  "file": "module1/module1-sim-vs-obs-Grain-yield-kg-ha"
+ },
+ {
+  "page": "learn/module1",
+  "file": "module1/module1-growth-CWAD"
+ },
+ {
+  "page": "learn/module1",
+  "file": "module1/module1-thermal-time-function"
+ },
+ {
+  "page": "learn/module1",
+  "file": "module1/module1-thermal-time-1982"
+ },
+ {
+  "page": "learn/module1",
+  "file": "module1/module1-cropgro-temperature"
+ },
+ {
+  "page": "learn/module1",
+  "file": "module1/module1-potential-vs-treatments"
+ },
+ {
+  "page": "learn/module1",
+  "file": "module1/module1-cultivars-LAID"
+ },
+ {
+  "page": "learn/module1",
+  "file": "module1/module1-planting-26Feb"
+ },
+ {
+  "page": "learn/module1",
+  "file": "module1/module1-planting-dates-phenology"
+ },
+ {
+  "page": "learn/module1",
+  "file": "module1/module1-P1-250-grain"
+ },
+ {
+  "page": "learn/module1",
+  "file": "module1/module1-P1-response"
+ },
+ {
+  "page": "learn/module1",
+  "file": "module1/module1-grid-len_wet_irrigated"
+ },
+ {
+  "page": "learn/module1",
+  "file": "module1/module1-grid-length-vs-tmin"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-sim-vs-obs-Seed-yield-kg-ha"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-carbon-balance-irrigated"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-partitioning-irrigated"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-growth-LAID"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-light-interception"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-water-stress"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-co2-response"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-weather-T"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-griffin-1993-T"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-griffin-maize"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-weather-scenarios-rainfed"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-experiments-per-crop"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-photoperiod-response"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-mg-exercise-GWAD"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-mg-planting-R1_dap"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-SFDUR-GWAD"
+ },
+ {
+  "page": "learn/module2",
+  "file": "module2/module2-grid-srada_wet_irrigated"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-glue-1-CSDL"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-glue-eval-MDAP"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-colorado-ADAP"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-peanut-GWAD"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-soil-IBMZ910014"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-soil-paw"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-saxton-rawls"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-production-levels"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-runoff-cn60"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-water-stress-factors"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-soil-water-rainfed"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-water-stress"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-yield-vs-paw"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-auto-irrigation-HWAM"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-gainesville-years"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-paddy-flood-depth"
+ },
+ {
+  "page": "learn/module3",
+  "file": "module3/module3-grid-paw_mm"
+ },
+ {
+  "page": "learn/module4",
+  "file": "module4/module4-shade-PWAD"
+ },
+ {
+  "page": "learn/module4",
+  "file": "module4/module4-one-to-one-CWAD"
+ },
+ {
+  "page": "learn/module4",
+  "file": "module4/module4-shade-window-189-0.25"
+ },
+ {
+  "page": "learn/module4",
+  "file": "module4/module4-shade-loss"
+ },
+ {
+  "page": "learn/module4",
+  "file": "module4/module4-n-balance"
+ },
+ {
+  "page": "learn/module4",
+  "file": "module4/module4-no3-4"
+ },
+ {
+  "page": "learn/module4",
+  "file": "module4/module4-soil-n-4"
+ },
+ {
+  "page": "learn/module4",
+  "file": "module4/module4-plant-n-NSTD"
+ },
+ {
+  "page": "learn/module4",
+  "file": "module4/module4-n-fixation"
+ },
+ {
+  "page": "learn/module4",
+  "file": "module4/module4-som-models"
+ },
+ {
+  "page": "learn/module4",
+  "file": "module4/module4-n-response-HWAM"
+ },
+ {
+  "page": "learn/module4",
+  "file": "module4/module4-n-stress-100"
+ },
+ {
+  "page": "learn/module4",
+  "file": "module4/module4-n-soils"
+ },
+ {
+  "page": "learn/module5",
+  "file": "module5/module5-ufga-climate"
+ },
+ {
+  "page": "learn/module5",
+  "file": "module5/module5-seasonal-HWAM"
+ },
+ {
+  "page": "learn/module5",
+  "file": "module5/module5-margin-cdf"
+ },
+ {
+  "page": "learn/module5",
+  "file": "module5/module5-mean-sd"
+ },
+ {
+  "page": "learn/module5",
+  "file": "module5/module5-certainty-equivalent-0"
+ },
+ {
+  "page": "learn/module5",
+  "file": "module5/module5-kadoma-rain"
+ },
+ {
+  "page": "learn/module5",
+  "file": "module5/module5-kadoma-1977-78"
+ },
+ {
+  "page": "learn/module5",
+  "file": "module5/module5-kadoma-best-rate"
+ },
+ {
+  "page": "learn/module5",
+  "file": "module5/module5-kadoma-n-lost"
+ },
+ {
+  "page": "learn/module5",
+  "file": "module5/module5-niger-yields"
+ },
+ {
+  "page": "learn/module5",
+  "file": "module5/module5-grid-wet_rainfed-cv"
+ },
+ {
+  "page": "learn/module6",
+  "file": "module6/module6-yields-Hyderabad-soybean-chickpea-fallow"
+ },
+ {
+  "page": "learn/module6",
+  "file": "module6/module6-hyderabad-OCAM"
+ }
+]

@@ -1,0 +1,97 @@
+---
+title: "Acknowledgements and how to cite"
+description: "xdssat is an independent project built on DSSAT. What it uses, who made it, and how to cite it."
+---
+
+::: {.callout-important appearance="simple"}
+**xdssat is not part of DSSAT.** It is an independent, open-source project. It is not developed, endorsed or
+supported by the DSSAT Foundation or the DSSAT development team. The names DSSAT and DSSAT-CSM appear on this
+site only to say which software xdssat works with. Questions about xdssat belong in
+[its issue tracker](https://github.com/bennyistanto/xdssat/issues), not with the DSSAT team.
+:::
+
+## DSSAT
+
+xdssat would not exist without DSSAT, the Decision Support System for Agrotechnology Transfer. It is developed
+and maintained by the [DSSAT Foundation](https://dssat.net) and the many scientists who have contributed to it
+over the years [@hoogenboom2026; @boote2025; @hoogenboom2019; @jones2003]. Every simulated number on this site
+comes from the DSSAT-CSM engine. xdssat does not reimplement the crop models: it writes the engine's own input
+files, runs the engine, and reads its output files.
+
+What xdssat uses from DSSAT, and on what terms:
+
+| From DSSAT | How xdssat uses it | Terms |
+|---|---|---|
+| [dssat-csm-os](https://github.com/DSSAT/dssat-csm-os), the source code of the engine | `scripts/build_engine.py` builds the engine `dscsm048` from an unmodified checkout. xdssat does not include or redistribute the engine or its source. Version used here: 4.8.6.4 (commit 25c93b9a) | [BSD-3-Clause](https://github.com/DSSAT/dssat-csm-os/blob/develop/license.txt), copyright DSSAT Foundation |
+| [dssat-csm-data](https://github.com/DSSAT/dssat-csm-data), the example experiments, weather, soil and genotype files | The tests and the training notebooks read them from a separate checkout next to this repository | The repository does not state a licence of its own |
+| [GLUE](https://github.com/DSSAT/glue), the calibration tool | Module 3 uses a Python port of its method (`docs/notebooks/glue.py`), with links to the R code it follows (commit e86093e) | [BSD-3-Clause](https://github.com/DSSAT/glue/blob/develop/license.txt), copyright DSSAT Foundation |
+
+The BSD-3-Clause licence of the engine and of GLUE asks that the name of the copyright holder and of its
+contributors not be used to endorse or promote derived products without permission. Nothing on this site should
+be read as such an endorsement.
+
+## The training material
+
+The [DSSAT training](learn/index.qmd) section is based on the DSSAT training held in Chiang Mai, Thailand, in
+2018. The trainers were Prof. Gerrit Hoogenboom of the University of Florida and Prof. Attachai Jintrawet of
+Chiang Mai University. The modules follow its syllabus and exercises but are written for this site. The
+course's slides and exercise sheets belong to their authors and are not reproduced or published here. The
+data files the course handed out for its exercises are used in the notebooks (`docs/notebooks/course-data/`).
+
+## Data of the case study
+
+The [rice case study](java/index.qmd) uses these data sets. Full details, including versions and
+processing, are on the [Data page](java/data.qmd).
+
+| Data | Provider |
+|---|---|
+| AgERA5 daily agrometeorological indicators | Copernicus Climate Change Service, ECMWF [@agera5] |
+| SoilGrids 2.0 | ISRIC - World Soil Information [@poggio2021] |
+| District rice statistics (BDSP) | Ministry of Agriculture of the Republic of Indonesia, from BPS [@bdsp] |
+| Rice field and irrigation maps, agro-ecological zones, soil map | ATR/BPN, Ministry of Agriculture, BBSDLP (see the [Data page](java/data.qmd)) |
+
+## Software
+
+The site is built with [Quarto](https://quarto.org). Its charts and maps use
+[Observable Plot](https://observablehq.com/plot/) and [D3](https://d3js.org), and its equations
+[MathJax](https://www.mathjax.org). The Python side relies on NumPy, pandas, xarray and rasterio, among others
+(`environment.yml`).
+
+## How to cite
+
+If you publish results produced with xdssat, cite DSSAT as the DSSAT Foundation asks on its
+[How to cite DSSAT](https://dssat.net/how-to-cite-dssat/) page: give the DSSAT version you used (it is printed at
+the top of every engine output file) and cite the references below. Then cite xdssat itself, with the commit or
+release you used.
+
+DSSAT, as listed by the DSSAT Foundation:
+
+- Hoogenboom, G., et al. (2026). *Decision Support System for Agrotechnology Transfer (DSSAT) Version 4.8.6.*
+  DSSAT Foundation, Gainesville, Florida, USA. <https://dssat.net>
+- Boote, K. J., et al. (2025). The Decision Support System for Agrotechnology Transfer (DSSAT) crop modeling
+  ecosystem: evolution and advances. In G. Hoogenboom (Ed.), *Current Crop Models: State-of-the-Art and Future
+  Developments* (pp. 3-63). Burleigh Dodds Science Publishing. <https://doi.org/10.19103/AS.2025.0155.01>
+- Hoogenboom, G., et al. (2019). The DSSAT crop modeling ecosystem. In K. J. Boote (Ed.), *Advances in Crop
+  Modelling for a Sustainable Agriculture* (pp. 173-216). Burleigh Dodds Science Publishing.
+  <https://doi.org/10.19103/AS.2019.0061.10>
+- Jones, J. W., et al. (2003). The DSSAT cropping system model. *European Journal of Agronomy*, 18(3-4),
+  235-265. <https://doi.org/10.1016/S1161-0301(02)00107-7>
+
+The full author lists are in the references below and on the DSSAT page.
+
+xdssat:
+
+```text
+Istanto, B. (2026). xdssat: gridded crop simulation with the DSSAT-CSM engine, driven from Python. Version <commit or release>. https://github.com/bennyistanto/xdssat
+```
+
+## License
+
+xdssat is released under the [Mozilla Public License 2.0](https://github.com/bennyistanto/xdssat/blob/main/LICENSE).
+That licence covers xdssat's own code and documentation only, not DSSAT, its data or the data sets above, which
+keep their own terms.
+
+## References {.unnumbered}
+
+::: {#refs}
+:::

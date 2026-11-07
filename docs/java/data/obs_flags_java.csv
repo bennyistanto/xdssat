@@ -1,0 +1,28 @@
+rule,province,n
+area_production_inconsistent (area),Banten,1
+area_production_inconsistent (area),DKI Jakarta,4
+area_production_inconsistent (area),Jawa Barat,3
+area_production_inconsistent (area),Jawa Tengah,1
+area_production_inconsistent (area),Jawa Timur,13
+area_production_inconsistent (production),Banten,1
+area_production_inconsistent (production),DKI Jakarta,4
+area_production_inconsistent (production),Jawa Barat,3
+area_production_inconsistent (production),Jawa Tengah,1
+area_production_inconsistent (production),Jawa Timur,13
+column_constant_placeholder,DKI Jakarta,7
+implausible_range,Banten,1
+implausible_range,Jawa Tengah,1
+implausible_range,Jawa Timur,2
+outlier_vs_district,DKI Jakarta,1
+outlier_vs_district,Jawa Timur,6
+yield_disagrees_with_production_over_area,Banten,1
+yield_disagrees_with_production_over_area,DI Yogyakarta,4
+yield_disagrees_with_production_over_area,DKI Jakarta,2
+yield_disagrees_with_production_over_area,Jawa Barat,6
+yield_disagrees_with_production_over_area,Jawa Tengah,29
+yield_disagrees_with_production_over_area,Jawa Timur,29
+yield_from_production_over_area,Banten,32
+yield_from_production_over_area,DKI Jakarta,19
+yield_from_production_over_area,Jawa Barat,3
+yield_from_production_over_area,Jawa Tengah,36
+yield_from_production_over_area,Jawa Timur,296

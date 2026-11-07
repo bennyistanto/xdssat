@@ -1,0 +1,19 @@
+/*-- scss:defaults --*/
+// xdssat dark theme, layered on Bootswatch "darkly", same logo colours lightened for dark backgrounds.
+$xd-orange: #fdbd56;
+$xd-green: #8cc37a;
+$xd-paper: #1c201d;
+
+$primary: $xd-green;
+$link-color: $xd-green;
+$body-bg: $xd-paper;
+$navbar-bg: #141714;
+$navbar-hl: $xd-orange;
+
+/*-- scss:rules --*/
+.navbar { border-bottom: 3px solid $xd-orange; }
+.navbar-brand img { max-height: 40px; }
+h2 { border-bottom: 2px solid rgba($xd-orange, 0.35); padding-bottom: 0.2rem; }
+.callout-note { border-left-color: $xd-green !important; }
+.track-card { border-top: 4px solid $xd-orange; }
+.kpi .v { color: $xd-orange; }

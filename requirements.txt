@@ -1,0 +1,29 @@
+# xdssat - Python dependencies
+# Install with: pip install -r requirements.txt
+# The DSSAT engine (dscsm048) is not a Python package. Build it with
+# scripts/build_engine.py (needs gfortran, cmake and make on PATH).
+
+# --- Mandatory ---------------------------------------------------------------
+numpy>=1.26
+pandas>=2.1
+xarray>=2024.1
+netCDF4>=1.6          # CF netCDF read/write backend
+cftime>=1.6
+
+# --- Gridded inputs (agera5.py, rasters.py, scripts/prepare_rasters.py) ------
+geopandas>=1.0
+pyogrio>=0.7          # fast GeoPackage / shapefile reading
+shapely>=2.0
+pyproj>=3.6
+rasterio>=1.3
+scipy>=1.11           # nearest valid weather cell
+openpyxl>=3.1         # reading the LBS province table
+
+# --- Optional ----------------------------------------------------------------
+# Tests
+pytest>=8.0
+# Larger-than-memory inputs and parallel I/O
+dask>=2024.1
+# Notebooks and plots
+jupyterlab>=4.0
+matplotlib>=3.8

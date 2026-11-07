@@ -1,0 +1,8 @@
+section,text
+TREATMENTS,"*TREATMENTS                        -------------FACTOR LEVELS------------
+@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM
+ 1 1 0 0 SOYBEAN                    1  1  0  1  1  0  1  0  0  0  0  0  1
+ 1 2 0 0 CHICKPEA                   2  1  0  0  2  0  0  0  0  0  0  0  2
+ 1 3 0 0 FALLOW                     3  1  0  0  0  0  0  0  0  0  0  1  3
+ 2 1 0 0 SOYBEAN                    1  1  0  1  1  0  1  0  0  0  0  0  1
+ 2 2 0 0 FALLOW                     3  1  0  0  0  0  0  0  0  0  0  1  3"

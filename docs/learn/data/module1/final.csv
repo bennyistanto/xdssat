@@ -1,0 +1,31 @@
+TRNO,treatment,variable,simulated,observed,sim/obs
+1,Rainfed Low Nitrogen,"Grain yield, kg/ha",2293.0,2929.0,0.783
+1,Rainfed Low Nitrogen,"Tops weight, kg/ha",6556.0,5532.0,1.185
+1,Rainfed Low Nitrogen,"LAI, maximum",1.989,2.26,0.88
+1,Rainfed Low Nitrogen,"Anthesis, DAP",76.0,75.0,1.013
+1,Rainfed Low Nitrogen,"Maturity, DAP",128.0,128.0,1.0
+2,Rainfed High Nitrogen,"Grain yield, kg/ha",2293.0,3130.0,0.733
+2,Rainfed High Nitrogen,"Tops weight, kg/ha",7538.0,7201.0,1.047
+2,Rainfed High Nitrogen,"LAI, maximum",3.274,2.84,1.153
+2,Rainfed High Nitrogen,"Anthesis, DAP",76.0,75.0,1.013
+2,Rainfed High Nitrogen,"Maturity, DAP",128.0,128.0,1.0
+3,Irrigated Low Nitrogen,"Grain yield, kg/ha",8207.0,6850.0,1.198
+3,Irrigated Low Nitrogen,"Tops weight, kg/ha",14578.0,14581.0,1.0
+3,Irrigated Low Nitrogen,"LAI, maximum",2.507,3.26,0.769
+3,Irrigated Low Nitrogen,"Anthesis, DAP",76.0,75.0,1.013
+3,Irrigated Low Nitrogen,"Maturity, DAP",128.0,128.0,1.0
+4,Irrigated High Nitrogen,"Grain yield, kg/ha",11854.0,11881.0,0.998
+4,Irrigated High Nitrogen,"Tops weight, kg/ha",22454.0,22001.0,1.021
+4,Irrigated High Nitrogen,"LAI, maximum",4.548,4.09,1.112
+4,Irrigated High Nitrogen,"Anthesis, DAP",76.0,75.0,1.013
+4,Irrigated High Nitrogen,"Maturity, DAP",128.0,128.0,1.0
+5,Veg Stress Low Nitrogen,"Grain yield, kg/ha",7718.0,6375.0,1.211
+5,Veg Stress Low Nitrogen,"Tops weight, kg/ha",13458.0,12002.0,1.121
+5,Veg Stress Low Nitrogen,"LAI, maximum",2.507,2.76,0.908
+5,Veg Stress Low Nitrogen,"Anthesis, DAP",76.0,75.0,1.013
+5,Veg Stress Low Nitrogen,"Maturity, DAP",128.0,128.0,1.0
+6,Veg Stress High Nitrogen,"Grain yield, kg/ha",10293.0,9344.0,1.102
+6,Veg Stress High Nitrogen,"Tops weight, kg/ha",19234.0,17146.0,1.122
+6,Veg Stress High Nitrogen,"LAI, maximum",4.031,3.7,1.089
+6,Veg Stress High Nitrogen,"Anthesis, DAP",76.0,75.0,1.013
+6,Veg Stress High Nitrogen,"Maturity, DAP",128.0,128.0,1.0

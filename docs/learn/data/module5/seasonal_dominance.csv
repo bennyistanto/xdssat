@@ -1,0 +1,11 @@
+row,rainfed,auto 10%,auto 20%,auto 30%,auto 40%,auto 50%,auto 60%,auto 70%,auto 80%,auto 90%
+rainfed,false,false,false,false,false,false,false,false,false,false
+auto 10%,false,false,false,false,false,false,false,false,false,false
+auto 20%,false,false,false,false,false,false,false,false,false,false
+auto 30%,false,false,false,false,false,false,false,false,false,false
+auto 40%,false,false,true,false,false,false,false,false,false,false
+auto 50%,false,false,true,false,false,false,false,false,false,true
+auto 60%,false,false,false,false,false,false,false,false,false,false
+auto 70%,false,false,false,false,false,false,false,false,false,false
+auto 80%,false,false,false,false,false,false,false,false,false,true
+auto 90%,false,false,false,false,false,false,false,false,false,false

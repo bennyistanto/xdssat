@@ -1,0 +1,174 @@
+---
+title: "How xdssat differs from common DSSAT use"
+subtitle: "From one field and one weather station to every rice cell of an island, with the engine unchanged"
+---
+
+```{ojs}
+import {withDownload, adminMarks, cellFeatures, fmt} from "../assets/js/dl.js"
+summary = FileAttachment("../java/data/summary.json").json()
+runs = FileAttachment("../java/data/runs.json").json()
+cells = FileAttachment("../java/data/grid_cells.csv").csv({typed: true})
+outline = FileAttachment("../java/data/java_outline.geojson").json()
+provinces = FileAttachment("../java/data/provinces.geojson").json()
+districtsGeo = FileAttachment("../java/data/districts.geojson").json()
+grid = FileAttachment("../java/data/grid_yearly.json").json()
+schema = FileAttachment("../java/data/nc_schema.csv").csv()
+ncAttrs = FileAttachment("../java/data/nc_attrs.json").json()
+cur = summary.current
+mapW = Math.min(width, 960)
+```
+
+## Side by side
+
+| | Common DSSAT use | xdssat |
+|---|---|---|
+| Unit of simulation | A field experiment: one plot, a few treatments | One stratum = one 0.1° weather cell x one water regime, one treatment per season |
+| Weather | One station file, often typed in or converted by hand | One `.WTH` per cell, written from the AgERA5 cache (`src/wth.py`) |
+| Soil | A profile picked from a DSSAT soil file (WISE, local survey) | One profile per cell built from SoilGrids 2.0 (`src/soils.py`) |
+| Management | The experiment's own FileX, edited in the DSSAT shell or XBuild | A template FileX; every unit copies one treatment and shifts all its dates (`src/filex.py`) |
+| Planting date | Fixed by the experiment | Per cell from rainfall onset, per zone, or uniform (`src/management.py`) |
+| Running | The DSSAT shell, one batch, one process | Chunks of up to `--chunk-size` units, each its own folder and `dscsm048` process, `--workers` in parallel (`src/runner.py`) |
+| Failures | The batch stops at the first fatal input error | The failing unit is named from `ERROR.OUT`, dropped, the rest rerun; listed in `failed.csv` |
+| Output | `.OUT` text files and `summary.csv` per run | `summary.csv` joined to the strata, then a CF-1.10 netCDF on the weather grid (`src/outputs.py`) |
+| Area | Results per hectare of the plot | Every result carries the rice ha it stands for, so regional totals are sums |
+
+The engine itself is not touched: xdssat builds or reuses the stock DSSAT-CSM 4.8 executable
+[@jones2003; @dssatcsmos] and talks to it only through its own text files.
+
+## Gridding: 100 m pixels to 0.1° weather cells to strata
+
+Rice fields, irrigation class, province, district and zone are burned onto one 100 m equal-area grid
+(ESRI:54034), where one pixel is one hectare. Each pixel goes to the AgERA5 cell that holds its centre. Within
+a cell all rice shares one weather series and one soil profile, so the only split that changes the simulation
+is the water regime: a cell has an irrigated stratum, a rain-fed stratum, or both.
+
+```{ojs}
+strataCount = d3.rollups(cells, v => v.length, d => (d.ha_irrigated > 0 ? "irrigated" : "") + (d.ha_irrigated > 0 && d.ha_rainfed > 0 ? " + " : "") + (d.ha_rainfed > 0 ? "rain-fed" : ""))
+  .map(([k, n]) => ({strata: k, cells: n}))
+strataText = strataCount.map(d => `${fmt.int(d.cells)} cells with ${d.strata}`).join(", ")
+```
+
+For the current run: ${fmt.int(cur.cells)} cells and ${fmt.int(cur.strata)} strata
+: ${strataText}.
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(width, 760), height: 300, marginLeft: 55,
+  x: {type: "log", label: "Rice area in the cell, ha (log scale)", grid: true},
+  y: {label: "Cells", grid: true},
+  color: {legend: true},
+  marks: [
+    Plot.rectY(cells.map(d => ({ha: d.ha, kind: d.ha_irrigated > 0 && d.ha_rainfed > 0 ? "both regimes" : d.ha_irrigated > 0 ? "irrigated only" : "rain-fed only"})),
+      Plot.binX({y: "count"}, {x: "ha", fill: "kind", thresholds: d3.ticks(0, 4.2, 30).map(v => 10 ** v), tip: true})),
+    Plot.ruleY([0])
+  ]
+}), "xdssat-cells-rice-ha-histogram")
+```
+
+The rice area per cell spans several orders of magnitude, so weighting matters: a cell with a few hectares of
+rice should not count as much as one with ten thousand. Every stratum carries its hectares into the outputs.
+
+## Data preparation: netCDF and GeoTIFF to WTH, SOL and FileX
+
+```{mermaid}
+%%{init: {"theme": "neutral"}}%%
+flowchart TB
+  A1["AgERA5 netCDF<br/>global, per variable-year"] -->|build_agera5_cache.py| B1["agera5/idn/VAR/<br/>int16, DSSAT units"]
+  A2["SoilGrids VRT + tiles<br/>250 m"] -->|build_soilgrids_cache.py| B2["soilgrids/idn/*.tif"]
+  A3["Rice, irrigation, zones,<br/>districts: polygons"] -->|prepare_rasters.py| B3["rasters/idn_*.tif<br/>100 m, 1 px = 1 ha"]
+  B2 -->|prepare_soils.py| B4["soils/java.SOL<br/>1 profile per cell"]
+  B3 --> B4
+  B3 -->|run_aoi.py| C1["strata.csv<br/>cell x water regime, ha"]
+  C1 --> C2["units.csv<br/>one row per season"]
+  B1 --> C3
+  B4 --> C3
+  C2 --> C3["chunk folders:<br/>FileX + WTH + SOIL.SOL"]
+  C3 --> C4["dscsm048 x workers"]
+  C4 --> C5["summary.csv + failed.csv"]
+  C5 -->|outputs.py| C6["run .nc, CF-1.10"]
+```
+
+- **Weather**: per cell, a seven-digit-date `.WTH` file covering all years, so one file serves every season
+  (`src/wth.py`; `TAV` and `AMP` computed from the series).
+- **Soil**: `SOIL.SOL` in each chunk folder holds exactly the profiles that chunk uses; the engine looks there
+  first (`src/sol.py`).
+- **FileX**: one experiment per chunk, one treatment per cell-season. Field, weather station, soil ID and every
+  date of the template treatment change; identical levels are written once (`src/filex.py`).
+
+## Chunked parallel runs
+
+A chunk is one folder, one FileX with up to `--chunk-size` treatments, one `dscsm048` process. DSSAT clears its
+fixed-name output files at start-up, so each process needs its own folder; and a fatal input error stops the
+whole FileX, so the runner finds the culprit in `ERROR.OUT`, removes it and reruns the rest. The table lists
+every run folder in the cache.
+
+```{ojs}
+Inputs.table(runs, {
+  columns: ["run", "status", "mode", "cultivar", "n", "slpf", "slpf_rainfed", "slpf_table", "tcldf", "seasons", "failed", "minutes", "workers", "chunk_size", "nc_mb"],
+  header: {run: "Run", status: "Status", mode: "Mode", cultivar: "Cultivar", n: "N kg/ha", slpf: "SLPF", slpf_rainfed: "SLPF rain-fed", slpf_table: "SLPF table", tcldf: "TCLDF", seasons: "Seasons", failed: "Failed", minutes: "Minutes", workers: "Workers", chunk_size: "Chunk", nc_mb: "netCDF MB"},
+  format: {seasons: fmt.int}, layout: "auto", rows: 10})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(width, 760), height: 40 + runs.length * 28, marginLeft: 260,
+  x: {label: "Wall time, minutes", grid: true},
+  y: {label: null},
+  marks: [
+    Plot.barX(runs, {y: "run", x: "minutes", fill: d => d.current ? "#2a7f62" : "#9bb8ad", tip: true, channels: {seasons: "seasons", failed: "failed"}, sort: {y: "x"}})
+  ]
+}), "xdssat-run-times")
+```
+
+::: {.source-note}
+From each run's `run_info.json`. Status labels: "current" is the run the site is exported from; the others are
+labelled in `export_data.py` from `HANDOFF.md` (runs made before the initial soil-N fix are stale).
+:::
+
+## CF netCDF output
+
+Each run ends with one netCDF file on the AgERA5 grid, dimensions `(system, time, lat, lon)`. A *system* is a
+season and water regime that was simulated (`wet_irrigated`, `wet_rainfed`, `dry_irrigated`), so no slab is
+empty by construction: rain-fed rice has no dry season. `time` is 1 August of each agricultural year; the
+actual dates are variables. Area variables make regional totals a plain sum: the mean yield of any region is
+`production.sum() / harvested_area.sum() * 1000` kg/ha.
+
+```{ojs}
+viewof ncSys = Inputs.radio(new Map(Object.keys(grid.systems).map(k => [k.replace("_", ", "), k])), {value: Object.keys(grid.systems)[0], label: "system"})
+viewof ncYear = Inputs.range([d3.min(grid.years), d3.max(grid.years)], {step: 1, value: d3.max(grid.years), label: "time (season year)"})
+```
+
+```{ojs}
+{
+  const t = grid.years.indexOf(ncYear);
+  const vals = grid.systems[ncSys][t];
+  const rows = grid.lat.map((lat, i) => ({lat, lon: grid.lon[i], v: vals[i]})).filter(d => d.v != null);
+  const meanY = d3.mean(rows, d => d.v);
+  return withDownload(Plot.plot({
+    width: mapW, height: Math.round(mapW * 0.42),
+    projection: {type: "mercator", domain: outline},
+    caption: `yield[system=${ncSys}, time=${ncYear}-08-01], ${grid.run}; ${rows.length} cells, unweighted cell mean ${fmt.int(meanY)} kg/ha`,
+    color: {type: "linear", scheme: "YlGn", domain: [2000, 7000], clamp: true, legend: true, label: "yield (HWAH), kg/ha dry matter"},
+    marks: [
+      Plot.geo(provinces, {fill: "#f1f1f1", clip: true}),
+      Plot.geo(cellFeatures(rows).features, Plot.centroid({fill: d => d.properties.v, title: d => `${fmt.int(d.properties.v)} kg/ha`, tip: true})),
+      ...adminMarks(Plot, provinces, districtsGeo)
+    ]
+  }), `xdssat-nc-yield-${ncSys}-${ncYear}`);
+}
+```
+
+The variables in the file (read from the current run's netCDF by `export_data.py`):
+
+```{ojs}
+Inputs.table(schema, {columns: ["name", "kind", "dims", "dtype", "units", "long_name", "standard_name"], rows: 30, layout: "auto"})
+```
+
+```{ojs}
+Inputs.table(Object.entries(ncAttrs).map(([k, v]) => ({attribute: k, value: v})), {rows: 20, layout: "auto", width: {value: 600}})
+```
+
+## References {.unnumbered}
+
+::: {#refs}
+:::

@@ -1,0 +1,7 @@
+TRNO,season,regime,HWAM,PRCM,IRCM,ROCM,DRCM,ETCM,days_to_maturity,flood_days,flood_mean,flood_evap,infiltration,over_bund,WSPD,WSGD
+1,dry season,"flooded, 50 mm kept",8939,13,784,0,178,577,89,91,46.233,151.2,596.8,0.0,0.0,0.0
+2,dry season,"flooded, drained twice",8939,13,859,75,178,577,89,91,44.17,151.2,596.8,75.0,0.0,0.0
+3,dry season,"rainfed, bunded",8760,834,0,0,458,463,161,1,0.014,0.0,834.0,0.0,0.329,0.36
+4,wet season,"flooded, 50 mm kept",8876,1109,77,317,198,541,97,100,99.624,153.0,582.4,317.3,0.0,0.0
+5,wet season,"flooded, drained twice",8876,1109,241,481,198,541,97,100,78.64,153.0,582.4,481.0,0.0,0.0
+6,wet season,"rainfed, bunded",8876,1109,0,258,196,538,97,99,100.369,149.4,581.5,258.2,0.0,0.0

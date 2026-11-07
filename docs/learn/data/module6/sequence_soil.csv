@@ -1,0 +1,62 @@
+sequence,year,OCAM_median,OCAM_p10,OCAM_p90,ONAM_median,NIAM_median
+Gainesville: dry bean - fallow,1978,38697.0,38674.8,38712.2,3857.5,13.5
+Gainesville: dry bean - fallow,1979,38334.5,38294.2,38371.0,3817.0,15.0
+Gainesville: dry bean - fallow,1980,37987.5,37943.0,38014.2,3779.0,14.0
+Gainesville: dry bean - fallow,1981,37647.5,37600.7,37689.1,3741.0,14.0
+Gainesville: dry bean - fallow,1982,37310.5,37253.5,37357.5,3703.0,13.0
+Gainesville: soybean - fallow,1978,38834.5,38801.3,38877.8,3863.0,18.0
+Gainesville: soybean - fallow,1979,38585.0,38548.4,38641.6,3828.0,19.0
+Gainesville: soybean - fallow,1980,38350.5,38302.6,38403.4,3794.0,17.0
+Gainesville: soybean - fallow,1981,38119.5,38043.6,38191.7,3760.5,17.0
+Gainesville: soybean - fallow,1982,37847.0,37807.1,37949.1,3725.0,17.0
+Hyderabad: soybean - chickpea - fallow,1975,91733.0,91635.4,91741.8,9163.0,113.0
+Hyderabad: soybean - chickpea - fallow,1976,91983.0,91059.0,92107.0,9183.5,71.0
+Hyderabad: soybean - chickpea - fallow,1977,90807.5,90530.9,91067.9,9058.0,76.0
+Hyderabad: soybean - chickpea - fallow,1978,89772.0,88599.8,90073.6,8945.0,79.0
+Hyderabad: soybean - chickpea - fallow,1979,88660.5,87949.1,89022.0,8828.0,83.0
+Hyderabad: soybean - chickpea - fallow,1980,87537.5,86242.5,87860.5,8709.5,77.5
+Hyderabad: soybean - chickpea - fallow,1981,86582.0,85561.8,86845.2,8609.0,77.0
+Hyderabad: soybean - chickpea - fallow,1982,85304.0,84355.9,85799.0,8475.0,82.5
+Hyderabad: soybean - chickpea - fallow,1983,84533.5,84208.8,84900.2,8390.0,70.0
+Hyderabad: soybean - chickpea - fallow,1984,83466.0,82500.9,83754.6,8274.0,74.0
+Hyderabad: soybean - chickpea - fallow,1985,82460.0,81610.4,82862.2,8169.0,72.0
+Hyderabad: soybean - chickpea - fallow,1986,81557.5,80655.8,81785.0,8071.0,74.0
+Hyderabad: soybean - chickpea - fallow,1987,80559.5,79692.9,80857.1,7965.0,71.5
+Hyderabad: soybean - chickpea - fallow,1988,79545.0,78593.0,79952.8,7854.0,68.0
+Hyderabad: soybean - chickpea - fallow,1989,78578.0,77305.8,79011.8,7752.0,69.0
+Hyderabad: soybean - chickpea - fallow,1990,77604.0,76574.1,78063.6,7649.0,69.0
+Hyderabad: soybean - chickpea - fallow,1991,76288.0,75623.2,77212.2,7520.0,73.0
+Hyderabad: soybean - chickpea - fallow,1992,75841.0,74440.0,76381.0,7468.0,68.0
+Hyderabad: soybean - chickpea - fallow,1993,74786.0,73879.3,75410.3,7352.5,62.5
+Hyderabad: soybean - chickpea - fallow,1994,73678.0,72981.0,74556.0,7240.5,72.0
+Hyderabad: soybean - chickpea - fallow,1995,73067.0,71671.5,73782.6,7171.5,61.5
+Hyderabad: soybean - chickpea - fallow,1996,72260.0,71786.0,72998.4,7084.0,61.0
+Hyderabad: soybean - chickpea - fallow,1997,71238.0,70325.7,72038.3,6974.0,64.0
+Hyderabad: soybean - chickpea - fallow,1998,70417.0,69270.1,71076.2,6888.5,67.0
+Hyderabad: soybean - chickpea - fallow,1999,69643.0,68806.0,70337.0,6808.5,61.5
+Hyderabad: soybean - chickpea - fallow,2000,69048.0,68407.0,69528.0,6739.0,60.0
+Hyderabad: soybean - fallow,1975,91535.0,91319.4,91835.4,9144.0,132.0
+Hyderabad: soybean - fallow,1976,90133.0,89593.4,90549.6,8999.0,130.0
+Hyderabad: soybean - fallow,1977,88649.0,88131.2,89195.6,8846.0,124.0
+Hyderabad: soybean - fallow,1978,87256.0,86684.4,87907.4,8701.0,121.0
+Hyderabad: soybean - fallow,1979,85928.0,85228.0,86510.6,8563.0,129.0
+Hyderabad: soybean - fallow,1980,84259.0,83817.6,85022.0,8392.0,125.0
+Hyderabad: soybean - fallow,1981,83088.0,82581.8,83916.4,8270.0,108.0
+Hyderabad: soybean - fallow,1982,81713.0,81219.8,82743.6,8127.0,117.0
+Hyderabad: soybean - fallow,1983,80347.0,79817.4,81434.4,7985.0,118.0
+Hyderabad: soybean - fallow,1984,79054.0,78512.2,80225.2,7851.0,110.0
+Hyderabad: soybean - fallow,1985,77820.0,77341.0,79042.8,7721.0,112.0
+Hyderabad: soybean - fallow,1986,76850.0,76080.8,77654.6,7620.0,111.0
+Hyderabad: soybean - fallow,1987,75410.0,74792.8,76419.0,7472.0,112.0
+Hyderabad: soybean - fallow,1988,74327.0,73571.0,75244.4,7361.0,116.0
+Hyderabad: soybean - fallow,1989,73103.0,72302.4,74101.4,7232.0,105.0
+Hyderabad: soybean - fallow,1990,72150.0,71311.2,73081.2,7133.0,94.0
+Hyderabad: soybean - fallow,1991,70925.0,70096.8,71985.6,7007.0,102.0
+Hyderabad: soybean - fallow,1992,69802.0,69020.4,70765.2,6890.0,103.0
+Hyderabad: soybean - fallow,1993,68603.0,67940.6,69738.6,6767.0,97.0
+Hyderabad: soybean - fallow,1994,67732.0,66715.0,68762.2,6673.0,99.0
+Hyderabad: soybean - fallow,1995,66660.0,65826.0,67627.6,6564.0,102.0
+Hyderabad: soybean - fallow,1996,65548.0,64816.8,66662.2,6448.0,96.0
+Hyderabad: soybean - fallow,1997,64533.0,63896.0,65588.8,6344.0,97.0
+Hyderabad: soybean - fallow,1998,63770.0,62999.8,64385.6,6264.0,88.0
+Hyderabad: soybean - fallow,1999,62551.0,61948.2,63397.2,6140.0,92.0

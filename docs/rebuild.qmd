@@ -1,0 +1,109 @@
+---
+title: "Rebuild the site"
+subtitle: "Refresh the data extracts after a new run, then render"
+---
+
+```{ojs}
+summary = FileAttachment("java/data/summary.json").json()
+```
+
+The pages hold no results of their own. Every number, chart and map is read from the small files in
+`docs/java/data/` (CSV and JSON) and the two PNGs in `docs/assets/java/`, which
+`docs/scripts/export_data.py` writes from the xdssat cache. The data on this build were exported on ${summary.generated} from the cache at ${summary.cache}, with ${summary.current_run} as the current run.
+
+## 1. Re-export the data
+
+From the repository root, in the `climate` environment (on Windows, through `conda run`):
+
+```bash
+conda run --no-capture-output -n climate python docs/scripts/export_data.py
+```
+
+| Option | Effect |
+|---|---|
+| `--run <folder>` | the run under `XDSSAT_CACHE/runs` that the pages call current (default `java_per_cell_1991-2020_slpf0.76_rf0.58_tcldf19`) |
+| `--adm1 <shp>`, `--adm2 <shp>` | admin1 and admin2 boundaries (`a2bps` codes in admin2); cut to the Java box plus 1° and simplified by 0.002° for the map overlays |
+| `--skip-rasters` | skip the two 100 m PNGs and the irrigation class table (they change only when the rasters change) |
+| `--skip-cli` | do not refresh the `--help` texts of the scripts |
+
+It reads, never writes, the cache: `runs/*/` (run info, strata, onset, summary, netCDF),
+`checks/districts/*_{districts,years}.csv` (from `scripts/compare_districts.py`, so run that first for a new
+run), `checks/n_cultivar_sensitivity*.csv`, `obs/bdsp_*`, `soils/java.SOL`, `rasters/idn_*.tif`, and the
+engine's `RICER048.CUL`. It also imports `src/config.py`, `src/sol.py`, `src/rasters.py` and
+`scripts/compare_districts.py` (for `pieces()`), read only. A full export took about 95 s on the reference
+machine; the extracts total about 2 MB.
+
+| File | Content |
+|---|---|
+| `summary.json` | current run, district comparison metrics per run (level, spatial r, trends, ...) |
+| `runs.json`, `run_years.csv` | every run folder: arguments, counts, timing, yield per system and season year |
+| `grid_cells.csv` | one row per weather cell of the current run: rice ha, zone, onset, mean yield, season climate, top soil layer |
+| `grid_yearly.json` | yield per cell, system and season year (the netCDF explorer) |
+| `nc_schema.csv`, `nc_attrs.json` | variables and global attributes of the current netCDF |
+| `districts.csv`, `district_years.csv`, `java_years.csv` | the district comparison of every checked run, plus district drivers (season length, Tmin, irrigated share) |
+| `provinces.geojson`, `districts.geojson`, `java_outline.geojson` | admin1 and admin2 lines drawn on every map (static PNGs too), and the Java outline that frames the maps (clockwise rings for d3) |
+| `obs_*.csv` | BDSP observations for Java: province series, district means, cleaning flags |
+| `sensitivity.csv`, `tcldf_cells.csv` | 40-cell sensitivity samples (N, cultivar, SOC, SLPF, TCLDF) |
+| `soil_layers.csv` | soil water limits and SRGF by depth (quantiles over profiles) |
+| `cultivars.csv` | IR 58 and IR 64 coefficients and their definitions |
+| `settings.csv`, `cli/*.txt` | `config.SETTINGS` and every script's `--help` |
+
+## 1b. Re-run a training notebook
+
+Each module's notebook (`notebooks/module1.ipynb` ... `module6.ipynb`) runs the DSSAT engine on example
+experiments from [DSSAT/dssat-csm-data](https://github.com/DSSAT/dssat-csm-data) and on the course's data files
+in `notebooks/course-data/`, and writes the CSV files its page reads into `learn/data/<module>/`. It needs the
+engine (`XDSSAT_ENGINE`), a short work folder outside OneDrive (`XDSSAT_WORK`), `dssat-csm-data` cloned next to
+this repository and `xlrd` for the course's spreadsheets. Run it top to bottom in Jupyter, from the `notebooks/`
+folder (kernel: the xdssat Python environment), and save it, so the page shows the new outputs.
+
+| Notebook | Runs | Run time, roughly |
+|---|---|---|
+| `module1.ipynb` | maize UFGA8201, potential production and sensitivity | under a minute |
+| `module2.ipynb` | soybean UFGA7901, the Griffin weather import, maturity groups, the course's coefficient sweep | under a minute |
+| `module3.ipynb` | GLUE: 3 x 3,000 parameter sets on five soybean treatments and 2 x 2,000 on four Colorado maize treatments (up to 48 engine processes at once), the peanut calibration grid, soils, water-limited maize, paddy rice flood water | the longest: 17 minutes (1,040 s) measured on a workstation with 2 x 20 cores (80 logical processors) |
+| `module4.ipynb` | the 1976 peanut shading study and its shade sweep, the N-limited maize exercise and its self tests, nitrogen fixation in soybean | under a minute (47 s measured) |
+| `module5.ipynb` | 30-season seasonal analysis, Kadoma urea rates over 13 seasons, Niger millet over 10 | a minute or two |
+| `module6.ipynb` | four crop sequences in the engine's sequence mode, up to 25 years x 15 replicates | a few minutes |
+
+Helpers: `notebooks/learnlib.py` (running the engine, cultivar variants, observed-data files, engine soil layers,
+sequences) and `notebooks/glue.py` (the GLUE port). The notebooks were executed with `nbclient`; running them in
+Jupyter gives the same files. `XLEARN_GLUE_N` (an environment variable) sets fewer GLUE sets per round for a
+quick test run.
+
+## 2. Render
+
+```bash
+quarto render docs
+```
+
+On Windows, stop any local server that is serving `docs/_site/` before rendering: Quarto replaces the
+folder and fails with "being used by another process" (os error 32) while a file in it is open.
+
+Quarto 1.8 renders the pages into `docs/_site/` (gitignored). The pages run Observable JS in the
+browser, notebooks are shown with their stored outputs, and `freeze: auto` is set, so nothing is computed
+at render time and neither Python nor the DSSAT engine is needed for this step. To look at it locally,
+serve the folder over HTTP (the browser will not load the data files from `file://`):
+
+```bash
+python -m http.server 4317 --directory docs/_site
+```
+
+## OneDrive
+
+The repository lives in OneDrive. `docs/_site/` and `docs/.quarto/` are rewritten on every render
+and are gitignored, but OneDrive still syncs them, so each render churns sync traffic. Render when needed, not
+in a loop, or move the output folder outside OneDrive (`output-dir` in `docs/_quarto.yml`).
+
+## Charts and downloads
+
+Every chart and map has **Download SVG** and **Download PNG** buttons, from `docs/assets/js/dl.js`
+(`withDownload(chart, name)`). The helper folds Plot's legend, title and caption into one standalone SVG and
+draws it on a canvas at 2x for the PNG, on a white background.
+
+Backup copies of every chart are kept as SVG and PNG, each chart in its default state, one folder per page:
+the training pages in `docs/assets/training/`, the case-study pages in `docs/assets/java/` and the xdssat pages
+and the home page in `docs/assets/xdssat/` (each with an `index.json`). `docs/scripts/save_charts.py` writes them
+from the rendered site (serve `docs/_site` on port 8765 first): it opens each page in headless Chrome, waits for
+the charts and saves what the download buttons would. `--pages` limits it to some pages. The 14 pages hold 109 charts on
+this build.

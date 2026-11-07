@@ -1,0 +1,43 @@
+usage: fit_slpf.py [-h] --runs RUNS [RUNS ...] [--obs OBS]
+                   [--moisture MOISTURE] [--min-ha MIN_HA] [--step STEP]
+                   [--out OUT]
+
+Fit the soil fertility factor SLPF separately for irrigated and rainfed rice
+against district yields, from three or more runs that differ only in SLPF.
+
+    python scripts/fit_slpf.py --runs E:/temp/xdssat/runs/java_per_cell_1991-2020_slpf0.63_tcldf19         E:/temp/xdssat/runs/java_per_cell_1991-2020_slpf0.73_tcldf19         E:/temp/xdssat/runs/java_per_cell_1991-2020_slpf0.83_tcldf19
+
+Method
+1. Each simulated season (cell, water regime, season, season year) has its
+   yield at the SLPF values of the runs; a polynomial through the points
+   (degree = runs - 1, at most 3, least squares beyond that) gives its yield
+   at any SLPF in between (SLPF only scales growth, so
+   the season, its dates and harvest year stay the same).
+2. Seasons go to district and calendar year of harvest exactly as in
+   scripts/compare_districts.py (rice ha per cell x regime x district from the
+   100 m rasters; dry matter / (1 - moisture) = GKG, ku/ha).
+3. For a pair (SLPF irrigated, SLPF rainfed) the district mean over the years
+   with observations is compared with the BDSP district mean; the objective is
+   the rice-area weighted mean squared log ratio over districts (>= --min-ha
+   rice, >= 5 observed years). Grid search over the run range.
+4. Temperature model ("temp"): SLPF of a cell = s_regime + b x (Tmin_cell - TREF),
+   clipped to the SLPF range of the runs, where Tmin_cell is the cell's mean
+   season minimum temperature (TMINA of the middle run). Each season's
+   polynomial is evaluated at its own cell's SLPF; three parameters fitted by
+   Nelder-Mead from the pair optimum (b = 0). A statistical correction of the
+   model's long-season yield bonus in cool cells, not a mechanism.
+5. Leave-one-province-out: refit without each province and score its districts,
+   for every model, to see whether extra parameters predict or only fit.
+
+Writes <XDSSAT_CACHE>/checks/districts/fit_slpf.json, fit_slpf_grid.csv and
+slpf_table.csv (iy, ix, water, tmin, slpf of the temp model, for --slpf-table).
+
+options:
+  -h, --help            show this help message and exit
+  --runs RUNS [RUNS ...]
+                        three or more runs
+  --obs OBS
+  --moisture MOISTURE
+  --min-ha MIN_HA
+  --step STEP
+  --out OUT

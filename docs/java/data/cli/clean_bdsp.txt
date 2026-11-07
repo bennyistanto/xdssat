@@ -1,0 +1,40 @@
+usage: clean_bdsp.py [-h] [--long LONG] [--boundary BOUNDARY] [--out OUT]
+
+Clean the BDSP district rice tables (harvested area, production, yield) into CSVs.
+
+    python scripts/clean_bdsp.py
+
+Input: <XDSSAT_CACHE>/obs/bdsp/bdsp_padi_adm2_long.csv from scripts/fetch_bdsp.py
+(LUAS PANEN ha, PRODUKSI t, PRODUKTIVITAS ku/ha GKG, per district and year).
+
+Its yield is the same series as the MoA workbook (identical in all 12,770
+district-years both have), minus the workbook's production-sized Jawa Timur
+values, so the yield rules of scripts/clean_moa_yields.py apply. Area and
+production add a check: yield should equal production / area x 10.
+
+Steps:
+1. Reported yield: clean_moa_yields column rules, plausible range 10-100 ku/ha.
+2. Yc = production / area x 10 where both are reported.
+   - Yc within 10-100 and the reported yield missing or removed in step 1:
+     yield = Yc (flag yield_from_production_over_area). This recovers Jawa
+     Timur 2014 and 2017-2022, Sulawesi Selatan 2021-22 and others.
+   - Yc within 10-100 and reported yield more than 5% away: reported yield
+     kept, flagged yield_disagrees_with_production_over_area (Yc in the flag).
+   - Yc outside 10-100: area and production of that year are removed
+     (area_production_inconsistent); the reported yield is kept if it passed 1.
+3. Yield against the district's 7-year running median (clean_moa_yields rule 4).
+4. Codes moved to the latest boundaries as in clean_moa_yields (Papua and
+   Papua Barat splits), for all three variables.
+
+Writes to <XDSSAT_CACHE>/obs:
+    bdsp_rice_yield_adm2.csv        ku/ha GKG
+    bdsp_rice_area_adm2.csv         harvested area, ha
+    bdsp_rice_production_adm2.csv   production, t GKG
+    bdsp_rice_adm2_flags.csv        every change, with raw values
+Rows: code (a2bps), name, name_moa, province_code, province, in_boundary; columns: years.
+
+options:
+  -h, --help           show this help message and exit
+  --long LONG
+  --boundary BOUNDARY
+  --out OUT

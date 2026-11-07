@@ -1,0 +1,26 @@
+---
+title: "Notebooks"
+subtitle: "The code behind the training modules: each notebook runs the DSSAT engine through xdssat and writes the data its module page shows"
+---
+
+Each notebook goes with one [training module](../learn/index.qmd). The module page explains the ideas and
+shows the results interactively; the notebook is where the engine runs. It is shown here with the outputs of its
+last run, and it can be downloaded and rerun.
+
+| Notebook | Module page | What it runs |
+|---|---|---|
+| [Module 1](module1.ipynb) | [Running a crop model, phenology, potential production](../learn/module1.qmd) | Maize UFGA8201, potential production, sensitivity to cultivar, planting date and coefficients |
+| [Module 2](module2.ipynb) | [Growth, weather, files, cultivar coefficients](../learn/module2.qmd) | Soybean carbon balance, the WeatherMan exercise (Griffin, Georgia), maturity groups and the course's coefficient sweep |
+| [Module 3](module3.ipynb) | [Calibration, soils, water-limited production](../learn/module3.qmd) | GLUE for Williams-82 and for Colorado maize, peanut in-season calibration grid, two course soils, water-limited maize |
+| [Module 4](module4.ipynb) | [Measurement files, nitrogen](../learn/module4.qmd) | The 1976 peanut shading study with its FileA and FileT, the N-limited maize exercise and its self tests |
+| [Module 5](module5.ipynb) | [Seasonal analysis, risk](../learn/module5.qmd) | Irrigation strategies over 30 seasons, the Kadoma urea exercise, millet adoption in Niger |
+| [Module 6](module6.ipynb) | [Crop rotations](../learn/module6.qmd) | Sequence experiments in the engine's sequence mode, with and without a crop |
+
+## Running them
+
+Download a notebook with the link at the top of its module page, or take it from `docs/notebooks/` in the
+repository together with its two helpers: `learnlib.py` (running the engine, cultivar variants, observed-data
+files, engine soil layers, sequences) and `glue.py` (the GLUE port). The course's data files are in
+`docs/notebooks/course-data/`. What the notebooks need is listed on the
+[training overview](../learn/index.qmd#what-you-need-to-run-the-notebooks); how long each takes is in the
+[rebuild notes](../rebuild.qmd).

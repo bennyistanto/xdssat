@@ -1,0 +1,11 @@
+variable,value
+"SRAD, largest change",0.0
+"TMAX, largest change",0.0
+"TMIN, largest change",0.0
+"RAIN, largest change",0.1
+"seed yield irrigated, original file",3114.0
+"seed yield rainfed, original file",3061.0
+"seed yield irrigated, converted, PAR kept",3114.0
+"seed yield rainfed, converted, PAR kept",3063.0
+"seed yield irrigated, converted, no PAR",3187.0
+"seed yield rainfed, converted, no PAR",3135.0

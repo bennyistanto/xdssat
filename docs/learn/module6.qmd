@@ -1,0 +1,209 @@
+---
+title: "Module 6: cropping systems, simulating crop rotations"
+subtitle: "DSSAT training, module 6 of 6. Day 6 of the course: crop rotations and the sequence experiment file"
+---
+
+```{ojs}
+import {withDownload, fmt} from "../assets/js/dl.js"
+sqxSections = FileAttachment("data/module6/sqx_sections.csv").csv()
+sqxControls = FileAttachment("data/module6/sqx_controls.csv").csv()
+sqxNew = FileAttachment("data/module6/sqx_new.csv").csv()
+runs = FileAttachment("data/module6/sequence_runs.csv").csv({typed: true})
+soilY = FileAttachment("data/module6/sequence_soil.csv").csv({typed: true})
+cropY = FileAttachment("data/module6/sequence_yields.csv").csv({typed: true})
+runInfo = FileAttachment("data/module6/run_info.csv").csv()
+dlLinks = html`<a href="${"../notebooks/module6" + ".ipynb"}" download>download .ipynb</a>, helper <a href="../notebooks/learnlib.py" download>learnlib.py</a>`
+W = Math.min(width, 860)
+pre = (t) => html`<pre class="filex">${t}</pre>`
+seqs = [...new Set(runs.map(d => d.sequence))]
+```
+
+::: {.callout-note appearance="simple"}
+**How to use this module.** Read this page for the ideas; every chart comes from the
+[module 6 notebook](../notebooks/module6.ipynb) (${dlLinks}), which runs the DSSAT engine and writes the small
+data files the charts read. The runs on this build were made on ${runInfo[0].run_on}.
+:::
+
+The sixth day of the course covered cropping systems: simulating crop rotations, creating the experiment file
+for a rotation (sequence) analysis, and a closing group discussion of applications and needs. Its material is
+not part of the course files used for this site, so this module is built from DSSAT's own sequence examples in dssat-csm-data [@csmdata], the engine's source code, and
+Bowen et al. [-@bowen1998] on simulating cropping sequences with DSSAT.
+
+## What you will learn
+
+- How a sequence experiment file differs from an ordinary one, and how the engine runs it.
+- What a rotation carries from one crop to the next: water, mineral and organic nitrogen, carbon, residues.
+- How to write a new sequence and compare rotations over decades of weather.
+- Where DSSAT is applied, and what each kind of application needs from you.
+
+## 1. A sequence experiment file
+
+A sequence file (`.SQX`) has the sections of any experiment file. The difference is in the treatment table: each
+line is one **component** of a rotation, and the columns before the name say where it belongs. `N` is the
+sequence (treatment) the component belongs to, `R` the rotation component number, the order in which the crops
+follow each other, and `O` and `C` the rotation option and crop component (0 in these examples). In sequence mode
+the engine reads `N` and `R` as two-digit numbers
+([`ipexp.for:865-866`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/InputModule/ipexp.for#L865)).
+
+```{ojs}
+viewof sqxFile = Inputs.radio(["ITHY7501.SQX", "UFGA7803.SQX"], {value: "ITHY7501.SQX", label: "File"})
+```
+
+```{ojs}
+pre(sqxSections.filter(d => d.file === sqxFile).map(d => d.text).join("\n\n"))
+```
+
+Three things to see in these tables. Only the first component has initial conditions (`IC` = 1): the later ones
+have `IC` = 0 and start from whatever soil the previous crop left. A **fallow** is a component like any other,
+with the crop code `FA` and a harvest date (`MH`) that ends it. And every component has its own simulation-control
+level (`SM`): its own planting rule, its own water and nitrogen switches, its own harvest. In ITHY7501 the soybean
+is planted on a reported date, the chickpea automatically when the soil allows it:
+
+```{ojs}
+pre(sqxControls.map(d => d.line).join("\n"))
+```
+
+## 2. How the engine runs a sequence
+
+The engine runs a sequence in mode `Q`, from a batch file that lists the components in order: the file name in the
+first 92 columns, then the treatment, replicate and sequence (component) numbers as `1X,I6` fields
+([`CSM.for`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/CSM_Main/CSM.for),
+the batch reader). It runs one line per crop season and starts again from the first line for the next year,
+carrying the soil from one crop to the next: for any soil state \(X\) (water, mineral and organic N, carbon,
+residue) of component \(k\) in a sequence,
+
+\[
+X_{k+1}(t_{start}) = X_k(t_{end}),
+\]
+
+instead of reading new initial conditions. `learnlib.run_sequence` writes the batch file and runs one sequence
+at a time: two sequences in one batch would be chained into each other.
+
+`NYERS` sets the number of years and `NREPS` the number of replicates. Both examples generate their weather
+(`WTHER` = `W`) from the climate files `UFGA.CLI` and `ITHY.CLI`, so each replicate is another draw of the same
+climate.
+
+## 3. Two rotations from DSSAT's examples
+
+`UFGA7803.SQX` compares two short sequences at Gainesville: soybean then fallow, and dry bean then fallow, for 5
+years with 30 weather replicates. `ITHY7501.SQX` grows soybean in the rainy season, chickpea after it and a fallow
+until the next soybean at Hyderabad, India, for 25 years with 15 replicates.
+
+```{ojs}
+viewof ySeq = Inputs.select(seqs, {value: seqs.find(s => s.includes("chickpea")), label: "Sequence"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 320, marginLeft: 60,
+  x: {label: "Year", tickFormat: "d", grid: true},
+  y: {label: "Yield, kg/ha", grid: true},
+  color: {legend: true},
+  marks: [
+    Plot.areaY(cropY.filter(d => d.sequence === ySeq), {x: "year", y1: "p10", y2: "p90", fill: "crop", fillOpacity: 0.18}),
+    Plot.lineY(cropY.filter(d => d.sequence === ySeq), {x: "year", y: "median", stroke: "crop", strokeWidth: 2, tip: true})
+  ]
+}), `module6-yields-${ySeq.replace(/[^a-z]+/gi, "-")}`)
+```
+
+::: {.source-note}
+Line: median over the weather replicates; band: 10th to 90th percentile.
+:::
+
+```{ojs}
+sumTab = d3.rollups(runs.filter(d => d.crop !== "fallow"), v => ({seasons: v.length, yield: d3.median(v, d => d.HWAM), fixed: d3.median(v, d => d.NFXM),
+  leached: d3.median(v, d => d.NLCM), rain: d3.median(v, d => d.PRCM)}), d => d.sequence, d => d.crop)
+  .flatMap(([s, arr]) => arr.map(([crop, v]) => ({sequence: s, crop, ...v})))
+Inputs.table(sumTab, {header: {sequence: "Sequence", crop: "Crop", seasons: "Seasons", yield: "Median yield, kg/ha", fixed: "N fixed, kg/ha", leached: "N leached, kg/ha", rain: "Rain in season, mm"},
+  format: {yield: fmt.int, fixed: fmt.int, leached: fmt.int, rain: fmt.int}, layout: "auto"})
+```
+
+## 4. Creating a sequence: the rotation without chickpea
+
+What does the chickpea do for the Hyderabad system? To find out, write a second sequence in the same file: soybean
+followed directly by the fallow. In the treatment table that is two more lines, treatment 2, with the soybean and
+fallow components renumbered 1 and 2; nothing else changes, and the fallow still ends on its harvest date before
+the next soybean.
+
+```{ojs}
+pre(sqxNew[0].text)
+```
+
+```{ojs}
+viewof soilVar = Inputs.radio(new Map([["Soil organic carbon, kg C/ha", "OCAM"], ["Soil organic N, kg N/ha", "ONAM"], ["Soil mineral N, kg N/ha", "NIAM"]]), {value: "OCAM", label: "Show"})
+```
+
+```{ojs}
+hyd = runs.filter(d => d.sequence.startsWith("Hyderabad") && d.crop === "fallow")
+hydMed = d3.rollups(hyd, v => ({median: d3.median(v, d => d[soilVar]), p10: d3.quantile(v, 0.1, d => d[soilVar]), p90: d3.quantile(v, 0.9, d => d[soilVar])}), d => d.sequence, d => d.year)
+  .flatMap(([s, arr]) => arr.map(([year, v]) => ({sequence: s, year, ...v}))).sort((a, b) => a.year - b.year)
+withDownload(Plot.plot({
+  width: W, height: 320, marginLeft: 70,
+  x: {label: "Year (end of each fallow)", tickFormat: "d", grid: true},
+  y: {label: soilVar, grid: true},
+  color: {legend: true, domain: ["Hyderabad: soybean - chickpea - fallow", "Hyderabad: soybean - fallow"], range: ["#3f7a34", "#f2a33a"]},
+  marks: [
+    Plot.areaY(hydMed, {x: "year", y1: "p10", y2: "p90", fill: "sequence", fillOpacity: 0.15}),
+    Plot.lineY(hydMed, {x: "year", y: "median", stroke: "sequence", strokeWidth: 2, tip: true})
+  ]
+}), `module6-hyderabad-${soilVar}`)
+```
+
+```{ojs}
+oc = (s) => { const g = soilY.filter(d => d.sequence === s); return {first: g[0].OCAM_median, last: g[g.length - 1].OCAM_median}; }
+withC = oc("Hyderabad: soybean - chickpea - fallow")
+noC = oc("Hyderabad: soybean - fallow")
+sb = (s, k) => d3.median(runs.filter(d => d.sequence === s && d.crop === "soybean"), d => d[k])
+```
+
+Over 25 years the simulated soil organic carbon falls in both rotations: from ${fmt.int(withC.first)} to ${fmt.int(withC.last)} kg C/ha with chickpea, and to ${fmt.int(noC.last)} without it. Without the chickpea the soybean's median yield is ${fmt.int(sb("Hyderabad: soybean - fallow", "HWAM"))} kg/ha against ${fmt.int(sb("Hyderabad: soybean - chickpea - fallow", "HWAM"))}, and the nitrate leached in the soybean season is ${fmt.int(sb("Hyderabad: soybean - fallow", "NLCM"))} kg N/ha against ${fmt.int(sb("Hyderabad: soybean - chickpea - fallow", "NLCM"))}. That is consistent with the chickpea taking up nitrogen between the soybean crops (a median of ${fmt.int(d3.median(runs.filter(d => d.crop === "chickpea"), d => d.NUCM))} kg N/ha) that would otherwise stay in the soil until the next rains. Single seasons cannot show such differences, which is what sequence analysis is for. Whether the steady loss of carbon in both is real for Hyderabad soils, or comes from a starting soil carbon that is not in balance with these rotations, is a question the runs alone cannot answer.
+
+## 5. Applications and needs: a discussion
+
+The course closed with a group discussion: what would each participant use DSSAT for, and what would they need
+to do it? A web page cannot hold that discussion, but it can set it up. The DSSAT Foundation lists these
+application areas on its [About DSSAT](https://dssat.net/about/) page; the table links each to the modules of this training that prepare for it.
+
+| Application area (DSSAT Foundation) | Where this training prepares for it | What it needs first |
+|---|---|---|
+| On-farm and precision management | [Module 1](module1.qmd) (potential production), [module 4](module4.qmd) (nitrogen), [module 5](module5.qmd) (strategies and risk) | A calibrated cultivar and the field's own soil and weather |
+| Regional assessments of climate variability and climate change | [Module 5](module5.qmd) (seasonal analysis); the [rice case study](../java/index.qmd) with xdssat | Long weather series on a grid, soil profiles for every cell, planting dates that fit each place |
+| Gene-based modelling and breeding selection | [Module 2](module2.qmd) (species, ecotype, cultivar coefficients), [module 3](module3.qmd) (GLUE) | Phenology and yield observations of each line in several environments |
+| Crop water use and greenhouse gas emissions | [Module 3](module3.qmd) (water balance), [module 4](module4.qmd) (soil nitrogen and carbon) | Measured soil water or fluxes to test against, not yield alone |
+| Climate-smart agriculture, bioenergy and agrivoltaics | Modules 1 to 5 together | A clear question: which practice, compared with what, judged by which outcome |
+| Long-term sustainability: soil organic carbon and nitrogen | This module (rotations over 25 years) | A starting soil carbon that is in balance with past management (section 4) |
+
+Questions for your own discussion, alone or with colleagues:
+
+1. **Your question.** Write it in one sentence. Is it about one field, a farm, or a region? Is it about one
+   season, or many seasons in a row? That decides between a single experiment, a seasonal analysis (module 5)
+   and a sequence (this module).
+2. **Your crop and cultivar.** Is there a model for the crop, and coefficients for a cultivar like yours? If not,
+   which observations would GLUE need (module 3), and do you have them?
+3. **Your data.** For each part of the minimum data set (weather, soil, management, observations;
+   [module 2](module2.qmd)), what do you have, what can you estimate, and what would you have to measure?
+4. **Your outcome.** Yield, profit, water used, nitrogen lost, soil carbon? Each needs different observations to
+   trust the model on it ([module 4](module4.qmd)).
+5. **Your scale.** If the answer is needed for a whole region, the work changes from calibrating one field to
+   preparing inputs for thousands of cells: that is what [xdssat](../xdssat/index.qmd) was built for.
+
+## Self-test
+
+1. Why does only the first component of a sequence have initial conditions?
+2. What would happen if two sequences were listed in one batch file?
+3. Add irrigation at planting for the chickpea (an irrigation level for component 2). What do you expect for the
+   soybean that follows, and why?
+4. Replace the generated weather with the measured Hyderabad files (dssat-csm-data has ITHY7501 to ITHY9901).
+   Does the ranking of the two rotations hold for the actual years?
+5. Pick one row of the applications table in section 5. Which of the six modules would you rerun first with
+   your own data, and what would you change in it?
+
+## Where this goes next
+
+This is the last training module. The [rice case study](../java/index.qmd) shows the same engine run over a whole
+island with xdssat; the [notebooks](../notebooks/index.qmd) hold the code of every module.
+
+## References {.unnumbered}
+
+::: {#refs}
+:::

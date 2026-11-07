@@ -1,0 +1,70 @@
+name: Publish documentation site
+
+# Renders the Quarto site in docs/ and deploys it to GitHub Pages.
+#
+# Nothing is computed here. The pages read CSV and JSON files that are committed
+# (docs/java/data/, docs/learn/data/), the notebooks are shown with their stored
+# outputs (Quarto does not execute .ipynb files by default), and no page has a
+# Python or R code cell. So the runner needs only Quarto: no DSSAT engine, no
+# conda environment, no data downloads. Observable JS runs in the reader's browser.
+#
+# Runs on pushes to main that touch the site, and by hand from the Actions tab.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - ".github/workflows/quarto-publish.yml"
+  workflow_dispatch:
+
+# Pages deployment needs id-token: write and pages: write; contents: read is
+# enough because nothing is pushed back to the repository.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; a newer push cancels a build still in progress.
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          # the version the site is built and checked with locally
+          version: "1.8.27"
+
+      - name: Render Quarto site
+        uses: quarto-dev/quarto-actions/render@v2
+        with:
+          path: docs
+
+      # output-dir in docs/_quarto.yml is _site, relative to docs/
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/_site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

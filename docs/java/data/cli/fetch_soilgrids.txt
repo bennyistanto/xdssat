@@ -1,0 +1,27 @@
+usage: fetch_soilgrids.py [-h] [--mirror MIRROR] [--region REGION]
+                          [--props PROPS [PROPS ...]]
+                          [--depths DEPTHS [DEPTHS ...]] [--workers WORKERS]
+                          [--dry-run]
+
+Download SoilGrids 2.0 tiles that a local mirror's .vrt files reference but lack.
+
+    python scripts/fetch_soilgrids.py --dry-run          # count what is missing
+    python scripts/fetch_soilgrids.py                    # fetch it (Indonesia, mean layers)
+
+The local mirror (XDSSAT_SOILGRIDS, default E:/temp/soilgrids) has the layout of
+https://files.isric.org/soilgrids/latest/data/: ``<prop>/<prop>_<depth>_mean.vrt``
+plus a folder of GeoTIFF tiles. Only tiles under the land cells of an AgERA5
+region are considered (cell centre and corners), so sea tiles are skipped.
+
+Each tile is written to ``.part`` and renamed only after it opens with rasterio
+and its size and data type match the .vrt entry. Re-running skips tiles that
+are already present. SoilGrids is CC-BY 4.0 (ISRIC).
+
+options:
+  -h, --help            show this help message and exit
+  --mirror MIRROR
+  --region REGION
+  --props PROPS [PROPS ...]
+  --depths DEPTHS [DEPTHS ...]
+  --workers WORKERS
+  --dry-run

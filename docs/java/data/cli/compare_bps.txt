@@ -1,0 +1,33 @@
+usage: compare_bps.py [-h] --bps BPS [--runs RUNS] [--aoi AOI]
+                      [--years YEARS YEARS] [--moisture MOISTURE] [--out OUT]
+
+Compare simulated rice yields with BPS provincial productivity.
+
+    python scripts/compare_bps.py --bps C:/Users/benny/Downloads/produktivitas_padi_kuintaperha.csv
+
+BPS table (bps.go.id, "Produktivitas Padi Menurut Provinsi", 1993-2015, from
+the Statistik Pertanian reports): quintal per ha of gabah kering giling (GKG,
+the table's own note), per calendar year, all seasons harvested in that year.
+2016-2017 are absent (moratorium, per the table note).
+
+Simulated yields are made comparable in three steps:
+1. each season goes to the calendar year of its harvest date (HDAT, else MDAT);
+2. the province yield of a year is the rice-area weighted mean over every
+   season harvested in it, with the area of each (cell, water regime,
+   province) piece from the 100 m rasters, so irrigated rice counts twice a
+   year (two seasons) and rainfed once, as in harvested area;
+3. dry matter (DSSAT HWAH) to GKG: divided by (1 - moisture), moisture 0.14 by
+   default. The GKG moisture is an assumption: 14% is the usual quality limit
+   quoted for GKG, but this script does not have a BPS definition to cite.
+
+Writes <XDSSAT_CACHE>/checks/bps/: bps_compare_years.csv (province x year x
+mode), bps_compare_summary.csv (province x mode).
+
+options:
+  -h, --help           show this help message and exit
+  --bps BPS
+  --runs RUNS
+  --aoi AOI
+  --years YEARS YEARS
+  --moisture MOISTURE
+  --out OUT

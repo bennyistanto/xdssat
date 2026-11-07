@@ -1,0 +1,27 @@
+name,dims,dtype,units,long_name,standard_name,kind
+yield,"system, time, lat, lon",float32,kg ha-1,"harvested grain yield, dry matter",,data
+biomass,"system, time, lat, lon",float32,kg ha-1,"above-ground biomass at maturity, dry matter",,data
+lai_max,"system, time, lat, lon",float32,1,maximum leaf area index during the season,leaf_area_index,data
+rain,"system, time, lat, lon",float32,mm,precipitation from simulation start to harvest,lwe_thickness_of_precipitation_amount,data
+irrigation,"system, time, lat, lon",float32,mm,"applied irrigation including losses, simulation start to harvest",,data
+evapotranspiration,"system, time, lat, lon",float32,mm,evapotranspiration from simulation start to harvest,,data
+n_uptake,"system, time, lat, lon",float32,kg ha-1,crop nitrogen uptake during the season,,data
+planting_date,"system, time, lat, lon",datetime64[ns],,planting (transplanting) date,,data
+anthesis_date,"system, time, lat, lon",datetime64[ns],,anthesis date,,data
+maturity_date,"system, time, lat, lon",datetime64[ns],,physiological maturity date,,data
+season_length,"system, time, lat, lon",float32,d,days from planting to physiological maturity,,data
+harvested_area,"system, time, lat, lon",float32,ha,rice area of the stratum where the season has a simulated yield,,data
+production,"system, time, lat, lon",float32,t,"simulated grain production, yield x harvested_area, dry matter",,data
+rice_area,"system, lat, lon",float32,ha,"rice field area of the water regime in the cell (100 m equal-area pixels, 1 pixel = 1 ha)",,data
+rice_area_total,"lat, lon",float32,ha,"rice field area in the cell, all water regimes",,data
+time_bnds,"time, nv",datetime64[ns],,,,data
+lat_bnds,"lat, nv",float64,,,,data
+lon_bnds,"lon, nv",float64,,,,data
+crs,,int32,,WGS 84 (AgERA5 grid),,data
+system,system,<U13,,cropping system: season and water regime,,coordinate
+season,system,<U3,,"season (wet: first season of the agricultural year, dry: second)",,coordinate
+water_regime,system,<U9,,"water regime (irrigated: constant flood; rainfed: bunded, rain only)",,coordinate
+time,time,datetime64[ns],,start of the agricultural year (1 Aug),time,coordinate
+lat,lat,float64,degrees_north,latitude of the AgERA5 cell centre,latitude,coordinate
+lon,lon,float64,degrees_east,longitude of the AgERA5 cell centre,longitude,coordinate
+season_year,time,int32,,agricultural year: 1 Aug of this year to 31 Jul of the next,,coordinate

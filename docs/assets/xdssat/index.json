@@ -1,0 +1,30 @@
+[
+ {
+  "page": "index",
+  "file": "home/xdssat-home-java-yield"
+ },
+ {
+  "page": "xdssat/index",
+  "file": "index/xdssat-runs-overview"
+ },
+ {
+  "page": "xdssat/gridding",
+  "file": "gridding/xdssat-cells-rice-ha-histogram"
+ },
+ {
+  "page": "xdssat/gridding",
+  "file": "gridding/xdssat-run-times"
+ },
+ {
+  "page": "xdssat/gridding",
+  "file": "gridding/xdssat-nc-yield-wet_irrigated-2020"
+ },
+ {
+  "page": "xdssat/implementation",
+  "file": "implementation/xdssat-runs-wet_irrigated"
+ },
+ {
+  "page": "xdssat/implementation",
+  "file": "implementation/xdssat-runs-yield-by-system"
+ }
+]

@@ -1,0 +1,19 @@
+usage: build_agera5_cache.py [-h] [--region {idn}] [--vars VARS [VARS ...]]
+                             [--years YEARS [YEARS ...]]
+                             [--cache-dir CACHE_DIR] [--workers WORKERS]
+
+Extract a region of the global AgERA5 archive into the xdssat cache.
+
+    python scripts/build_agera5_cache.py                 # Indonesia, all variables, all years
+    python scripts/build_agera5_cache.py --years 2000 2001 --vars TMAX TMIN
+
+Resumable: files already in the cache are skipped. See src/agera5.py for the
+layout, the unit conversions and the packing.
+
+options:
+  -h, --help            show this help message and exit
+  --region {idn}
+  --vars VARS [VARS ...]
+  --years YEARS [YEARS ...]
+  --cache-dir CACHE_DIR
+  --workers WORKERS

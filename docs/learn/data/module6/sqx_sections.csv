@@ -1,0 +1,22 @@
+file,section,text
+UFGA7803.SQX,*TREATMENTS,"*TREATMENTS                        -------------FACTOR LEVELS------------
+@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM
+ 1 1 1 0 Soybean treatment 1        1  1  0  1  1  1  0  0  0  0  0  0  1
+ 1 2 1 0 Fallow treatment 1         2  1  0  0  0  0  0  0  0  0  0  1  2
+ 2 1 1 0 Dry bean treatment 2       3  1  0  1  1  1  0  0  0  0  0  0  1
+ 2 2 1 0 Fallow treatment 2         2  1  0  0  0  0  0  0  0  0  0  1  2"
+UFGA7803.SQX,*CULTIVARS,"*CULTIVARS
+@C CR INGENO CNAME
+ 1 SB IB0001 BRAGG
+ 2 FA IB0001 -99
+ 3 BN IB0001 PORILLO SINTETICO"
+ITHY7501.SQX,*TREATMENTS,"*TREATMENTS                        -------------FACTOR LEVELS------------
+@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM
+ 1 1 0 0 SOYBEAN                    1  1  0  1  1  0  1  0  0  0  0  0  1
+ 1 2 0 0 CHICKPEA                   2  1  0  0  2  0  0  0  0  0  0  0  2
+ 1 3 0 0 FALLOW                     3  1  0  0  0  0  0  0  0  0  0  1  3"
+ITHY7501.SQX,*CULTIVARS,"*CULTIVARS
+@C CR INGENO CNAME
+ 1 SB IB0051 PK-472
+ 2 CH IB0001 ANNIGERI
+ 3 FA    -99 -99"

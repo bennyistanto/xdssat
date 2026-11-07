@@ -1,0 +1,9 @@
+model,treatment,HWAM,NUCM,NLCM,NMINC,NIAM
+CERES (Godwin),"rainfed, no N",547,25,44,47,13
+CERES (Godwin),"irrigated, no N",882,27,46,50,13
+CERES (Godwin),"rainfed, 135 kg N",2268,114,66,44,34
+CERES (Godwin),"irrigated, 135 kg N",8436,130,70,51,21
+CENTURY (Parton),"rainfed, no N",250,13,40,27,10
+CENTURY (Parton),"irrigated, no N",368,14,41,29,9
+CENTURY (Parton),"rainfed, 135 kg N",2600,114,57,24,22
+CENTURY (Parton),"irrigated, 135 kg N",8097,123,63,33,16

@@ -1,0 +1,9 @@
+file,role,lines,source
+SOIL.SOL,soil profiles (many per file),1981,dssat-csm-data
+UFGA7901.SBA,FileA: observed end-of-season data,12,dssat-csm-data
+UFGA7901.SBT,FileT: observed data during the season,60,dssat-csm-data
+UFGA7901.SBX,"FileX: experiment (treatments, management, simulation controls)",134,dssat-csm-data
+UFGA7901.WTH,daily weather of one station and year(s),370,dssat-csm-data
+SBGRO048.CUL,cultivar coefficients,129,engine Genotype folder
+SBGRO048.ECO,ecotype coefficients,82,engine Genotype folder
+SBGRO048.SPE,species coefficients,174,engine Genotype folder

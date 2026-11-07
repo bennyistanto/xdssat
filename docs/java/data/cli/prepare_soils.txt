@@ -1,0 +1,24 @@
+usage: prepare_soils.py [-h] [--aoi {java}] [--rice RICE] [--out OUT]
+                        [--workers WORKERS] [--no-soc-scale]
+
+One DSSAT soil profile per AgERA5 cell with rice, from SoilGrids 2.0.
+
+    python scripts/prepare_soils.py --aoi java
+    python scripts/prepare_soils.py                 # all of Indonesia
+
+Needs the national rice raster (scripts/prepare_rasters.py), the AgERA5 cache
+(scripts/build_agera5_cache.py) and a complete SoilGrids mirror over the area
+(scripts/fetch_soilgrids.py). See src/soils.py for sources and equations.
+
+Outputs (in --out, default <XDSSAT_CACHE>/soils):
+    <name>_soilgrids_cells.csv   rice-weighted SoilGrids properties per cell (unscaled)
+    <name>.SOL                   the DSSAT profiles, IDs XS<iy:04><ix:04>
+
+options:
+  -h, --help         show this help message and exit
+  --aoi {java}
+  --rice RICE
+  --out OUT
+  --workers WORKERS
+  --no-soc-scale     keep SoilGrids organic carbon as is (default: scale to
+                     WISE)

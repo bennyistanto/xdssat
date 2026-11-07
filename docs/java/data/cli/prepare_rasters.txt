@@ -1,0 +1,47 @@
+usage: prepare_rasters.py [-h] [--aoi {java}] [--out OUT] [--inputs INPUTS]
+                          [--layers LAYERS [LAYERS ...]] [--adm2 ADM2]
+                          [--workers WORKERS]
+
+Burn rice fields, soil and regions onto the 100 m equal-area grid.
+
+    python scripts/prepare_rasters.py                    # all of Indonesia
+    python scripts/prepare_rasters.py --aoi java --out C:/TEMP/x   # a window, for testing
+
+Inputs (under XDSSAT_INPUTS, default E:/temp):
+    idn-lbs/idn_phy_luasbakusawah_atrbpn_2024_a.gpkg   rice fields, ATR/BPN 2024
+    idn-soil/idn_phy_tanahsemidetil_50k_bbsdlp_a.shp   soil, BBSDLP 1:50k (no Papua)
+    idn-soil/idn_phy_agroecological_zone_bbsdlp_a.shp  island groups and AEZ zones
+    idn-lbs/idn_phy_ricefield_java_{irrigated,rainfed}_moa_a.shp
+                                                       Java irrigation type, Ministry
+                                                       of Agriculture (attributes *_09)
+
+Outputs (in --out, default <XDSSAT_CACHE>/rasters):
+    <name>_rice.tif     band 1 share of the 1 ha pixel under rice (percent),
+                        band 2 rice field type (rasters.RICE_CLASSES)
+    <name>_soil.tif     dominant soil (JNTNH1) code, table in <name>_soil_classes.csv
+    <name>_region.tif   island group code, table in <name>_region_classes.csv
+    <name>_aez.tif      agro-ecological zone (SIMBOL) code, table in <name>_aez_classes.csv
+    <name>_irrigation.tif  MoA irrigation type (Java only), table in
+                        <name>_irrigation_classes.csv
+    <name>_irrigation_filled.tif  band 1 MoA class where Java rice (LBS) has none
+                        taken from the nearest MoA pixel; band 2 that distance
+                        in 100 m pixels (0 = own class, capped at 255)
+    <name>_province.tif, <name>_province_filled.tif
+                        province (PROVINSI of the MoA files, Java only), table in
+                        <name>_province_classes.csv; filled like irrigation. Used to
+                        compare with BPS provincial statistics (scripts/compare_bps.py)
+    <name>_adm2.tif, <name>_adm2_filled.tif
+                        district (admin2) BPS code (a2bps) from --adm2 (latest
+                        boundaries), uint16; the filled copy gives Java rice
+                        outside every polygon the nearest district. Used by
+                        scripts/compare_districts.py
+    <name>_check.csv    rice area burned vs polygon area, per rice class
+
+options:
+  -h, --help            show this help message and exit
+  --aoi {java}          burn only this window
+  --out OUT
+  --inputs INPUTS
+  --layers LAYERS [LAYERS ...]
+  --adm2 ADM2           admin2 boundaries with a2bps codes
+  --workers WORKERS

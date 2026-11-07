@@ -1,0 +1,18 @@
+usage: make_netcdf.py [-h] [--region REGION] [--out OUT] run_dir
+
+Write the gridded CF netCDF of a finished run.
+
+    python scripts/make_netcdf.py E:/temp/xdssat/runs/java_per_cell_1991-2020
+    python scripts/make_netcdf.py RUN_DIR --out results.nc
+
+Reads summary.csv, strata.csv and run_info.json from the run folder and writes
+<run folder>/<run folder name>.nc (src/outputs.py describes the layout).
+run_aoi.py calls this itself at the end of a run.
+
+positional arguments:
+  run_dir
+
+options:
+  -h, --help       show this help message and exit
+  --region REGION
+  --out OUT

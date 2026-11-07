@@ -1,0 +1,8 @@
+check,count
+days in the spreadsheet,2696
+duplicate dates,0
+days missing between first and last date,0
+missing values,0
+TMAX below TMIN,0
+negative rain,0
+SRAD below 0 or above 35 MJ/m2/day,0

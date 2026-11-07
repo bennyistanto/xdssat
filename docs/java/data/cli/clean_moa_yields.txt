@@ -1,0 +1,49 @@
+usage: clean_moa_yields.py [-h] [--xlsx XLSX] [--boundary BOUNDARY]
+                           [--out OUT]
+
+Clean the Ministry of Agriculture district rice productivity workbook into a CSV.
+
+    python scripts/clean_moa_yields.py
+    python scripts/clean_moa_yields.py --xlsx E:/temp/xdssat/temp/padi-produktivitas-moa.xlsx
+
+Input: one worksheet per province (sheet name = BPS province code), columns
+No, Lokasi ("<BPS code> - <name>"), 1970 ... 2026. Values are text with a
+comma decimal separator, in quintal per hectare (ku/ha); "0,00" means no data.
+
+Output, in --out (default <XDSSAT_CACHE>/obs):
+    moa_rice_yield_adm2.csv        one row per district: code (BPS, as in the
+                                   admin2 boundaries a2bps), name, province_code,
+                                   province, then one column per year with data
+                                   (ku/ha, empty = missing)
+    moa_rice_yield_adm2_flags.csv  every value changed or removed: code, year,
+                                   raw text, value before and after, rule
+
+Cleaning rules, in order (thresholds measured on this workbook):
+1. "0,00" and blanks are missing. Years with no data at all are dropped.
+2. Rules on a whole province-year column (sheet x year), from its non-missing values:
+   - median >= 10,000: production-sized numbers, not ku/ha (Jawa Timur 2014 and
+     2017-2022). Values outside 10-100 are removed; plausible ones are kept.
+   - 1,000 <= median < 10,000 and every value >= 1,000 is a whole number: the
+     decimal separator was lost (1998, e.g. "3647,00" for 36.47). Divided by 100.
+   - three or more values, all identical: placeholder (Sulawesi Selatan 2021-22,
+     all 10.0). Removed.
+   - median < 10: another unit, likely t/ha (Papua 2016-17, Bangka Belitung
+     2013, Maluku Utara 2013). Removed, not rescaled.
+   - more than half the values outside 10-100: column unusable (Kalimantan
+     Selatan 2021-22). Removed.
+3. Any remaining value outside 10-100 ku/ha is removed.
+4. A value below 0.6 or above 1.6 times the district's 7-year centred running
+   median (at least 3 values) is removed. Over the plausible values, 98% lie
+   within 0.83-1.17 of that median and 99.8% within 0.48-1.92.
+5. District codes follow the latest admin2 boundaries (a2bps). Papua districts
+   that moved to Papua Selatan, Papua Tengah and Papua Pegunungan (sheet 94 ->
+   95, 96, 97), and Papua Barat districts that moved to Papua Barat Daya
+   (sheet 91 -> 92), are matched by type (Kab./Kota) and name; the old-code
+   series continues under the new code. Where both have a value for a year the
+   new-code value is kept and the old one flagged.
+
+options:
+  -h, --help           show this help message and exit
+  --xlsx XLSX
+  --boundary BOUNDARY
+  --out OUT

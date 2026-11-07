@@ -1,0 +1,7 @@
+TRNO,TNAME,water,nitrogen
+1,RAINFED LOW NITROGEN,rainfed,low
+2,RAINFED HIGH NITROGEN,rainfed,high
+3,IRRIGATED LOW NITROGEN,irrigated,low
+4,IRRIGATED HIGH NITROGEN,irrigated,high
+5,VEG STRESS LOW NITROGEN,vegetative stress,low
+6,VEG STRESS HIGH NITROGEN,vegetative stress,high

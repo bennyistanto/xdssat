@@ -1,0 +1,13 @@
+usage: build_soilgrids_cache.py [-h] [--region REGION]
+
+Copy a region of the local SoilGrids mirror into one GeoTIFF per layer.
+
+    python scripts/build_soilgrids_cache.py          # Indonesia, 9 properties x 6 depths
+
+Writes <XDSSAT_CACHE>/soilgrids/<region>/<prop>_<depth>_mean.tif (same 250 m
+Homolosine grid as SoilGrids; pixels copied, not resampled). Resumable.
+src/soils.py samples from these files when they exist.
+
+options:
+  -h, --help       show this help message and exit
+  --region REGION

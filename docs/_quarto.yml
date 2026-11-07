@@ -1,0 +1,232 @@
+project:
+  type: website
+  # Render output stays in a gitignored folder; it churns on every build, so it
+  # also churns OneDrive sync (see README.md).
+  output-dir: _site
+  render:
+    - index.qmd
+    - xdssat/index.qmd
+    - xdssat/gridding.qmd
+    - xdssat/implementation.qmd
+    - getting-started.md
+    - java/index.qmd
+    - java/data.qmd
+    - java/science.qmd
+    - learn/index.qmd
+    - learn/module1.qmd
+    - learn/module2.qmd
+    - learn/module3.qmd
+    - learn/module4.qmd
+    - learn/module5.qmd
+    - learn/module6.qmd
+    - notebooks/index.qmd
+    - notebooks/module1.ipynb
+    - notebooks/module2.ipynb
+    - notebooks/module3.ipynb
+    - notebooks/module4.ipynb
+    - notebooks/module5.ipynb
+    - notebooks/module6.ipynb
+    - rebuild.qmd
+    - faq.qmd
+    - acknowledgements.qmd
+  resources:
+    - java/data/
+    - assets/
+    - learn/data/
+    - notebooks/*.ipynb
+    - notebooks/*.py
+    - notebooks/course-data/
+
+website:
+  title: "xdssat"
+  description: "A bridge between the DSSAT crop model and Python: from one field to a whole region"
+  repo-url: https://github.com/bennyistanto/xdssat
+  repo-subdir: docs
+  repo-actions: [source, issue]
+  bread-crumbs: true
+  back-to-top-navigation: true
+  page-navigation: true
+  favicon: assets/logo/favicon.ico
+  # Google Analytics 4 (Quarto adds the gtag.js snippet to every page)
+  google-analytics: "G-HEKCPKS4QN"
+  # cookie-consent: true   # uncomment to ask visitors before analytics cookies are set
+  navbar:
+    logo: assets/logo/logo-light-64.png
+    logo-alt: "xdssat logo"
+    left:
+      - text: "xdssat"
+        menu:
+          - href: index.qmd
+            text: Home
+          - href: xdssat/index.qmd
+            text: What xdssat is
+          - href: xdssat/gridding.qmd
+            text: How xdssat differs from common DSSAT use
+          - href: xdssat/implementation.qmd
+            text: Implementation
+          - href: getting-started.md
+            text: Getting started
+      - text: "Case study: rice in Java"
+        menu:
+          - href: java/index.qmd
+            text: Story
+          - href: java/data.qmd
+            text: Data, AOI, variety
+          - href: java/science.qmd
+            text: Scientific method
+      - text: "DSSAT training"
+        menu:
+          - href: learn/index.qmd
+            text: "From the case study to DSSAT itself"
+          - href: learn/module1.qmd
+            text: "1. Running a model, phenology, potential production"
+          - href: learn/module2.qmd
+            text: "2. Growth, weather, files, cultivar coefficients"
+          - href: learn/module3.qmd
+            text: "3. Calibration, soils, water-limited production"
+          - href: learn/module4.qmd
+            text: "4. Measurement files, nitrogen"
+          - href: learn/module5.qmd
+            text: "5. Seasonal analysis and risk"
+          - href: learn/module6.qmd
+            text: "6. Crop rotations"
+      - text: "Notebooks"
+        menu:
+          - href: notebooks/index.qmd
+            text: Overview
+          - href: notebooks/module1.ipynb
+            text: "Module 1 notebook"
+          - href: notebooks/module2.ipynb
+            text: "Module 2 notebook"
+          - href: notebooks/module3.ipynb
+            text: "Module 3 notebook"
+          - href: notebooks/module4.ipynb
+            text: "Module 4 notebook"
+          - href: notebooks/module5.ipynb
+            text: "Module 5 notebook"
+          - href: notebooks/module6.ipynb
+            text: "Module 6 notebook"
+    right:
+      - text: "About"
+        menu:
+          - href: faq.qmd
+            text: FAQ
+          - href: acknowledgements.qmd
+            text: "Acknowledgements and how to cite"
+          - href: rebuild.qmd
+            text: Rebuild notes
+      - icon: github
+        href: https://github.com/bennyistanto/xdssat
+  # One sidebar per section: a page shows the sidebar that lists it, and the
+  # breadcrumbs above its title follow the section it sits in.
+  sidebar:
+    - id: xdssat
+      style: docked
+      collapse-level: 2
+      contents:
+        - section: "xdssat"
+          href: index.qmd
+          contents:
+            - href: xdssat/index.qmd
+              text: What xdssat is
+            - href: xdssat/gridding.qmd
+              text: How xdssat differs from common DSSAT use
+            - href: xdssat/implementation.qmd
+              text: Implementation
+            - href: getting-started.md
+              text: Getting started
+    - id: java
+      style: docked
+      contents:
+        - section: "Case study: rice in Java"
+          href: java/index.qmd
+          contents:
+            - href: java/data.qmd
+              text: Data, AOI, variety
+            - href: java/science.qmd
+              text: Scientific method
+    - id: training
+      style: docked
+      contents:
+        - section: "DSSAT training"
+          href: learn/index.qmd
+          contents:
+            - href: learn/module1.qmd
+              text: "1. Running a model, phenology, potential production"
+            - href: learn/module2.qmd
+              text: "2. Growth, weather, files, cultivar coefficients"
+            - href: learn/module3.qmd
+              text: "3. Calibration, soils, water-limited production"
+            - href: learn/module4.qmd
+              text: "4. Measurement files, nitrogen"
+            - href: learn/module5.qmd
+              text: "5. Seasonal analysis and risk"
+            - href: learn/module6.qmd
+              text: "6. Crop rotations"
+    - id: notebooks
+      style: docked
+      contents:
+        - section: "Notebooks"
+          href: notebooks/index.qmd
+          contents:
+            - href: notebooks/module1.ipynb
+              text: "Module 1 notebook"
+            - href: notebooks/module2.ipynb
+              text: "Module 2 notebook"
+            - href: notebooks/module3.ipynb
+              text: "Module 3 notebook"
+            - href: notebooks/module4.ipynb
+              text: "Module 4 notebook"
+            - href: notebooks/module5.ipynb
+              text: "Module 5 notebook"
+            - href: notebooks/module6.ipynb
+              text: "Module 6 notebook"
+    - id: about
+      style: docked
+      contents:
+        - section: "About"
+          contents:
+            - href: faq.qmd
+              text: FAQ
+            - href: acknowledgements.qmd
+              text: "Acknowledgements and how to cite"
+            - href: rebuild.qmd
+              text: Rebuild notes
+  page-footer:
+    left:
+      - text: "License: MPL-2.0"
+        href: https://github.com/bennyistanto/xdssat/blob/main/LICENSE
+      - text: "Not an official DSSAT product"
+        href: acknowledgements.qmd
+    right:
+      - icon: github
+        href: https://github.com/bennyistanto/xdssat
+        aria-label: "xdssat on GitHub"
+
+bibliography: references.bib
+link-citations: true
+
+format:
+  html:
+    # equations are written as \( inline \) and \[ display \]; "$...$" math is off because the
+    # dollar signs of inline ${...} expressions (OJS) and of prices would pair up into math
+    from: markdown-tex_math_dollars+tex_math_single_backslash
+    html-math-method: mathjax
+    theme:
+      light: [cosmo, styles/light.scss]
+      dark: [darkly, styles/dark.scss]
+    css: styles/custom.css
+    toc: true
+    toc-depth: 3
+    number-sections: false
+    link-external-newwindow: true
+    link-external-icon: true
+    smooth-scroll: true
+    code-copy: true
+    fig-cap-location: bottom
+
+execute:
+  echo: false
+  # Pages never run the DSSAT engine at render time: notebooks keep their stored
+  # outputs (Quarto does not execute .ipynb by default) and anything executed is frozen.
+  freeze: auto

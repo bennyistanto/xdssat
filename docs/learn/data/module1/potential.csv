@@ -1,0 +1,9 @@
+scenario,group,HWAM,CWAM,LAIX,CO2_mean,HWAM_obs,share_of_potential
+"Potential, CO2 M",potential,11859,23174,4.562,340.887,,1.0
+"Potential, CO2 D",potential,11983,23367,4.569,380.0,,1.01
+T1 Rainfed Low Nitrogen,UFGA8201 treatments,2293,6556,1.989,,2929.0,0.193
+T2 Rainfed High Nitrogen,UFGA8201 treatments,2293,7538,3.274,,3130.0,0.193
+T3 Irrigated Low Nitrogen,UFGA8201 treatments,8207,14578,2.507,,6850.0,0.692
+T4 Irrigated High Nitrogen,UFGA8201 treatments,11854,22454,4.548,,11881.0,1.0
+T5 Veg Stress Low Nitrogen,UFGA8201 treatments,7718,13458,2.507,,6375.0,0.651
+T6 Veg Stress High Nitrogen,UFGA8201 treatments,10293,19234,4.031,,9344.0,0.868

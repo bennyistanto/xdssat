@@ -1,0 +1,733 @@
+DAP,NFXC,NUPC,CNAD,case,treatment
+0,0.0,0.0,0.0,no fixation,irrigated
+1,0.0,0.0,0.0,no fixation,irrigated
+2,0.0,0.0,0.0,no fixation,irrigated
+3,0.0,0.0,0.0,no fixation,irrigated
+4,0.0,0.0,0.7,no fixation,irrigated
+5,0.0,0.1,0.8,no fixation,irrigated
+6,0.0,0.1,0.9,no fixation,irrigated
+7,0.0,0.2,1.0,no fixation,irrigated
+8,0.0,0.3,1.1,no fixation,irrigated
+9,0.0,0.4,1.2,no fixation,irrigated
+10,0.0,0.5,1.3,no fixation,irrigated
+11,0.0,0.7,1.5,no fixation,irrigated
+12,0.0,0.8,1.6,no fixation,irrigated
+13,0.0,1.0,1.8,no fixation,irrigated
+14,0.0,1.2,2.0,no fixation,irrigated
+15,0.0,1.4,2.2,no fixation,irrigated
+16,0.0,1.6,2.4,no fixation,irrigated
+17,0.0,1.8,2.6,no fixation,irrigated
+18,0.0,2.1,2.8,no fixation,irrigated
+19,0.0,2.4,3.1,no fixation,irrigated
+20,0.0,2.7,3.3,no fixation,irrigated
+21,0.0,3.0,3.6,no fixation,irrigated
+22,0.0,3.2,3.7,no fixation,irrigated
+23,0.0,3.3,3.8,no fixation,irrigated
+24,0.0,3.4,3.8,no fixation,irrigated
+25,0.0,3.5,3.8,no fixation,irrigated
+26,0.0,3.6,3.9,no fixation,irrigated
+27,0.0,3.7,3.9,no fixation,irrigated
+28,0.0,3.7,3.9,no fixation,irrigated
+29,0.0,3.8,3.9,no fixation,irrigated
+30,0.0,3.8,3.8,no fixation,irrigated
+31,0.0,3.9,3.8,no fixation,irrigated
+32,0.0,3.9,3.8,no fixation,irrigated
+33,0.0,4.0,3.8,no fixation,irrigated
+34,0.0,4.0,3.8,no fixation,irrigated
+35,0.0,4.0,3.8,no fixation,irrigated
+36,0.0,4.1,3.8,no fixation,irrigated
+37,0.0,4.1,3.7,no fixation,irrigated
+38,0.0,4.2,3.7,no fixation,irrigated
+39,0.0,4.2,3.7,no fixation,irrigated
+40,0.0,4.2,3.7,no fixation,irrigated
+41,0.0,4.3,3.7,no fixation,irrigated
+42,0.0,4.3,3.7,no fixation,irrigated
+43,0.0,4.4,3.6,no fixation,irrigated
+44,0.0,4.4,3.6,no fixation,irrigated
+45,0.0,4.4,3.6,no fixation,irrigated
+46,0.0,4.4,3.6,no fixation,irrigated
+47,0.0,4.4,3.5,no fixation,irrigated
+48,0.0,4.4,3.5,no fixation,irrigated
+49,0.0,4.4,3.5,no fixation,irrigated
+50,0.0,4.4,3.4,no fixation,irrigated
+51,0.0,4.4,3.4,no fixation,irrigated
+52,0.0,4.4,3.4,no fixation,irrigated
+53,0.0,4.4,3.4,no fixation,irrigated
+54,0.0,4.4,3.3,no fixation,irrigated
+55,0.0,4.4,3.3,no fixation,irrigated
+56,0.0,4.4,3.3,no fixation,irrigated
+57,0.0,4.4,3.2,no fixation,irrigated
+58,0.0,4.4,3.2,no fixation,irrigated
+59,0.0,4.4,3.2,no fixation,irrigated
+60,0.0,4.4,3.2,no fixation,irrigated
+61,0.0,4.4,3.1,no fixation,irrigated
+62,0.0,4.4,3.1,no fixation,irrigated
+63,0.0,4.4,3.1,no fixation,irrigated
+64,0.0,4.4,3.0,no fixation,irrigated
+65,0.0,4.4,3.0,no fixation,irrigated
+66,0.0,4.4,3.0,no fixation,irrigated
+67,0.0,4.4,3.0,no fixation,irrigated
+68,0.0,4.4,3.0,no fixation,irrigated
+69,0.0,4.4,2.9,no fixation,irrigated
+70,0.0,4.4,2.9,no fixation,irrigated
+71,0.0,4.4,2.9,no fixation,irrigated
+72,0.0,4.4,2.9,no fixation,irrigated
+73,0.0,4.4,2.9,no fixation,irrigated
+74,0.0,4.5,2.9,no fixation,irrigated
+75,0.0,4.5,2.9,no fixation,irrigated
+76,0.0,4.5,2.9,no fixation,irrigated
+77,0.0,4.5,2.9,no fixation,irrigated
+78,0.0,4.5,2.9,no fixation,irrigated
+79,0.0,4.5,2.9,no fixation,irrigated
+80,0.0,4.6,3.0,no fixation,irrigated
+81,0.0,4.6,3.0,no fixation,irrigated
+82,0.0,4.6,3.0,no fixation,irrigated
+83,0.0,4.8,3.2,no fixation,irrigated
+84,0.0,4.9,3.3,no fixation,irrigated
+85,0.0,5.0,3.4,no fixation,irrigated
+86,0.0,5.0,3.4,no fixation,irrigated
+87,0.0,5.2,3.6,no fixation,irrigated
+88,0.0,5.3,3.6,no fixation,irrigated
+89,0.0,5.4,3.7,no fixation,irrigated
+90,0.0,5.5,3.9,no fixation,irrigated
+91,0.0,5.7,4.0,no fixation,irrigated
+92,0.0,5.8,4.2,no fixation,irrigated
+93,0.0,5.9,4.3,no fixation,irrigated
+94,0.0,6.0,4.4,no fixation,irrigated
+95,0.0,6.2,4.5,no fixation,irrigated
+96,0.0,6.3,4.6,no fixation,irrigated
+97,0.0,6.4,4.8,no fixation,irrigated
+98,0.0,6.6,4.9,no fixation,irrigated
+99,0.0,6.7,5.0,no fixation,irrigated
+100,0.0,6.8,5.2,no fixation,irrigated
+101,0.0,6.9,5.2,no fixation,irrigated
+102,0.0,7.0,5.3,no fixation,irrigated
+103,0.0,7.1,5.5,no fixation,irrigated
+104,0.0,7.3,5.5,no fixation,irrigated
+105,0.0,7.4,5.6,no fixation,irrigated
+106,0.0,7.5,5.7,no fixation,irrigated
+107,0.0,7.7,5.8,no fixation,irrigated
+108,0.0,7.7,5.9,no fixation,irrigated
+109,0.0,7.8,5.9,no fixation,irrigated
+110,0.0,7.9,5.7,no fixation,irrigated
+111,0.0,8.0,5.5,no fixation,irrigated
+112,0.0,8.1,5.3,no fixation,irrigated
+113,0.0,8.3,5.3,no fixation,irrigated
+114,0.0,8.4,5.2,no fixation,irrigated
+115,0.0,8.5,5.1,no fixation,irrigated
+116,0.0,8.5,5.0,no fixation,irrigated
+117,0.0,8.6,5.0,no fixation,irrigated
+118,0.0,8.6,4.9,no fixation,irrigated
+119,0.0,8.7,4.9,no fixation,irrigated
+120,0.0,8.7,4.9,no fixation,irrigated
+0,0.0,0.0,0.0,no fixation,rainfed
+1,0.0,0.0,0.0,no fixation,rainfed
+2,0.0,0.0,0.0,no fixation,rainfed
+3,0.0,0.0,0.0,no fixation,rainfed
+4,0.0,0.0,0.7,no fixation,rainfed
+5,0.0,0.1,0.8,no fixation,rainfed
+6,0.0,0.1,0.9,no fixation,rainfed
+7,0.0,0.2,0.9,no fixation,rainfed
+8,0.0,0.3,1.0,no fixation,rainfed
+9,0.0,0.4,1.1,no fixation,rainfed
+10,0.0,0.6,1.3,no fixation,rainfed
+11,0.0,0.8,1.5,no fixation,rainfed
+12,0.0,0.9,1.7,no fixation,rainfed
+13,0.0,1.1,1.9,no fixation,rainfed
+14,0.0,1.3,2.1,no fixation,rainfed
+15,0.0,1.6,2.3,no fixation,rainfed
+16,0.0,1.8,2.5,no fixation,rainfed
+17,0.0,2.1,2.8,no fixation,rainfed
+18,0.0,2.4,3.0,no fixation,rainfed
+19,0.0,2.7,3.3,no fixation,rainfed
+20,0.0,3.1,3.6,no fixation,rainfed
+21,0.0,3.5,4.0,no fixation,rainfed
+22,0.0,3.7,4.2,no fixation,rainfed
+23,0.0,3.9,4.3,no fixation,rainfed
+24,0.0,4.0,4.3,no fixation,rainfed
+25,0.0,4.2,4.4,no fixation,rainfed
+26,0.0,4.3,4.4,no fixation,rainfed
+27,0.0,4.4,4.5,no fixation,rainfed
+28,0.0,4.5,4.5,no fixation,rainfed
+29,0.0,4.6,4.5,no fixation,rainfed
+30,0.0,4.7,4.5,no fixation,rainfed
+31,0.0,4.7,4.5,no fixation,rainfed
+32,0.0,4.8,4.5,no fixation,rainfed
+33,0.0,4.9,4.5,no fixation,rainfed
+34,0.0,4.9,4.4,no fixation,rainfed
+35,0.0,5.0,4.4,no fixation,rainfed
+36,0.0,5.1,4.4,no fixation,rainfed
+37,0.0,5.1,4.4,no fixation,rainfed
+38,0.0,5.2,4.4,no fixation,rainfed
+39,0.0,5.3,4.4,no fixation,rainfed
+40,0.0,5.3,4.4,no fixation,rainfed
+41,0.0,5.4,4.4,no fixation,rainfed
+42,0.0,5.5,4.4,no fixation,rainfed
+43,0.0,5.6,4.4,no fixation,rainfed
+44,0.0,5.6,4.3,no fixation,rainfed
+45,0.0,5.6,4.3,no fixation,rainfed
+46,0.0,5.6,4.3,no fixation,rainfed
+47,0.0,5.6,4.2,no fixation,rainfed
+48,0.0,5.6,4.2,no fixation,rainfed
+49,0.0,5.6,4.2,no fixation,rainfed
+50,0.0,5.6,4.1,no fixation,rainfed
+51,0.0,5.6,4.1,no fixation,rainfed
+52,0.0,5.6,4.1,no fixation,rainfed
+53,0.0,5.6,4.0,no fixation,rainfed
+54,0.0,5.6,4.0,no fixation,rainfed
+55,0.0,5.6,4.0,no fixation,rainfed
+56,0.0,5.6,3.9,no fixation,rainfed
+57,0.0,5.6,3.9,no fixation,rainfed
+58,0.0,5.6,3.9,no fixation,rainfed
+59,0.0,5.6,3.8,no fixation,rainfed
+60,0.0,5.6,3.8,no fixation,rainfed
+61,0.0,5.6,3.8,no fixation,rainfed
+62,0.0,5.6,3.7,no fixation,rainfed
+63,0.0,5.6,3.7,no fixation,rainfed
+64,0.0,5.6,3.7,no fixation,rainfed
+65,0.0,5.7,3.6,no fixation,rainfed
+66,0.0,5.7,3.6,no fixation,rainfed
+67,0.0,5.7,3.6,no fixation,rainfed
+68,0.0,5.8,3.6,no fixation,rainfed
+69,0.0,5.9,3.6,no fixation,rainfed
+70,0.0,5.9,3.6,no fixation,rainfed
+71,0.0,6.0,3.7,no fixation,rainfed
+72,0.0,6.1,3.7,no fixation,rainfed
+73,0.0,6.1,3.8,no fixation,rainfed
+74,0.0,6.1,3.7,no fixation,rainfed
+75,0.0,6.2,3.8,no fixation,rainfed
+76,0.0,6.3,3.8,no fixation,rainfed
+77,0.0,6.3,3.8,no fixation,rainfed
+78,0.0,6.4,3.9,no fixation,rainfed
+79,0.0,6.4,3.9,no fixation,rainfed
+80,0.0,6.5,4.0,no fixation,rainfed
+81,0.0,6.5,4.0,no fixation,rainfed
+82,0.0,6.6,4.0,no fixation,rainfed
+83,0.0,6.7,4.2,no fixation,rainfed
+84,0.0,6.8,4.2,no fixation,rainfed
+85,0.0,6.8,4.3,no fixation,rainfed
+86,0.0,6.9,4.3,no fixation,rainfed
+87,0.0,7.0,4.4,no fixation,rainfed
+88,0.0,7.0,4.4,no fixation,rainfed
+89,0.0,7.1,4.5,no fixation,rainfed
+90,0.0,7.1,4.6,no fixation,rainfed
+91,0.0,7.2,4.6,no fixation,rainfed
+92,0.0,7.2,4.7,no fixation,rainfed
+93,0.0,7.3,4.7,no fixation,rainfed
+94,0.0,7.4,4.8,no fixation,rainfed
+95,0.0,7.5,4.9,no fixation,rainfed
+96,0.0,7.5,4.9,no fixation,rainfed
+97,0.0,7.6,5.0,no fixation,rainfed
+98,0.0,7.7,5.1,no fixation,rainfed
+99,0.0,7.8,5.1,no fixation,rainfed
+100,0.0,7.9,5.2,no fixation,rainfed
+101,0.0,8.0,5.3,no fixation,rainfed
+102,0.0,8.0,5.3,no fixation,rainfed
+103,0.0,8.1,5.4,no fixation,rainfed
+104,0.0,8.2,5.5,no fixation,rainfed
+105,0.0,8.3,5.5,no fixation,rainfed
+106,0.0,8.4,5.6,no fixation,rainfed
+107,0.0,8.5,5.6,no fixation,rainfed
+108,0.0,8.6,5.7,no fixation,rainfed
+109,0.0,8.7,5.5,no fixation,rainfed
+110,0.0,8.8,5.4,no fixation,rainfed
+111,0.0,9.0,5.3,no fixation,rainfed
+112,0.0,9.1,5.2,no fixation,rainfed
+113,0.0,9.2,5.1,no fixation,rainfed
+114,0.0,9.3,5.1,no fixation,rainfed
+115,0.0,9.4,5.0,no fixation,rainfed
+116,0.0,9.4,4.9,no fixation,rainfed
+117,0.0,9.5,4.9,no fixation,rainfed
+118,0.0,9.5,4.8,no fixation,rainfed
+119,0.0,9.6,4.8,no fixation,rainfed
+120,0.0,9.6,4.8,no fixation,rainfed
+0,0.0,0.0,0.0,fixation,irrigated
+1,0.0,0.0,0.0,fixation,irrigated
+2,0.0,0.0,0.0,fixation,irrigated
+3,0.0,0.0,0.0,fixation,irrigated
+4,0.2,0.0,0.7,fixation,irrigated
+5,0.2,0.1,0.8,fixation,irrigated
+6,0.2,0.1,0.9,fixation,irrigated
+7,0.2,0.2,0.9,fixation,irrigated
+8,0.2,0.3,1.1,fixation,irrigated
+9,0.2,0.4,1.1,fixation,irrigated
+10,0.2,0.5,1.3,fixation,irrigated
+11,0.3,0.7,1.5,fixation,irrigated
+12,0.4,0.8,1.8,fixation,irrigated
+13,0.6,1.0,2.1,fixation,irrigated
+14,0.8,1.1,2.4,fixation,irrigated
+15,1.0,1.3,2.8,fixation,irrigated
+16,1.4,1.5,3.3,fixation,irrigated
+17,1.7,1.7,3.7,fixation,irrigated
+18,2.2,1.9,4.3,fixation,irrigated
+19,2.6,2.2,4.8,fixation,irrigated
+20,3.1,2.4,5.5,fixation,irrigated
+21,3.5,2.8,6.1,fixation,irrigated
+22,4.1,2.9,6.7,fixation,irrigated
+23,4.9,3.1,7.4,fixation,irrigated
+24,5.8,3.2,8.1,fixation,irrigated
+25,6.8,3.3,9.0,fixation,irrigated
+26,8.0,3.4,10.0,fixation,irrigated
+27,9.2,3.5,11.1,fixation,irrigated
+28,10.7,3.6,12.2,fixation,irrigated
+29,12.4,3.7,13.6,fixation,irrigated
+30,14.4,3.8,15.1,fixation,irrigated
+31,15.2,3.9,15.8,fixation,irrigated
+32,17.4,4.0,17.6,fixation,irrigated
+33,19.9,4.1,19.6,fixation,irrigated
+34,22.4,4.2,21.9,fixation,irrigated
+35,25.1,4.3,24.2,fixation,irrigated
+36,28.1,4.5,26.7,fixation,irrigated
+37,31.4,4.6,29.5,fixation,irrigated
+38,34.8,4.7,32.4,fixation,irrigated
+39,38.5,4.8,35.6,fixation,irrigated
+40,42.2,5.0,38.9,fixation,irrigated
+41,45.3,5.3,41.8,fixation,irrigated
+42,49.1,5.5,45.4,fixation,irrigated
+43,51.5,5.7,47.7,fixation,irrigated
+44,55.0,5.9,50.8,fixation,irrigated
+45,59.3,5.9,54.5,fixation,irrigated
+46,62.3,5.9,57.2,fixation,irrigated
+47,66.8,5.9,61.1,fixation,irrigated
+48,71.7,6.0,65.2,fixation,irrigated
+49,76.7,6.0,69.5,fixation,irrigated
+50,81.8,6.0,74.0,fixation,irrigated
+51,86.7,6.0,78.3,fixation,irrigated
+52,90.7,6.0,81.7,fixation,irrigated
+53,95.9,6.0,86.2,fixation,irrigated
+54,99.7,6.0,89.5,fixation,irrigated
+55,105.0,6.0,94.0,fixation,irrigated
+56,109.4,6.0,97.8,fixation,irrigated
+57,113.0,6.0,100.9,fixation,irrigated
+58,117.3,6.0,104.5,fixation,irrigated
+59,120.4,6.0,107.1,fixation,irrigated
+60,124.9,6.0,110.8,fixation,irrigated
+61,129.9,6.0,115.1,fixation,irrigated
+62,134.2,6.0,118.8,fixation,irrigated
+63,139.0,6.0,122.8,fixation,irrigated
+64,143.8,6.3,127.2,fixation,irrigated
+65,147.9,6.3,130.8,fixation,irrigated
+66,152.8,6.3,135.1,fixation,irrigated
+67,157.5,6.3,139.2,fixation,irrigated
+68,161.6,6.3,142.7,fixation,irrigated
+69,166.0,6.3,146.5,fixation,irrigated
+70,170.5,6.4,150.4,fixation,irrigated
+71,174.3,6.7,154.1,fixation,irrigated
+72,178.6,6.7,157.9,fixation,irrigated
+73,182.6,7.0,161.6,fixation,irrigated
+74,186.2,7.0,164.3,fixation,irrigated
+75,189.9,7.3,167.3,fixation,irrigated
+76,193.8,7.3,170.4,fixation,irrigated
+77,197.2,7.6,173.2,fixation,irrigated
+78,200.3,8.1,175.8,fixation,irrigated
+79,203.4,8.4,178.2,fixation,irrigated
+80,207.8,8.5,181.6,fixation,irrigated
+81,212.1,8.5,184.6,fixation,irrigated
+82,216.3,8.9,188.3,fixation,irrigated
+83,221.3,8.9,192.6,fixation,irrigated
+84,225.8,9.3,196.6,fixation,irrigated
+85,230.4,9.5,199.8,fixation,irrigated
+86,234.7,9.5,202.5,fixation,irrigated
+87,236.1,9.9,203.4,fixation,irrigated
+88,241.5,10.0,206.4,fixation,irrigated
+89,246.2,10.2,209.8,fixation,irrigated
+90,247.6,10.3,210.9,fixation,irrigated
+91,251.7,10.6,213.8,fixation,irrigated
+92,255.0,10.6,216.6,fixation,irrigated
+93,255.0,10.6,216.5,fixation,irrigated
+94,258.8,11.0,218.7,fixation,irrigated
+95,258.9,11.1,218.7,fixation,irrigated
+96,258.9,11.1,218.6,fixation,irrigated
+97,261.7,11.4,219.5,fixation,irrigated
+98,262.0,11.5,219.4,fixation,irrigated
+99,262.0,11.5,217.8,fixation,irrigated
+100,262.9,11.9,216.6,fixation,irrigated
+101,265.2,12.0,218.5,fixation,irrigated
+102,267.5,12.1,219.6,fixation,irrigated
+103,267.5,12.1,217.7,fixation,irrigated
+104,269.0,12.4,219.2,fixation,irrigated
+105,269.7,12.6,219.8,fixation,irrigated
+106,270.2,12.8,220.4,fixation,irrigated
+107,270.3,12.9,219.4,fixation,irrigated
+108,271.8,13.1,220.9,fixation,irrigated
+109,273.8,13.3,222.4,fixation,irrigated
+110,275.5,13.6,224.3,fixation,irrigated
+111,276.2,13.7,224.8,fixation,irrigated
+112,276.2,13.7,224.8,fixation,irrigated
+113,276.2,13.7,224.8,fixation,irrigated
+114,276.2,14.1,225.1,fixation,irrigated
+115,276.2,14.1,219.5,fixation,irrigated
+116,276.2,14.2,215.2,fixation,irrigated
+117,276.2,14.2,211.8,fixation,irrigated
+118,276.2,14.4,209.4,fixation,irrigated
+119,276.2,14.4,207.3,fixation,irrigated
+120,276.2,14.4,205.7,fixation,irrigated
+121,276.2,14.4,204.4,fixation,irrigated
+122,276.2,14.4,203.3,fixation,irrigated
+123,276.2,14.4,202.5,fixation,irrigated
+124,276.2,14.4,201.9,fixation,irrigated
+125,276.2,14.4,201.3,fixation,irrigated
+126,276.2,14.4,200.9,fixation,irrigated
+0,0.0,0.0,0.0,fixation,rainfed
+1,0.0,0.0,0.0,fixation,rainfed
+2,0.0,0.0,0.0,fixation,rainfed
+3,0.0,0.0,0.0,fixation,rainfed
+4,0.2,0.0,0.7,fixation,rainfed
+5,0.2,0.1,0.8,fixation,rainfed
+6,0.2,0.1,0.9,fixation,rainfed
+7,0.2,0.2,0.9,fixation,rainfed
+8,0.2,0.3,1.0,fixation,rainfed
+9,0.2,0.4,1.1,fixation,rainfed
+10,0.2,0.6,1.2,fixation,rainfed
+11,0.3,0.8,1.5,fixation,rainfed
+12,0.4,0.9,1.8,fixation,rainfed
+13,0.5,1.1,2.1,fixation,rainfed
+14,0.7,1.3,2.4,fixation,rainfed
+15,0.9,1.5,2.8,fixation,rainfed
+16,1.2,1.7,3.3,fixation,rainfed
+17,1.6,2.0,3.7,fixation,rainfed
+18,2.0,2.2,4.3,fixation,rainfed
+19,2.3,2.5,4.8,fixation,rainfed
+20,2.8,2.8,5.5,fixation,rainfed
+21,3.1,3.2,6.0,fixation,rainfed
+22,3.7,3.5,6.7,fixation,rainfed
+23,4.4,3.6,7.3,fixation,rainfed
+24,5.2,3.8,8.1,fixation,rainfed
+25,6.2,4.0,8.9,fixation,rainfed
+26,7.3,4.1,9.9,fixation,rainfed
+27,8.4,4.3,11.0,fixation,rainfed
+28,9.8,4.4,12.1,fixation,rainfed
+29,11.4,4.6,13.4,fixation,rainfed
+30,13.2,4.6,14.9,fixation,rainfed
+31,14.0,4.7,15.5,fixation,rainfed
+32,16.1,4.9,17.3,fixation,rainfed
+33,18.6,5.0,19.2,fixation,rainfed
+34,21.0,5.1,21.4,fixation,rainfed
+35,23.7,5.3,23.7,fixation,rainfed
+36,26.7,5.4,26.2,fixation,rainfed
+37,29.9,5.5,28.9,fixation,rainfed
+38,33.3,5.7,31.9,fixation,rainfed
+39,36.8,5.9,35.1,fixation,rainfed
+40,40.6,6.0,38.3,fixation,rainfed
+41,43.6,6.3,41.2,fixation,rainfed
+42,47.3,6.7,44.7,fixation,rainfed
+43,49.7,6.9,47.0,fixation,rainfed
+44,53.1,7.0,50.1,fixation,rainfed
+45,57.4,7.0,53.8,fixation,rainfed
+46,60.4,7.1,56.4,fixation,rainfed
+47,64.9,7.1,60.3,fixation,rainfed
+48,69.7,7.1,64.4,fixation,rainfed
+49,74.7,7.1,68.7,fixation,rainfed
+50,79.8,7.1,73.1,fixation,rainfed
+51,84.7,7.1,77.5,fixation,rainfed
+52,88.7,7.1,80.9,fixation,rainfed
+53,93.8,7.1,85.4,fixation,rainfed
+54,97.7,7.1,88.7,fixation,rainfed
+55,102.9,7.1,93.1,fixation,rainfed
+56,107.3,7.1,96.9,fixation,rainfed
+57,111.0,7.1,100.0,fixation,rainfed
+58,115.3,7.1,103.7,fixation,rainfed
+59,118.4,7.1,106.2,fixation,rainfed
+60,122.8,7.1,110.0,fixation,rainfed
+61,127.8,7.1,114.3,fixation,rainfed
+62,132.2,7.1,117.9,fixation,rainfed
+63,137.0,7.1,122.0,fixation,rainfed
+64,142.0,7.2,126.4,fixation,rainfed
+65,145.8,7.6,130.0,fixation,rainfed
+66,150.7,7.6,134.3,fixation,rainfed
+67,155.4,7.6,138.3,fixation,rainfed
+68,159.5,7.6,141.9,fixation,rainfed
+69,163.9,7.6,145.7,fixation,rainfed
+70,168.2,7.9,149.6,fixation,rainfed
+71,172.3,7.9,153.3,fixation,rainfed
+72,176.0,7.9,155.9,fixation,rainfed
+73,177.2,7.9,156.2,fixation,rainfed
+74,178.1,7.9,155.8,fixation,rainfed
+75,178.3,8.1,155.1,fixation,rainfed
+76,178.4,8.3,154.4,fixation,rainfed
+77,178.5,8.4,151.7,fixation,rainfed
+78,178.7,8.4,149.3,fixation,rainfed
+79,179.0,8.5,146.2,fixation,rainfed
+80,179.1,8.5,142.8,fixation,rainfed
+81,179.1,8.6,139.1,fixation,rainfed
+82,179.3,8.7,136.6,fixation,rainfed
+83,179.4,8.8,134.3,fixation,rainfed
+84,179.4,8.9,131.7,fixation,rainfed
+85,179.4,8.9,129.1,fixation,rainfed
+86,179.4,9.0,127.0,fixation,rainfed
+87,179.7,9.0,125.3,fixation,rainfed
+88,179.7,9.0,123.2,fixation,rainfed
+89,179.7,9.0,121.4,fixation,rainfed
+90,179.7,9.0,119.9,fixation,rainfed
+91,179.7,9.0,119.3,fixation,rainfed
+92,179.7,9.0,117.7,fixation,rainfed
+93,179.7,9.0,116.6,fixation,rainfed
+94,179.7,9.0,116.6,fixation,rainfed
+95,179.7,9.0,116.6,fixation,rainfed
+96,179.7,9.0,116.6,fixation,rainfed
+97,179.7,9.0,116.6,fixation,rainfed
+98,179.7,9.0,116.6,fixation,rainfed
+99,179.7,9.0,116.5,fixation,rainfed
+100,179.7,9.0,116.5,fixation,rainfed
+101,179.7,9.3,116.7,fixation,rainfed
+102,179.7,9.3,116.7,fixation,rainfed
+103,179.7,9.3,116.7,fixation,rainfed
+104,179.7,9.3,116.7,fixation,rainfed
+105,179.7,9.3,116.7,fixation,rainfed
+106,179.7,9.3,111.4,fixation,rainfed
+107,179.7,9.3,107.3,fixation,rainfed
+108,179.7,9.3,104.1,fixation,rainfed
+109,179.7,9.5,101.8,fixation,rainfed
+110,179.7,9.6,100.1,fixation,rainfed
+111,179.7,9.6,98.7,fixation,rainfed
+112,179.7,9.6,97.6,fixation,rainfed
+113,179.7,9.6,96.7,fixation,rainfed
+114,179.7,9.6,96.0,fixation,rainfed
+115,179.7,9.6,95.4,fixation,rainfed
+116,179.7,9.6,94.9,fixation,rainfed
+117,179.7,9.6,94.6,fixation,rainfed
+0,0.0,0.0,0.0,nitrogen not limiting,irrigated
+1,0.0,0.0,0.0,nitrogen not limiting,irrigated
+2,0.0,0.0,0.0,nitrogen not limiting,irrigated
+3,0.0,0.0,0.0,nitrogen not limiting,irrigated
+4,0.0,0.0,0.7,nitrogen not limiting,irrigated
+5,0.0,0.0,0.8,nitrogen not limiting,irrigated
+6,0.0,0.0,0.8,nitrogen not limiting,irrigated
+7,0.0,0.0,0.8,nitrogen not limiting,irrigated
+8,0.0,0.0,0.8,nitrogen not limiting,irrigated
+9,0.0,0.0,0.9,nitrogen not limiting,irrigated
+10,0.0,0.0,0.9,nitrogen not limiting,irrigated
+11,0.0,0.0,1.1,nitrogen not limiting,irrigated
+12,0.0,0.0,1.3,nitrogen not limiting,irrigated
+13,0.0,0.0,1.5,nitrogen not limiting,irrigated
+14,0.0,0.0,1.8,nitrogen not limiting,irrigated
+15,0.0,0.0,2.2,nitrogen not limiting,irrigated
+16,0.0,0.0,2.6,nitrogen not limiting,irrigated
+17,0.0,0.0,3.1,nitrogen not limiting,irrigated
+18,0.0,0.0,3.8,nitrogen not limiting,irrigated
+19,0.0,0.0,4.3,nitrogen not limiting,irrigated
+20,0.0,0.0,5.0,nitrogen not limiting,irrigated
+21,0.0,0.0,5.6,nitrogen not limiting,irrigated
+22,0.0,0.0,6.3,nitrogen not limiting,irrigated
+23,0.0,0.0,7.3,nitrogen not limiting,irrigated
+24,0.0,0.0,8.4,nitrogen not limiting,irrigated
+25,0.0,0.0,9.6,nitrogen not limiting,irrigated
+26,0.0,0.0,10.9,nitrogen not limiting,irrigated
+27,0.0,0.0,11.9,nitrogen not limiting,irrigated
+28,0.0,0.0,13.3,nitrogen not limiting,irrigated
+29,0.0,0.0,14.9,nitrogen not limiting,irrigated
+30,0.0,0.0,16.6,nitrogen not limiting,irrigated
+31,0.0,0.0,17.2,nitrogen not limiting,irrigated
+32,0.0,0.0,19.2,nitrogen not limiting,irrigated
+33,0.0,0.0,21.4,nitrogen not limiting,irrigated
+34,0.0,0.0,23.5,nitrogen not limiting,irrigated
+35,0.0,0.0,25.9,nitrogen not limiting,irrigated
+36,0.0,0.0,28.5,nitrogen not limiting,irrigated
+37,0.0,0.0,31.3,nitrogen not limiting,irrigated
+38,0.0,0.0,34.3,nitrogen not limiting,irrigated
+39,0.0,0.0,37.5,nitrogen not limiting,irrigated
+40,0.0,0.0,40.8,nitrogen not limiting,irrigated
+41,0.0,0.0,43.6,nitrogen not limiting,irrigated
+42,0.0,0.0,47.1,nitrogen not limiting,irrigated
+43,0.0,0.0,49.3,nitrogen not limiting,irrigated
+44,0.0,0.0,52.4,nitrogen not limiting,irrigated
+45,0.0,0.0,56.3,nitrogen not limiting,irrigated
+46,0.0,0.0,58.8,nitrogen not limiting,irrigated
+47,0.0,0.0,62.8,nitrogen not limiting,irrigated
+48,0.0,0.0,67.1,nitrogen not limiting,irrigated
+49,0.0,0.0,71.4,nitrogen not limiting,irrigated
+50,0.0,0.0,75.8,nitrogen not limiting,irrigated
+51,0.0,0.0,80.0,nitrogen not limiting,irrigated
+52,0.0,0.0,83.4,nitrogen not limiting,irrigated
+53,0.0,0.0,87.9,nitrogen not limiting,irrigated
+54,0.0,0.0,91.1,nitrogen not limiting,irrigated
+55,0.0,0.0,95.7,nitrogen not limiting,irrigated
+56,0.0,0.0,99.4,nitrogen not limiting,irrigated
+57,0.0,0.0,102.4,nitrogen not limiting,irrigated
+58,0.0,0.0,106.1,nitrogen not limiting,irrigated
+59,0.0,0.0,108.6,nitrogen not limiting,irrigated
+60,0.0,0.0,112.5,nitrogen not limiting,irrigated
+61,0.0,0.0,116.8,nitrogen not limiting,irrigated
+62,0.0,0.0,120.3,nitrogen not limiting,irrigated
+63,0.0,0.0,124.5,nitrogen not limiting,irrigated
+64,0.0,0.0,128.9,nitrogen not limiting,irrigated
+65,0.0,0.0,132.4,nitrogen not limiting,irrigated
+66,0.0,0.0,136.8,nitrogen not limiting,irrigated
+67,0.0,0.0,140.9,nitrogen not limiting,irrigated
+68,0.0,0.0,144.5,nitrogen not limiting,irrigated
+69,0.0,0.0,148.5,nitrogen not limiting,irrigated
+70,0.0,0.0,152.7,nitrogen not limiting,irrigated
+71,0.0,0.0,156.6,nitrogen not limiting,irrigated
+72,0.0,0.0,160.8,nitrogen not limiting,irrigated
+73,0.0,0.0,164.9,nitrogen not limiting,irrigated
+74,0.0,0.0,167.8,nitrogen not limiting,irrigated
+75,0.0,0.0,171.4,nitrogen not limiting,irrigated
+76,0.0,0.0,175.0,nitrogen not limiting,irrigated
+77,0.0,0.0,178.2,nitrogen not limiting,irrigated
+78,0.0,0.0,181.3,nitrogen not limiting,irrigated
+79,0.0,0.0,184.1,nitrogen not limiting,irrigated
+80,0.0,0.0,187.9,nitrogen not limiting,irrigated
+81,0.0,0.0,191.0,nitrogen not limiting,irrigated
+82,0.0,0.0,195.0,nitrogen not limiting,irrigated
+83,0.0,0.0,199.3,nitrogen not limiting,irrigated
+84,0.0,0.0,203.0,nitrogen not limiting,irrigated
+85,0.0,0.0,206.0,nitrogen not limiting,irrigated
+86,0.0,0.0,208.6,nitrogen not limiting,irrigated
+87,0.0,0.0,209.4,nitrogen not limiting,irrigated
+88,0.0,0.0,212.2,nitrogen not limiting,irrigated
+89,0.0,0.0,215.4,nitrogen not limiting,irrigated
+90,0.0,0.0,216.5,nitrogen not limiting,irrigated
+91,0.0,0.0,219.2,nitrogen not limiting,irrigated
+92,0.0,0.0,222.0,nitrogen not limiting,irrigated
+93,0.0,0.0,221.9,nitrogen not limiting,irrigated
+94,0.0,0.0,224.0,nitrogen not limiting,irrigated
+95,0.0,0.0,223.9,nitrogen not limiting,irrigated
+96,0.0,0.0,223.9,nitrogen not limiting,irrigated
+97,0.0,0.0,225.0,nitrogen not limiting,irrigated
+98,0.0,0.0,224.9,nitrogen not limiting,irrigated
+99,0.0,0.0,223.3,nitrogen not limiting,irrigated
+100,0.0,0.0,222.7,nitrogen not limiting,irrigated
+101,0.0,0.0,226.1,nitrogen not limiting,irrigated
+102,0.0,0.0,228.5,nitrogen not limiting,irrigated
+103,0.0,0.0,226.5,nitrogen not limiting,irrigated
+104,0.0,0.0,228.8,nitrogen not limiting,irrigated
+105,0.0,0.0,230.1,nitrogen not limiting,irrigated
+106,0.0,0.0,231.0,nitrogen not limiting,irrigated
+107,0.0,0.0,229.9,nitrogen not limiting,irrigated
+108,0.0,0.0,231.9,nitrogen not limiting,irrigated
+109,0.0,0.0,234.0,nitrogen not limiting,irrigated
+110,0.0,0.0,236.4,nitrogen not limiting,irrigated
+111,0.0,0.0,237.6,nitrogen not limiting,irrigated
+112,0.0,0.0,237.6,nitrogen not limiting,irrigated
+113,0.0,0.0,237.6,nitrogen not limiting,irrigated
+114,0.0,0.0,239.0,nitrogen not limiting,irrigated
+115,0.0,0.0,233.4,nitrogen not limiting,irrigated
+116,0.0,0.0,229.1,nitrogen not limiting,irrigated
+117,0.0,0.0,225.8,nitrogen not limiting,irrigated
+118,0.0,0.0,223.5,nitrogen not limiting,irrigated
+119,0.0,0.0,221.5,nitrogen not limiting,irrigated
+120,0.0,0.0,219.9,nitrogen not limiting,irrigated
+121,0.0,0.0,218.6,nitrogen not limiting,irrigated
+122,0.0,0.0,217.6,nitrogen not limiting,irrigated
+123,0.0,0.0,216.8,nitrogen not limiting,irrigated
+124,0.0,0.0,216.2,nitrogen not limiting,irrigated
+125,0.0,0.0,215.6,nitrogen not limiting,irrigated
+126,0.0,0.0,215.2,nitrogen not limiting,irrigated
+0,0.0,0.0,0.0,nitrogen not limiting,rainfed
+1,0.0,0.0,0.0,nitrogen not limiting,rainfed
+2,0.0,0.0,0.0,nitrogen not limiting,rainfed
+3,0.0,0.0,0.0,nitrogen not limiting,rainfed
+4,0.0,0.0,0.7,nitrogen not limiting,rainfed
+5,0.0,0.0,0.8,nitrogen not limiting,rainfed
+6,0.0,0.0,0.8,nitrogen not limiting,rainfed
+7,0.0,0.0,0.8,nitrogen not limiting,rainfed
+8,0.0,0.0,0.8,nitrogen not limiting,rainfed
+9,0.0,0.0,0.9,nitrogen not limiting,rainfed
+10,0.0,0.0,0.9,nitrogen not limiting,rainfed
+11,0.0,0.0,1.1,nitrogen not limiting,rainfed
+12,0.0,0.0,1.3,nitrogen not limiting,rainfed
+13,0.0,0.0,1.5,nitrogen not limiting,rainfed
+14,0.0,0.0,1.8,nitrogen not limiting,rainfed
+15,0.0,0.0,2.2,nitrogen not limiting,rainfed
+16,0.0,0.0,2.6,nitrogen not limiting,rainfed
+17,0.0,0.0,3.1,nitrogen not limiting,rainfed
+18,0.0,0.0,3.8,nitrogen not limiting,rainfed
+19,0.0,0.0,4.3,nitrogen not limiting,rainfed
+20,0.0,0.0,5.0,nitrogen not limiting,rainfed
+21,0.0,0.0,5.6,nitrogen not limiting,rainfed
+22,0.0,0.0,6.3,nitrogen not limiting,rainfed
+23,0.0,0.0,7.3,nitrogen not limiting,rainfed
+24,0.0,0.0,8.4,nitrogen not limiting,rainfed
+25,0.0,0.0,9.6,nitrogen not limiting,rainfed
+26,0.0,0.0,10.8,nitrogen not limiting,rainfed
+27,0.0,0.0,11.9,nitrogen not limiting,rainfed
+28,0.0,0.0,13.3,nitrogen not limiting,rainfed
+29,0.0,0.0,14.8,nitrogen not limiting,rainfed
+30,0.0,0.0,16.6,nitrogen not limiting,rainfed
+31,0.0,0.0,17.2,nitrogen not limiting,rainfed
+32,0.0,0.0,19.2,nitrogen not limiting,rainfed
+33,0.0,0.0,21.4,nitrogen not limiting,rainfed
+34,0.0,0.0,23.5,nitrogen not limiting,rainfed
+35,0.0,0.0,25.8,nitrogen not limiting,rainfed
+36,0.0,0.0,28.5,nitrogen not limiting,rainfed
+37,0.0,0.0,31.3,nitrogen not limiting,rainfed
+38,0.0,0.0,34.3,nitrogen not limiting,rainfed
+39,0.0,0.0,37.5,nitrogen not limiting,rainfed
+40,0.0,0.0,40.8,nitrogen not limiting,rainfed
+41,0.0,0.0,43.6,nitrogen not limiting,rainfed
+42,0.0,0.0,47.1,nitrogen not limiting,rainfed
+43,0.0,0.0,49.2,nitrogen not limiting,rainfed
+44,0.0,0.0,52.4,nitrogen not limiting,rainfed
+45,0.0,0.0,56.2,nitrogen not limiting,rainfed
+46,0.0,0.0,58.8,nitrogen not limiting,rainfed
+47,0.0,0.0,62.8,nitrogen not limiting,rainfed
+48,0.0,0.0,67.0,nitrogen not limiting,rainfed
+49,0.0,0.0,71.3,nitrogen not limiting,rainfed
+50,0.0,0.0,75.7,nitrogen not limiting,rainfed
+51,0.0,0.0,80.0,nitrogen not limiting,rainfed
+52,0.0,0.0,83.3,nitrogen not limiting,rainfed
+53,0.0,0.0,87.8,nitrogen not limiting,rainfed
+54,0.0,0.0,91.1,nitrogen not limiting,rainfed
+55,0.0,0.0,95.6,nitrogen not limiting,rainfed
+56,0.0,0.0,99.4,nitrogen not limiting,rainfed
+57,0.0,0.0,102.4,nitrogen not limiting,rainfed
+58,0.0,0.0,106.1,nitrogen not limiting,rainfed
+59,0.0,0.0,108.5,nitrogen not limiting,rainfed
+60,0.0,0.0,112.4,nitrogen not limiting,rainfed
+61,0.0,0.0,116.7,nitrogen not limiting,rainfed
+62,0.0,0.0,120.3,nitrogen not limiting,rainfed
+63,0.0,0.0,124.4,nitrogen not limiting,rainfed
+64,0.0,0.0,128.8,nitrogen not limiting,rainfed
+65,0.0,0.0,132.3,nitrogen not limiting,rainfed
+66,0.0,0.0,136.7,nitrogen not limiting,rainfed
+67,0.0,0.0,140.8,nitrogen not limiting,rainfed
+68,0.0,0.0,144.5,nitrogen not limiting,rainfed
+69,0.0,0.0,148.5,nitrogen not limiting,rainfed
+70,0.0,0.0,152.6,nitrogen not limiting,rainfed
+71,0.0,0.0,156.5,nitrogen not limiting,rainfed
+72,0.0,0.0,160.0,nitrogen not limiting,rainfed
+73,0.0,0.0,161.0,nitrogen not limiting,rainfed
+74,0.0,0.0,160.9,nitrogen not limiting,rainfed
+75,0.0,0.0,160.2,nitrogen not limiting,rainfed
+76,0.0,0.0,159.5,nitrogen not limiting,rainfed
+77,0.0,0.0,156.7,nitrogen not limiting,rainfed
+78,0.0,0.0,154.2,nitrogen not limiting,rainfed
+79,0.0,0.0,151.0,nitrogen not limiting,rainfed
+80,0.0,0.0,147.4,nitrogen not limiting,rainfed
+81,0.0,0.0,143.6,nitrogen not limiting,rainfed
+82,0.0,0.0,140.7,nitrogen not limiting,rainfed
+83,0.0,0.0,138.3,nitrogen not limiting,rainfed
+84,0.0,0.0,135.5,nitrogen not limiting,rainfed
+85,0.0,0.0,132.9,nitrogen not limiting,rainfed
+86,0.0,0.0,130.7,nitrogen not limiting,rainfed
+87,0.0,0.0,128.8,nitrogen not limiting,rainfed
+88,0.0,0.0,126.6,nitrogen not limiting,rainfed
+89,0.0,0.0,124.8,nitrogen not limiting,rainfed
+90,0.0,0.0,123.2,nitrogen not limiting,rainfed
+91,0.0,0.0,122.6,nitrogen not limiting,rainfed
+92,0.0,0.0,120.9,nitrogen not limiting,rainfed
+93,0.0,0.0,120.5,nitrogen not limiting,rainfed
+94,0.0,0.0,120.5,nitrogen not limiting,rainfed
+95,0.0,0.0,120.6,nitrogen not limiting,rainfed
+96,0.0,0.0,120.6,nitrogen not limiting,rainfed
+97,0.0,0.0,120.6,nitrogen not limiting,rainfed
+98,0.0,0.0,120.6,nitrogen not limiting,rainfed
+99,0.0,0.0,120.6,nitrogen not limiting,rainfed
+100,0.0,0.0,120.6,nitrogen not limiting,rainfed
+101,0.0,0.0,120.9,nitrogen not limiting,rainfed
+102,0.0,0.0,120.9,nitrogen not limiting,rainfed
+103,0.0,0.0,120.9,nitrogen not limiting,rainfed
+104,0.0,0.0,120.9,nitrogen not limiting,rainfed
+105,0.0,0.0,120.9,nitrogen not limiting,rainfed
+106,0.0,0.0,115.3,nitrogen not limiting,rainfed
+107,0.0,0.0,111.0,nitrogen not limiting,rainfed
+108,0.0,0.0,107.7,nitrogen not limiting,rainfed
+109,0.0,0.0,105.2,nitrogen not limiting,rainfed
+110,0.0,0.0,103.4,nitrogen not limiting,rainfed
+111,0.0,0.0,101.9,nitrogen not limiting,rainfed
+112,0.0,0.0,100.8,nitrogen not limiting,rainfed
+113,0.0,0.0,99.8,nitrogen not limiting,rainfed
+114,0.0,0.0,99.1,nitrogen not limiting,rainfed
+115,0.0,0.0,98.5,nitrogen not limiting,rainfed
+116,0.0,0.0,98.0,nitrogen not limiting,rainfed
+117,0.0,0.0,97.6,nitrogen not limiting,rainfed

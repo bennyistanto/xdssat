@@ -1,0 +1,18 @@
+coefficient,IB0012,IB0015,definition
+name,IR 58,IR 64,
+EXPNO,.,.,Number of experiments used to estimate cultivar parameters
+ECO#,IB0001,IB0001,Ecotype code for this cultivar points to the Ecotype in the ECO file (currently not used).
+P1,254.8,500.0,"Time period (expressed as growing degree days [GDD] in °C-d above a base temperature of 9°C) from seedling emergence during which the rice plant is not responsive to changes in photoperiod. This period is also referred to as the basic vegetative phase of the plant. Range: 150-800 °C-d. Calibration: flexible, compare with observed panicle initiation and flowering dates."
+P2R,96.44,160.0,Extent to which phasic development leading to panicle initiation is delayed (expressed as GDD in °C-d) for each hour increase in photoperiod above P2O. Range 5-300 °C-d. Calibration: Modern rice varieties will have values in the lower range.
+P5,378.4,450.0,"Time period in GDD °C-d) from beginning of grain filling (3 to 4 days after flowering) to physiological maturity with a base temperature of 9°C. Range 150-850 °C-d. Calibration: Ensure P1, P2O and P2R are correctly calibrated for anthesis data. Then calibrate P5 for observed maturity date."
+P2O,10.63,12.0,"Critical photoperiod or the longest day length (in hours) at which the development occurs at a maximum rate. At values higher than P2O developmental rate is slowed, hence there is delay due to longer day lengths. Range 11-13 h. Default 12 h. Calibration: Do not go below 11 unless data are available."
+G1,77.03,60.0,Potential spikelet number coefficient as estimated from the number of spikelets per g of main culm dry weight (less leaf blades and sheaths plus spikes) at anthesis. Range 50-75 #/g. A typical value is 55 #/g.
+G2,0.020,.0250,"Single grain weight (g) under ideal growing conditions, i.e. nonlimiting light, water, nutrients, and absence of pests and diseases. Range 0.015-0.030 g. Default 0.025 g. Calibration: Very low flexibility."
+G3,1.00,1.00,Tillering coefficient (scalar value) relative to IR64 cultivar under ideal conditions. Range 0.7-1.3. Calibration: A higher tillering cultivar would have a coefficient greater than 1.0.
+PHINT,83.00,83.0,Phyllochron Interval (°C-d). Time interval in degree-days for each leaf-tip to appear under non-stressed conditions. Range 55-90 °C-d. Default 83 °C-d. Calibration: Recommend to not change unless field data on leaf numbers are available.
+THOT,33.9,28.0,Temperature (°C) above which spikelet sterility is affected by high temperature. Range 25-34 °C. Default 28°C. Calibration: recommended to not change unless hot environment data are available. Convert old cultivars THOT = 28./G4.
+TCLDP,15.0,15.0,"Temperature (°C) below which panicle initiation is further delayed (other than P1, P2O and P2R) by low temperature. Range 12-18 °C. Default 15°C. Calibration: recommended to not change unless cold environment data are available. Convert old cultivars TCLDP = 15.*G5."
+TCLDF,15.0,15.0,Temperature (°C) below which spikelet sterility is affected by low temperature. Range 10-20 °C. Default 15°C. Calibration: recommended to not change unless cold environment data are available. Convert old cultivars TCLDF = 15.*G5.
+FOZ1,0.00,0.00,"Ozone stress factor for photosynthesis (0.00-1.00), 0.00 = off, 0.10 = ozone tolerant, 0.30 = intermediate, 0.65 = sensitive"
+SFOZ1,0.00,0.00,"Ozone stress factor for leaf senescence (0.00-1.00), 0.00 = off, 0.08 = ozone tolerant, 0.10 = intermediate, 0.12 = sensitive"
+OBASE,25.0,25.0,"Base mean 7-hour (M7) ozone damage threshold, default = 25.0 ppb"

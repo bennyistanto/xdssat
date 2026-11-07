@@ -1,0 +1,15 @@
+TRNO,treatment,variable,simulated,observed,sim/obs
+1,irrigated,"Seed yield, kg/ha",3114.0,2891.0,1.077
+1,irrigated,"Tops weight, kg/ha",6314.0,5781.0,1.092
+1,irrigated,"Pod weight, kg/ha",3987.0,3734.0,1.068
+1,irrigated,"LAI, maximum",5.537,4.71,1.176
+1,irrigated,"Seed size, g",152.171,163.8,0.929
+1,irrigated,"First flower (R1), DAP",43.0,43.0,1.0
+1,irrigated,"Maturity, DAP",115.0,119.0,0.966
+2,rainfed,"Seed yield, kg/ha",3061.0,2883.0,1.062
+2,rainfed,"Tops weight, kg/ha",5994.0,5534.0,1.083
+2,rainfed,"Pod weight, kg/ha",3920.0,3755.0,1.044
+2,rainfed,"LAI, maximum",5.283,4.36,1.212
+2,rainfed,"Seed size, g",152.699,157.8,0.968
+2,rainfed,"First flower (R1), DAP",43.0,45.0,0.956
+2,rainfed,"Maturity, DAP",115.0,119.0,0.966

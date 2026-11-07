@@ -1,0 +1,12 @@
+code,label,description,file
+PWAM,Pod/Ear w kg/ha,Pod/Ear/Panicle weight at maturity (kg [dm]/ha),FileA
+H#AM,Number #/m2,Number at maturity (no/m2),FileA
+HWAM,Mat Yield kg/ha,Yield at harvest maturity (kg [dm]/ha),FileA
+CWAM,Biomass kg/ha,Biomass at maturity (total crop minus roots) (kg[dm]/ha),FileA
+HWUM,Weight g/unit,Unit wt at maturity (g [dm]/unit),FileA
+PWAD,Pod wt kg/ha,Pod weight (kg [dm]/ha),FileT
+G#AD,Grain no #/m2,Grain number (no/m2),FileT
+GWAD,Grain wt kg/ha,Grain weight (kg [dm]/ha),FileT
+P#AD,Pod no #/m2,Pod number (no/m2),FileT
+CWAD,Biomass kg/ha,Total crop weight minus roots (kg [dm]/ha),FileT
+GWGD,Grain wt mg,Unit grain weight (mg [dm]/grain),FileT

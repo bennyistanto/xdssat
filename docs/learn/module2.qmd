@@ -1,0 +1,808 @@
+---
+title: "Module 2: growth processes, weather data, the DSSAT file system and cultivar coefficients"
+subtitle: "DSSAT training, module 2 of 6. Follows day 2 of the course, with code instead of the DSSAT shell"
+---
+
+```{ojs}
+import {withDownload, fmt} from "../assets/js/dl.js"
+final = FileAttachment("data/module2/final.csv").csv({typed: true})
+gsim = FileAttachment("data/module2/growth_sim.csv").csv({typed: true})
+gobs = FileAttachment("data/module2/growth_obs.csv").csv({typed: true})
+stats = FileAttachment("data/module2/stats.csv").csv({typed: true})
+carbon = FileAttachment("data/module2/carbon.csv").csv({typed: true})
+cTot = FileAttachment("data/module2/carbon_totals.csv").csv({typed: true})
+light = FileAttachment("data/module2/light.csv").csv({typed: true})
+lightFit = FileAttachment("data/module2/light_fit.csv").csv({typed: true})
+stress = FileAttachment("data/module2/stress.csv").csv({typed: true})
+photo = FileAttachment("data/module2/photo_method.csv").csv({typed: true})
+wSeason = FileAttachment("data/module2/weather_season.csv").csv({typed: true})
+wMonthly = FileAttachment("data/module2/weather_monthly.csv").csv({typed: true})
+wChecks = FileAttachment("data/module2/weather_checks.csv").csv({typed: true})
+wTavAmp = FileAttachment("data/module2/weather_tavamp.csv").csv({typed: true})
+wRound = FileAttachment("data/module2/weather_roundtrip.csv").csv({typed: true})
+wSens = FileAttachment("data/module2/weather_sens.csv").csv({typed: true})
+files = FileAttachment("data/module2/files.csv").csv({typed: true})
+exps = FileAttachment("data/module2/experiments_per_crop.csv").csv({typed: true})
+naming = FileAttachment("data/module2/naming.csv").csv()
+// cultivar codes such as 990007 must stay text
+cultivars = (await FileAttachment("data/module2/cultivars.csv").csv({typed: true})).map(d => ({...d, var: String(d.var)}))
+mgPd = (await FileAttachment("data/module2/mg_pdate.csv").csv({typed: true})).map(d => ({...d, var: String(d.var)}))
+daylength = FileAttachment("data/module2/daylength.csv").csv({typed: true})
+sensCoef = FileAttachment("data/module2/sens_coef.csv").csv({typed: true})
+sensCoefG = FileAttachment("data/module2/sens_coef_growth.csv").csv({typed: true})
+mg7 = FileAttachment("data/module2/mg7_base.csv").csv({typed: true})
+mgEx = (await FileAttachment("data/module2/mg_exercise.csv").csv({typed: true})).map(d => ({...d, var: String(d.var)}))
+mgExG = (await FileAttachment("data/module2/mg_exercise_growth.csv").csv({typed: true})).map(d => ({...d, var: String(d.var)}))
+grRaw = FileAttachment("data/module2/grgr_raw.csv").csv({typed: true})
+grDaily = FileAttachment("data/module2/grgr_daily.csv").csv({typed: true})
+grMonthly = FileAttachment("data/module2/grgr_monthly.csv").csv({typed: true})
+grChecks = FileAttachment("data/module2/grgr_checks.csv").csv({typed: true})
+grFiles = FileAttachment("data/module2/grgr_files.csv").csv({typed: true})
+grStation = FileAttachment("data/module2/grgr_station.csv").csv({typed: true})
+grMaize = FileAttachment("data/module2/grgr_maize.csv").csv({typed: true})
+co2r = FileAttachment("data/module2/co2_response.csv").csv({typed: true})
+coefModels = FileAttachment("data/module2/coefficients_by_model.csv").csv({typed: true})
+runInfo = FileAttachment("data/module2/run_info.csv").csv()
+dlLinks = html`<a href="${"../notebooks/module2" + ".ipynb"}" download>download .ipynb</a>, helper <a href="../notebooks/learnlib.py" download>learnlib.py</a>`
+W = Math.min(width, 860)
+trtName = new Map([[1, "irrigated"], [2, "rainfed"]])
+bragg = cultivars.find(d => d.var === "IB0001")
+```
+
+::: {.callout-note appearance="simple"}
+**How to use this module.** Read this page for the ideas; every chart comes from the
+[module 2 notebook](../notebooks/module2.ipynb) (${dlLinks}), which runs the DSSAT engine and writes the small
+data files the charts read. The runs on this build were made on ${runInfo[0].run_on} with model ${runInfo[0].model}.
+:::
+
+## What you will learn
+
+- How a crop model grows a crop each day: photosynthesis, respiration, and how the new mass is shared
+  between leaves, stems, roots, pods and seeds.
+- What a DSSAT weather file holds, how to check it, how to convert data from other units, and how much the
+  simulated crop depends on each weather variable.
+- Which files make up the minimum data set of a run and how DSSAT names them.
+- The difference between species, ecotype and cultivar coefficients, and how day length and cultivar
+  coefficients set when a soybean flowers and matures.
+
+The example is a soybean experiment from Gainesville, Florida, in 1979 (`UFGA7901`, cultivar Bragg),
+shipped with DSSAT [@csmdata]. It has two treatments, irrigated and rainfed, both planted on 19 June. Soybean
+is simulated by CROPGRO, the grain legume model of DSSAT-CSM [@jones2003].
+
+## 1. Growth processes
+
+### The run, checked against the field
+
+```{ojs}
+viewof finalVar = Inputs.select([...new Set(final.map(d => d.variable))], {label: "Variable", value: "Seed yield, kg/ha"})
+```
+
+```{ojs}
+{
+  const rows = final.filter(d => d.variable === finalVar);
+  const hi = d3.max(rows, d => Math.max(d.simulated, d.observed)) * 1.1;
+  const lo = finalVar.includes("DAP") || finalVar.includes("size") ? d3.min(rows, d => Math.min(d.simulated, d.observed)) * 0.9 : 0;
+  return withDownload(Plot.plot({
+    width: Math.min(W, 460), height: 380, marginLeft: 60,
+    x: {label: `Observed: ${finalVar}`, domain: [lo, hi], grid: true},
+    y: {label: `Simulated: ${finalVar}`, domain: [lo, hi], grid: true},
+    color: {legend: true, domain: ["irrigated", "rainfed"], range: ["#2a7f62", "#d9822b"]},
+    marks: [
+      Plot.line([[lo, lo], [hi, hi]], {stroke: "#999", strokeDasharray: "4,3"}),
+      Plot.dot(rows, {x: "observed", y: "simulated", fill: "treatment", r: 7, tip: true, channels: {"sim/obs": "sim/obs"}})
+    ]
+  }), `module2-sim-vs-obs-${finalVar.replace(/[^a-z]+/gi, "-")}`);
+}
+```
+
+```{ojs}
+yRows = final.filter(d => d.variable === "Seed yield, kg/ha")
+```
+
+Simulated seed yield is ${fmt.int(yRows[0].simulated)} kg/ha irrigated and ${fmt.int(yRows[1].simulated)}
+rainfed, against ${fmt.int(yRows[0].observed)} and ${fmt.int(yRows[1].observed)} measured. In both the
+field and the model the two treatments yield almost the same: in this season the irrigation added little.
+
+### The daily carbon balance
+
+Each day CROPGRO computes **gross photosynthesis**, subtracts **maintenance respiration** (the cost of
+keeping existing tissue alive, part proportional to the plant's mass and part to the day's photosynthesis,
+[`RESPIR.for:54`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Plant/CROPGRO/RESPIR.for#L54)),
+and converts what is left into new tissue, losing **growth respiration** in the conversion. What is added
+to the crop that day is the **crop growth rate**:
+
+\[
+\frac{dW}{dt} = E\,(P_g - R_m), \qquad R_m = r_o\,W + r_p\,P_g
+\]
+
+with \(W\) the crop's dry weight, \(P_g\) gross photosynthesis, \(R_m\) maintenance respiration, \(E\) the
+conversion efficiency of carbohydrate into tissue (one minus the growth respiration share), and \(r_o\), \(r_p\)
+temperature-dependent coefficients (`RO`, `RP` in `RESPIR.for`).
+
+```{ojs}
+viewof cTrt = Inputs.radio(new Map([["Irrigated", 1], ["Rainfed", 2]]), {value: 1, label: "Treatment"})
+```
+
+```{ojs}
+cLong = carbon.filter(d => d.TRNO === cTrt).flatMap(d => [
+  {DAP: d.DAP, v: d.PHAD, term: "gross photosynthesis"}, {DAP: d.DAP, v: d.MRAD, term: "maintenance respiration"},
+  {DAP: d.DAP, v: d.GRAD, term: "growth respiration"}, {DAP: d.DAP, v: d.CGRD, term: "crop growth rate"}])
+withDownload(Plot.plot({
+  width: W, height: 340, marginLeft: 55,
+  x: {label: "Days after planting", grid: true},
+  y: {label: "g CH2O (or dry matter) per m² per day", grid: true},
+  color: {legend: true, domain: ["gross photosynthesis", "maintenance respiration", "growth respiration", "crop growth rate"], range: ["#2a7f62", "#d9822b", "#c4a35a", "#4a6fa5"]},
+  marks: [Plot.lineY(cLong, {x: "DAP", y: "v", stroke: "term", tip: true})]
+}), `module2-carbon-balance-${trtName.get(cTrt)}`)
+```
+
+```{ojs}
+ct = cTot.find(d => d.TRNO === cTrt)
+```
+
+Over the season the ${trtName.get(cTrt)} crop fixed ${fmt.int(ct.PHAD)} g CH2O/m² and respired ${fmt.pct(ct["respired share"])} of it (maintenance ${fmt.int(ct.MRAD)}, growth ${fmt.int(ct.GRAD)} g/m²), while the daily crop growth adds up to ${fmt.int(ct.CGRD)} g/m². Respiration is not a small correction: the crop respires almost as much as it
+grows.
+
+The way gross photosynthesis is computed is a simulation option. This experiment uses `PHOTO` = `L`, an
+hourly leaf-level calculation done in the soil-plant-atmosphere module; with `C` CROPGRO uses a daily
+canopy equation instead
+([`CROPGRO.for:748-758`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Plant/CROPGRO/CROPGRO.for#L748)),
+which multiplies a light-limited rate by 0-1 factors for soil fertility (`SLPF`), temperature, leaf N,
+water and CO2 ([`PHOTO.for:225`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Plant/CROPGRO/PHOTO.for#L225)):
+
+\[
+\begin{aligned}
+P_g = {} & P_{max} \cdot SLPF \cdot f_{light} \cdot f_{T} \cdot f_{age,N} \\
+& \cdot f_{SLW} \cdot f_{CO_2} \cdot f_{LFMAX} \cdot \min(SWFAC,\, f_{O_3})
+\end{aligned}
+\]
+
+(in the code `PTSMAX`, `SLPF`, `PGFAC`, `TPGFAC`, `E_FAC`, `PGSLW`, `PRATIO`, `PGLFMX` and the minimum of the water
+and ozone factors).
+
+```{ojs}
+Inputs.table(photo, {header: {treatment: "Treatment", HWAM_L: "Seed yield, PHOTO L", HWAM_C: "Seed yield, PHOTO C", CWAM_L: "Tops, PHOTO L", CWAM_C: "Tops, PHOTO C", obs_HWAM: "Seed yield, observed"}, layout: "auto"})
+```
+
+### Where the new mass goes
+
+```{ojs}
+viewof pTrt = Inputs.radio(new Map([["Irrigated", 1], ["Rainfed", 2]]), {value: 1, label: "Treatment"})
+viewof pMode = Inputs.radio(["kg/ha", "share of tops"], {value: "kg/ha", label: "Show"})
+```
+
+```{ojs}
+organs = [["LWAD", "leaf"], ["SWAD", "stem"], ["SHAD", "pod shell"], ["GWAD", "seed"]]
+pLong = gsim.filter(d => d.TRNO === pTrt).flatMap(d => {
+  const tot = d3.sum(organs, ([k]) => d[k] ?? 0);
+  return organs.map(([k, n]) => ({DAP: d.DAP, organ: n, v: pMode === "kg/ha" ? (d[k] ?? 0) : tot > 0 ? (d[k] ?? 0) / tot : 0}));
+})
+withDownload(Plot.plot({
+  width: W, height: 340, marginLeft: 60,
+  x: {label: "Days after planting", grid: true},
+  y: {label: pMode === "kg/ha" ? "Dry weight, kg/ha" : "Share of above-ground dry weight", grid: true, tickFormat: pMode === "kg/ha" ? null : "%"},
+  color: {legend: true, domain: organs.map(d => d[1]), range: ["#2a7f62", "#9bb8ad", "#c4a35a", "#d9822b"]},
+  marks: [
+    Plot.areaY(pLong, {x: "DAP", y: "v", fill: "organ", order: organs.map(d => d[1]), tip: true}),
+    ...(pMode === "kg/ha" ? [Plot.dot(gobs.filter(d => d.TRNO === pTrt), {x: "DAP", y: "CWAD", stroke: "#222", r: 3, tip: true, title: d => `observed tops ${d.CWAD} kg/ha, DAP ${d.DAP}`})] : [])
+  ]
+}), `module2-partitioning-${trtName.get(pTrt)}`)
+```
+
+Until flowering the new mass goes into leaves, stems (and roots, not shown). After the first pods set, a
+growing share goes to pods, and late in the season leaves fall and their mass is lost from the tops. The
+black dots are the field samples of total tops weight.
+
+Compare any organ with the field samples:
+
+```{ojs}
+viewof gVar = Inputs.select(new Map([["Leaf area index", "LAID"], ["Leaf weight, kg/ha", "LWAD"], ["Stem weight, kg/ha", "SWAD"], ["Pod weight, kg/ha", "PWAD"], ["Seed weight, kg/ha", "GWAD"], ["Tops weight, kg/ha", "CWAD"]]), {value: "LAID", label: "Variable"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 330, marginLeft: 60,
+  x: {label: "Days after planting", grid: true},
+  y: {label: gVar, grid: true},
+  color: {legend: true, domain: ["irrigated", "rainfed"], range: ["#2a7f62", "#d9822b"]},
+  marks: [
+    Plot.lineY(gsim, {x: "DAP", y: gVar, stroke: d => trtName.get(d.TRNO), tip: true}),
+    Plot.dot(gobs.filter(d => d[gVar] != null && trtName.has(d.TRNO)), {x: "DAP", y: gVar, fill: d => trtName.get(d.TRNO), r: 4, tip: true})
+  ]
+}), `module2-growth-${gVar}`)
+```
+
+```{ojs}
+Inputs.table(stats.map(d => ({...d, treatment: trtName.get(d.TRNO)})), {columns: ["treatment", "variable", "n", "rmse", "d"],
+  header: {n: "Samples", rmse: "RMSE", d: "Willmott d"}, format: {rmse: d => d.toFixed(1), d: d => d.toFixed(3)}, layout: "auto"})
+```
+
+### Light interception
+
+Photosynthesis starts with the light the canopy intercepts. With little leaf area most light reaches the
+ground; as leaf area grows, the canopy catches more and more of it, with diminishing returns. The usual summary is Beer's
+law,
+
+\[
+LI = 1 - e^{-k \cdot LAI},
+\]
+
+with an extinction coefficient \(k\). The notebook fits `k`
+to the engine's daily light interception (`LI%D`) and LAI by least squares: k = ${lightFit[0].k.toFixed(2)} from ${lightFit[0].days} days. Move the slider to see how `k` shapes the curve.
+
+```{ojs}
+viewof kUser = Inputs.range([0.3, 1.2], {step: 0.01, value: 0.5, label: "Your k"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(W, 620), height: 340, marginLeft: 55,
+  x: {label: "Leaf area index", grid: true},
+  y: {label: "Intercepted PAR, %", grid: true, domain: [0, 100]},
+  color: {legend: true, domain: ["engine, irrigated", "engine, rainfed", `fitted k = ${lightFit[0].k.toFixed(2)}`, `your k = ${kUser}`], range: ["#2a7f62", "#d9822b", "#222", "#4a6fa5"]},
+  marks: [
+    Plot.dot(light, {x: "LAID", y: "LI", fill: d => `engine, ${trtName.get(d.TRNO)}`, r: 2.5, fillOpacity: 0.6, tip: true}),
+    Plot.line(d3.range(0, 6.01, 0.05).map(l => [l, 100 * (1 - Math.exp(-lightFit[0].k * l))]), {stroke: () => `fitted k = ${lightFit[0].k.toFixed(2)}`, strokeWidth: 2}),
+    Plot.line(d3.range(0, 6.01, 0.05).map(l => [l, 100 * (1 - Math.exp(-kUser * l))]), {stroke: () => `your k = ${kUser}`, strokeWidth: 2, strokeDasharray: "5,3"})
+  ]
+}), "module2-light-interception")
+```
+
+The engine does not use one fixed `k`: the hourly leaf method accounts for the sun's angle and for direct
+and diffuse light, which is why the dots scatter around the fitted curve.
+
+### Water stress
+
+`PlantGro` reports two water stress indices: on photosynthesis (`WSPD`) and on expansion, partitioning and
+development (`WSGD`). CROPGRO writes them as 1 minus the stress factor
+([`Opgrow.for:277-278`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Plant/CROPGRO/Opgrow.for#L277)):
+0 means no stress. In the rainfed run the expansion index peaks at ${fmt.d2(d3.max(stress.filter(d => d.TRNO === 2), d => d.WSGD))}, the photosynthesis index at ${fmt.d2(d3.max(stress.filter(d => d.TRNO === 2), d => d.WSPD))}:
+leaf expansion is the more sensitive process.
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 360, marginLeft: 55,
+  x: {label: "Days after planting", grid: true},
+  y: {label: "Stress index (0 = none)", grid: true, domain: [0, 1]},
+  fy: {label: null},
+  color: {legend: true, domain: ["photosynthesis (WSPD)", "expansion (WSGD)", "rain + irrigation, mm/40"], range: ["#d9822b", "#2a7f62", "#9bb8ad"]},
+  marks: [
+    Plot.rectY(stress, {x1: "DAP", x2: d => d.DAP + 1, y: d => d.PRED / 40, fy: d => trtName.get(d.TRNO), fill: () => "rain + irrigation, mm/40", tip: true, title: d => `DAP ${d.DAP}: rain ${d.PRED} mm`}),
+    Plot.lineY(stress, {x: "DAP", y: "WSPD", fy: d => trtName.get(d.TRNO), stroke: () => "photosynthesis (WSPD)", tip: true}),
+    Plot.lineY(stress, {x: "DAP", y: "WSGD", fy: d => trtName.get(d.TRNO), stroke: () => "expansion (WSGD)"})
+  ]
+}), "module2-water-stress")
+```
+
+::: {.source-note}
+Rain bars show the weather file's daily rain only (scaled by 1/40). Irrigation of the irrigated treatment is
+not drawn; it received ${fmt.int(d3.max(stress.filter(d => d.TRNO === 1), d => d.IRRC))} mm in total.
+:::
+
+### The effect of CO2 on growth
+
+Photosynthesis responds to the CO2 concentration of the air, and C3 crops (soybean) more than C4 crops (maize),
+whose photosynthesis already concentrates CO2 inside the leaf. The notebook runs the irrigated soybean of UFGA7901
+and the irrigated, high-N maize of UFGA8201 at six fixed concentrations, set with the environmental modification
+column `ECO2`:
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(W, 640), height: 300, marginLeft: 60,
+  x: {label: "CO2, ppm", grid: true},
+  y: {label: "Yield relative to 380 ppm", grid: true},
+  color: {legend: true, domain: ["soybean (C3)", "maize (C4)"], range: ["#3f7a34", "#f2a33a"]},
+  marks: [Plot.ruleY([1], {stroke: "#bbb"}), Plot.lineY(co2r, {x: "CO2", y: "relative_yield", stroke: "crop", marker: "dot", tip: true, channels: {"yield, kg/ha": "HWAM", "ET, mm": "ETCM"}})]
+}), "module2-co2-response")
+```
+
+```{ojs}
+co2g = (c, v) => co2r.find(d => d.crop === c && d.CO2 === v).relative_yield
+```
+
+From 380 to 700 ppm the soybean yield rises by ${fmt.pct(co2g("soybean (C3)", 700) - 1)}, the maize yield by ${fmt.pct(co2g("maize (C4)", 700) - 1)}.
+
+## 2. Weather data
+
+A DSSAT weather file has a station line (code, latitude, longitude, elevation, `TAV` the mean annual
+temperature and `AMP` the amplitude of the monthly mean temperatures) and one line per day with at least
+solar radiation (MJ/m²/day), maximum and minimum temperature (°C) and rain (mm). The DSSAT shell's
+WeatherMan tool imports, checks and converts such data. In the notebook, pandas and xdssat's `src/wth.py`
+do the same.
+
+```{ojs}
+viewof wVar = Inputs.radio(new Map([["Temperature", "T"], ["Solar radiation", "SRAD"], ["Rain", "RAIN"]]), {value: "T", label: "Show"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 300, marginLeft: 55,
+  x: {type: "utc", label: "Date, 1979 (soybean season)"},
+  y: {label: wVar === "T" ? "°C" : wVar === "SRAD" ? "MJ/m²/day" : "mm/day", grid: true},
+  color: wVar === "T" ? {legend: true, domain: ["Tmax", "Tmin"], range: ["#d9822b", "#4a6fa5"]} : undefined,
+  marks: wVar === "T" ? [
+      Plot.lineY(wSeason, {x: d => new Date(d.date), y: "TMAX", stroke: () => "Tmax", tip: true}),
+      Plot.lineY(wSeason, {x: d => new Date(d.date), y: "TMIN", stroke: () => "Tmin", tip: true})]
+    : wVar === "SRAD" ? [Plot.lineY(wSeason, {x: d => new Date(d.date), y: "SRAD", stroke: "#c4a35a", tip: true})]
+    : [Plot.rectY(wSeason, {x1: d => new Date(d.date), x2: d => new Date(+new Date(d.date) + 864e5), y: "RAIN", fill: "#4a6fa5", tip: true, title: d => `${d3.utcFormat("%d %b")(d.date)}: ${d.RAIN} mm`})]
+}), `module2-weather-${wVar}`)
+```
+
+### Checks before use
+
+Bad weather data give wrong answers without an error message, so they are checked first. The notebook's
+checks on the 1979 file:
+
+```{ojs}
+Inputs.table(wChecks, {header: {check: "Check", count: "Days"}, layout: "auto"})
+```
+
+```{ojs}
+Inputs.table(wTavAmp, {header: {what: "Header value", header: "In the file", recomputed: "From the 1979 data"}, layout: "auto"})
+```
+
+`TAV` recomputed from the year's own data agrees with the file; `AMP` does not. Both header values are the
+ones in the station's long-term climate file, `Weather/Climate/UFGA.CLI` of dssat-csm-data (TAV 20.9, AMP
+13.0, "calculated from daily data" for 49 years from 1958): the header carries the long-term climate, not the
+year's own values. The engine reads both and uses them for the
+soil temperature; it only substitutes defaults (20 and 5 °C) when they are missing
+([`weathr.for:215-224`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Weather/weathr.for#L215)).
+Checks like the day-to-day change in Tmax list days to look at, not values to delete: a large jump can be
+real weather.
+
+### The WeatherMan exercise: weather from Griffin, Georgia
+
+The course's weather exercise hands out the daily records of an experiment station at Griffin, Georgia, as a
+spreadsheet, `GRGR-Raw.xls`. It has no header, and its units are not DSSAT's: date as `YYDDD`, rain in inches,
+maximum and minimum temperature in °F, solar radiation in cal/cm² per day. The first rows:
+
+```{ojs}
+Inputs.table(grRaw.slice(0, 8), {header: {YYDDD: "Date (YYDDD)", rain_in: "Rain, in", tmax_F: "Tmax, °F", tmin_F: "Tmin, °F", srad_ly: "Radiation, cal/cm²"}, layout: "auto"})
+```
+
+In the DSSAT shell, WeatherMan reads the spreadsheet, is told what each column holds and in which unit,
+converts, checks and writes one weather file per year. The notebook does the same with pandas and
+`wth.write_wth`, with the station position the exercise gives (33°16' N, 84°17' W, 299 m). Try the
+conversions:
+
+```{ojs}
+viewof inF = Inputs.number({value: 90, label: "Tmax, °F"})
+viewof inIn = Inputs.number({value: 1.2, label: "Rain, inches"})
+viewof inLy = Inputs.number({value: 500, label: "Radiation, cal/cm²"})
+```
+
+${fmt.d1((inF - 32) * 5 / 9)} °C; ${fmt.d1(inIn * 25.4)} mm; ${fmt.d1(inLy * 0.04184)} MJ/m²/day
+(°C = (°F - 32) × 5/9; 1 inch = 25.4 mm; 1 cal/cm² = 0.04184 MJ/m²).
+
+```{ojs}
+Inputs.table(grChecks, {header: {check: "Check on the converted data", count: "Days"}, layout: "auto"})
+```
+
+```{ojs}
+grCheckText = d3.sum(grChecks.slice(1), d => d.count) === 0 ? "The checks find nothing to repair in this record." : "Some checks flag days; the notebook fills them as described there."
+Inputs.table(grFiles, {header: {file: "File written", days: "Days", first: "From", last: "To"},
+  format: {first: d => d3.utcFormat("%Y-%m-%d")(d), last: d => d3.utcFormat("%Y-%m-%d")(d)}, layout: "auto"})
+```
+
+${grCheckText} The header of every file carries the
+station's `TAV` = ${fmt.d1(grStation[0].TAV)} °C and `AMP` = ${fmt.d1(grStation[0].AMP)} °C, computed here from the whole 1992-1999 record.
+
+```{ojs}
+viewof grYear = Inputs.select([...new Set(grDaily.map(d => d.date.getUTCFullYear()))], {value: 1993, label: "Year"})
+viewof grVar = Inputs.radio(new Map([["Temperature", "T"], ["Solar radiation", "SRAD"], ["Rain", "RAIN"]]), {value: "T", label: "Show"})
+```
+
+```{ojs}
+{
+  const rows = grDaily.filter(d => d.date.getUTCFullYear() === grYear);
+  return withDownload(Plot.plot({
+    width: W, height: 280, marginLeft: 55,
+    x: {type: "utc", label: `Date, ${grYear} (Griffin, Georgia)`},
+    y: {label: grVar === "T" ? "°C" : grVar === "SRAD" ? "MJ/m²/day" : "mm/day", grid: true},
+    color: grVar === "T" ? {legend: true, domain: ["Tmax", "Tmin"], range: ["#d9822b", "#4a6fa5"]} : undefined,
+    marks: grVar === "T" ? [
+        Plot.lineY(rows, {x: "date", y: "TMAX", stroke: () => "Tmax", tip: true}),
+        Plot.lineY(rows, {x: "date", y: "TMIN", stroke: () => "Tmin", tip: true})]
+      : grVar === "SRAD" ? [Plot.lineY(rows, {x: "date", y: "SRAD", stroke: "#c4a35a", tip: true})]
+      : [Plot.rectY(rows, {x1: "date", x2: d => new Date(+d.date + 864e5), y: "RAIN", fill: "#4a6fa5", tip: true})]
+  }), `module2-griffin-${grYear}-${grVar}`);
+}
+```
+
+**Self test 1** of the exercise runs the first treatment of the maize experiment UFGA8201 with the new
+weather. The Griffin record covers 1992-1999, not 1982, so the notebook plants on 26 February of each year
+from 1992 to 1998 (the experiment's other dates move with planting), next to Gainesville 1982:
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(W, 680), height: 300, marginLeft: 100,
+  x: {label: "Grain yield, kg/ha (rainfed, low N treatment)", grid: true},
+  y: {label: null, domain: grMaize.map(d => d.cell)},
+  marks: [Plot.barX(grMaize, {y: "cell", x: "HWAM", fill: d => d.cell.startsWith("UFGA") ? "#d9822b" : "#2a7f62", tip: true,
+    channels: {"season rain, mm": "PRCM", "days to maturity": "season_days", "mean Tmax, °C": "TMAXA"}})]
+}), "module2-griffin-maize")
+```
+
+```{ojs}
+gfx = grMaize.filter(d => d.cell.startsWith("GRGR"))
+```
+
+At Griffin the crop takes ${d3.min(gfx, d => d.season_days)} to ${d3.max(gfx, d => d.season_days)} days to mature, against ${grMaize.find(d => d.cell.startsWith("UFGA")).season_days} at Gainesville: Griffin is cooler over the season (mean Tmax ${fmt.d1(d3.mean(gfx, d => d.TMAXA))} °C against ${fmt.d1(grMaize.find(d => d.cell.startsWith("UFGA")).TMAXA)}). Yield swings from ${fmt.int(d3.min(gfx, d => d.HWAM))} to ${fmt.int(d3.max(gfx, d => d.HWAM))} kg/ha between years; hover the bars for the season's rain.
+
+### Converting back and forth: an optional column matters
+
+The notebook also converts the 1979 Gainesville file to those units and back, writes a new DSSAT weather file
+with `wth.write_wth`, and reruns the soybean experiment:
+
+```{ojs}
+Inputs.table(wRound, {header: {variable: "Quantity", value: "Value"}, format: {value: d => d >= 100 ? fmt.int(d) : d.toFixed(2)}, layout: "auto"})
+```
+
+```{ojs}
+rt = Object.fromEntries(wRound.map(d => [d.variable, d.value]))
+```
+
+Rain differs by up to ${rt["RAIN, largest change"]} mm because the inches were rounded to two decimals.
+The more instructive result is the last pair of rows. The original file also has a `PAR` column
+(photosynthetically active radiation). When the conversion drops it, the engine estimates PAR from solar
+radiation instead, and irrigated seed yield changes from ${fmt.int(rt["seed yield irrigated, original file"])}
+to ${fmt.int(rt["seed yield irrigated, converted, no PAR"])} kg/ha. An optional column can matter as much as a
+units error.
+
+### When there are no daily records: weather generators
+
+A weather generator draws daily maximum and minimum temperature, solar radiation and rain that are statistically
+like a site's climate. DSSAT has two: WGEN, which needs at least 5 years of daily data, and SIMMETEO, which works
+from monthly means (the course's weather lecture). Their parameters sit in a climate file, one per site, named
+`IIss.CLI` (here `UFGA.CLI`). The `WTHER` option of the simulation controls chooses: `M` and `G` read the
+weather from a file, and `S` and `W` let the engine generate it itself from SIMMETEO or WGEN inputs
+([`Weather/weathr.for:575-577`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Weather/weathr.for#L575)).
+Generated weather fills gaps and lets one run many seasons where few were measured; it is how the
+[seasonal analysis of module 5](module5.qmd) and the [rotations of module 6](module6.qmd) get decades of weather.
+It is not a forecast: each generated season is one draw of the climate, not of a particular year.
+
+### What if the weather were different?
+
+Each scenario edits the weather file and reruns both treatments.
+
+```{ojs}
+viewof wsTrt = Inputs.radio(["irrigated", "rainfed"], {value: "rainfed", label: "Treatment"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 340, marginLeft: 150,
+  x: {label: "Change in seed yield from the 1979 weather", grid: true, tickFormat: "+%"},
+  y: {label: null, domain: ["SRAD x 0.8", "SRAD x 0.9", "SRAD x 1.1", "SRAD x 1.2", "temperature +2 °C", "temperature +4 °C", "rain x 0.5", "rain x 1.5"]},
+  color: {domain: ["radiation", "temperature", "rain"], range: ["#c4a35a", "#d9822b", "#4a6fa5"], legend: true},
+  marks: [
+    Plot.barX(wSens.filter(d => d.treatment === wsTrt && d.scenario !== "baseline"), {y: "scenario", x: "change",
+      fill: d => d.scenario.startsWith("SRAD") ? "radiation" : d.scenario.startsWith("temp") ? "temperature" : "rain",
+      tip: true, channels: {"seed yield, kg/ha": "HWAM", "maturity, DAP": "maturity_dap"}}),
+    Plot.ruleX([0])
+  ]
+}), `module2-weather-scenarios-${wsTrt}`)
+```
+
+```{ojs}
+ws = Object.fromEntries(wSens.filter(d => d.treatment === wsTrt).map(d => [d.scenario, d]))
+warmText = {
+  const a = ws["temperature +4 °C"].maturity_dap, b = ws["baseline"].maturity_dap;
+  return a < b ? `Part of that is a shorter season: maturity comes after ${a} instead of ${b} days.`
+    : `The season is not shorter (maturity after ${a} instead of ${b} days), so the loss is not a matter of less time to grow; the notebook's daily output is the place to look for where it comes from.`;
+}
+```
+
+For the ${wsTrt} crop, 20% less radiation costs ${fmt.pct(-ws["SRAD x 0.8"].change)} of seed yield, and 4 °C warmer weather costs ${fmt.pct(-ws["temperature +4 °C"].change)}. ${warmText} Halving the rain costs the rainfed crop ${fmt.pct(-wSens.find(d => d.treatment === "rainfed" && d.scenario === "rain x 0.5").change)}, the irrigated crop ${fmt.pct(-wSens.find(d => d.treatment === "irrigated" && d.scenario === "rain x 0.5").change)}: its
+irrigation was a fixed schedule, not refilled as needed.
+
+## 3. The minimum data set and the file system
+
+A DSSAT run needs a **minimum data set**: the site and its soil, daily weather, the crop management, and the
+crop's coefficients [@hunt1998]. The same reference sets out levels of data beyond that minimum: what is enough to
+run the model is not enough to calibrate it, and calibrating needs less than a full evaluation, which also needs
+measurements during the season.
+
+The course's lecture on the minimum data set put these as three levels, each adding to the one before:
+
+| Level | Needed for | Data |
+|---|---|---|
+| 1 | Running the model | Daily weather (maximum and minimum temperature, rain, solar radiation); soil surface and profile (water limits, nitrogen, organic matter); management (crop, cultivar, planting date, spacing, irrigation, fertilizer, other operations) |
+| 2 | Calibrating and evaluating it | Level 1, plus crop measurements (yield and its components, flowering and maturity dates, growth samples during the season) and soil measurements (water, nitrogen and carbon by depth over time) |
+| 3 | Developing it | Levels 1 and 2, plus detailed experiments on the response to temperature, water, nitrogen and other factors |
+
+Level 1 is what DSSAT, following IBSNAT, calls *the* minimum data set. Modules 1 and 2 run on it; module 3
+(calibration) and module 4 (measurement files) need level 2.
+
+Each part of the data lives in its own text file. The base run used these:
+
+```{ojs}
+Inputs.table(files, {header: {file: "File", role: "What it holds", lines: "Lines", source: "From"}, layout: "auto"})
+```
+
+Experiment files are named `IIssYYnn.ccX`:
+
+```{ojs}
+Inputs.table(naming, {header: {part: "Part of UFGA7901.SBX", value: "Value"}, layout: "auto"})
+```
+
+with `A` and `T` instead of `X` for the observed data; the weather file uses the same first eight characters
+and `.WTH`. DSSAT ships ${d3.sum(exps, d => d.experiments)} such experiment files in ${exps.length} folders;
+the folders with most are:
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 380, marginLeft: 110,
+  x: {label: "Experiment files (FileX) in dssat-csm-data", grid: true},
+  y: {label: null},
+  marks: [Plot.barX(exps.slice(0, 20), {y: "folder", x: "experiments", fill: d => d.folder === "Soybean" ? "#d9822b" : "#2a7f62", sort: {y: "-x"}, tip: true})]
+}), "module2-experiments-per-crop")
+```
+
+## 4. Species, ecotype and cultivar coefficients
+
+CROPGRO reads its crop parameters at three levels. The **species** file (`SBGRO048.SPE`) holds what all
+soybeans share, such as cardinal temperatures and the photosynthesis and respiration parameters. The
+**ecotype** file (`SBGRO048.ECO`) groups cultivars, here by maturity group. The **cultivar** file
+(`SBGRO048.CUL`) holds the coefficients that users estimate for each variety.
+
+### Day length and flowering
+
+Soybean is a short-day plant: development toward flowering slows when days are longer than a critical day
+length `CSDL`. `PPSEN` is how fast it slows per hour beyond that. The engine computes the relative rate with
+an "inverse linear" curve
+([`UTILS.for:378-383`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Utilities/UTILS.for#L378),
+called in [`PHENOL.for:243`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Plant/CROPGRO/PHENOL.for#L243)):
+rate 1 up to `CSDL`, then falling in a straight line to the ecotype's minimum `THVAR`:
+
+\[
+\begin{gathered}
+f(DL) =
+\begin{cases}
+1 & DL \le CSDL \\
+1 - (1 - THVAR)\,\dfrac{DL - CSDL}{CLDL - CSDL} & \text{in between} \\
+THVAR & DL \ge CLDL
+\end{cases} \\[6pt]
+CLDL = CSDL + \frac{1 - THVAR}{PPSEN}
+\end{gathered}
+\]
+
+with \(DL\) the day length in hours
+([`Ipphenol.for:239-240`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Plant/CROPGRO/Ipphenol.for#L239)).
+`THVAR` is ${bragg.THVAR} for every soybean ecotype in the file, so development stops entirely at that day length.
+
+```{ojs}
+viewof ppCul = Inputs.select(cultivars.map(d => d.var), {value: "IB0001", label: "Start from", format: v => { const c = cultivars.find(d => d.var === v); return `${c.name.trim()} (CSDL ${c.CSDL}, PPSEN ${c.PPSEN})`; }})
+```
+
+```{ojs}
+ppStart = cultivars.find(d => d.var === ppCul)
+viewof csdl = Inputs.range([11, 15], {step: 0.01, value: ppStart.CSDL, label: "CSDL, h"})
+viewof ppsen = Inputs.range([0.1, 0.5], {step: 0.005, value: ppStart.PPSEN, label: "PPSEN, 1/h"})
+```
+
+```{ojs}
+function ppRate(dayl, c, p, thvar = 0) {
+  const x2 = c + (1 - thvar) / Math.max(p, 1e-6);
+  if (dayl <= c) return 1;
+  if (dayl >= x2) return thvar;
+  return 1 - (1 - thvar) * (dayl - c) / (x2 - c);
+}
+dlRange = d3.extent(daylength, d => d.DAYLD)
+withDownload(Plot.plot({
+  width: Math.min(W, 640), height: 320, marginLeft: 55,
+  x: {label: "Day length, hours", domain: [11, 16], grid: true},
+  y: {label: "Relative rate of development to flowering", domain: [0, 1.05], grid: true},
+  marks: [
+    Plot.rectX([dlRange], {x1: d => d[0], x2: d => d[1], fill: "#c4a35a", fillOpacity: 0.25}),
+    Plot.text([dlRange], {x: d => (d[0] + d[1]) / 2, y: 0.08, text: () => "Gainesville, Apr-Nov 1979", fill: "#806a2a"}),
+    Plot.line(d3.range(11, 16.01, 0.02).map(x => [x, ppRate(x, csdl, ppsen, bragg.THVAR)]), {stroke: "#2a7f62", strokeWidth: 2.5, tip: true}),
+    Plot.line(d3.range(11, 16.01, 0.02).map(x => [x, ppRate(x, ppStart.CSDL, ppStart.PPSEN, bragg.THVAR)]), {stroke: "#999", strokeDasharray: "4,3"})
+  ]
+}), "module2-photoperiod-response")
+```
+
+The shaded band is the range of day length at Gainesville from April to November 1979 (from the engine's
+weather output). Dashed: the cultivar you started from. In the generic maturity groups of the cultivar file,
+`CSDL` falls from ${cultivars[0].CSDL} h (group 000) to ${cultivars.find(d => d.var === "990010").CSDL} h (group 10). A cultivar whose `CSDL` is above the longest Gainesville day is not slowed
+at all; Bragg, with ${bragg.CSDL} h, is slowed for much of the summer.
+
+### Coefficients across the crop models
+
+Every crop model has its own cultivar coefficients. CERES models describe a cultivar mainly by thermal time to
+stages and by grain number and size; CROPGRO models by photothermal days between reproductive stages and by leaf,
+pod and seed traits. The definitions below are read from the comment block of each model's cultivar file in the
+engine:
+
+```{ojs}
+viewof cmModel = Inputs.select([...new Set(coefModels.map(d => d.model_name))], {value: "CROPGRO-Soybean", label: "Crop model"})
+```
+
+```{ojs}
+Inputs.table(coefModels.filter(d => d.model_name === cmModel), {columns: ["coefficient", "definition"],
+  header: {coefficient: "Coefficient", definition: "Definition (from the cultivar file)"}, layout: "auto", rows: 20, width: {definition: 620}})
+```
+
+CERES-Rice's `TCLDF`, the temperature below which cold makes spikelets sterile, is the coefficient the
+[rice case study](../java/science.qmd) raises for the cool highlands of Java.
+
+### The course exercise: maturity groups 3, 5 and 7
+
+The irrigated treatment of UFGA7901 with the generic maturity group 3, 5 and 7 cultivars, everything else as
+in the experiment. The self test asks for the days to flowering and to maturity, the time between them and
+the seed yield:
+
+```{ojs}
+Inputs.table(mgEx, {columns: ["maturity_group", "R1_dap", "maturity_dap", "R1_to_maturity", "HWAM", "seed_number", "seed_mg"],
+  header: {maturity_group: "Maturity group", R1_dap: "First flower, DAP", maturity_dap: "Maturity, DAP", R1_to_maturity: "Flower to maturity, days", HWAM: "Seed yield, kg/ha", seed_number: "Seeds per m²", seed_mg: "Seed size, mg"},
+  format: {seed_mg: fmt.int}, layout: "auto"})
+```
+
+```{ojs}
+viewof mgxVar = Inputs.radio(new Map([["Leaf area index", "LAID"], ["Seed weight, kg/ha", "GWAD"], ["Tops weight, kg/ha", "CWAD"]]), {value: "GWAD", label: "Show"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 300, marginLeft: 60,
+  x: {label: "Days after planting", grid: true},
+  y: {label: mgxVar, grid: true},
+  color: {legend: true, domain: ["990003", "990005", "990007"], range: ["#c4a35a", "#2a7f62", "#4a6fa5"], tickFormat: v => `MG ${v.slice(-1)}`},
+  marks: [Plot.lineY(mgExG, {x: "DAP", y: mgxVar, stroke: "var", tip: true})]
+}), `module2-mg-exercise-${mgxVar}`)
+```
+
+```{ojs}
+mg3 = mgEx.find(d => d.maturity_group === 3)
+mg7x = mgEx.find(d => d.maturity_group === 7)
+```
+
+Maturity group 7 flowers ${mg7x.R1_dap - mg3.R1_dap} days later than group 3 and takes ${mg7x.R1_to_maturity} days from flower to maturity instead of ${mg3.R1_to_maturity}. With the longer season its seed yield is ${fmt.int(mg7x.HWAM)} kg/ha against ${fmt.int(mg3.HWAM)}. The day-length response below shows why
+the later groups wait longer in Florida's June days.
+
+### Maturity group and planting date
+
+Generic maturity groups 3, 5 and 7, and Bragg, each planted every three weeks from 10 April, under potential
+production (water and N switched off), all in one FileX:
+
+```{ojs}
+viewof mgVar = Inputs.radio(new Map([["First flower, DAP", "R1_dap"], ["Maturity, DAP", "maturity_dap"], ["Seed yield, kg/ha", "HWAM"]]), {value: "R1_dap", label: "Show"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 340, marginLeft: 60,
+  x: {type: "utc", label: "Planting date, 1979"},
+  y: {label: mgVar, grid: true},
+  color: {legend: true},
+  marks: [Plot.lineY(mgPd, {x: d => new Date(d.pdate), y: mgVar, stroke: d => d.name.replace(/\s+/g, " ").trim(), marker: "dot", tip: true,
+    channels: {"day length at planting, h": "daylength_at_planting"}})]
+}), `module2-mg-planting-${mgVar}`)
+```
+
+```{ojs}
+mgLate = mgPd.filter(d => d.var === "990007")
+```
+
+Maturity group 7 flowers ${d3.max(mgLate, d => d.R1_dap)} days after a May planting but only ${d3.min(mgLate, d => d.R1_dap)} days after the August one. The day length at planting is ${fmt.d1(mgLate[2].daylength_at_planting)} h in late May and ${fmt.d1(mgLate[mgLate.length - 1].daylength_at_planting)} h in mid August, and falling: a late crop spends the weeks before flowering in
+ever shorter days, which slow it less. Its season is also shorter (maturity after ${mgLate[mgLate.length - 1].maturity_dap} days against ${mgLate[0].maturity_dap} for the April planting), and for every maturity group the
+yield falls with each planting after early May.
+
+### One coefficient at a time: the course's values
+
+Exercise 3 of the course changes one coefficient of the maturity group 7 cultivar (`990007`) at a time, to the
+values the course gives, in the irrigated treatment. Every value is a separate cultivar in a copy of the cultivar
+file (`learnlib.write_cultivar_variants`), so the whole sweep is one FileX and one engine call. Exercise 4 adds a
+new cultivar, `DS0001`: maturity group 7 with `PODUR` = 7.
+
+```{ojs}
+coefDesc = new Map([["EM-FL", "emergence to first flower, photothermal days"], ["SFDUR", "seed filling duration of a pod cohort, photothermal days"],
+  ["PODUR", "time to reach the final pod load, photothermal days"], ["WTPSD", "maximum weight per seed, g"],
+  ["CSDL", "critical short day length, h (12.33 to 12.07: MG 7 to MG 8)"], ["PPSEN", "photoperiod sensitivity, 1/h (0.32 to 0.33: MG 7 to MG 8)"]])
+viewof cPick = Inputs.radio([...coefDesc.keys()], {value: "SFDUR", label: "Coefficient", format: k => `${k} (${coefDesc.get(k)})`})
+viewof cgVar = Inputs.select(new Map([["Seed weight, kg/ha", "GWAD"], ["Weight per seed, mg", "GWGD"], ["Seed number, per m²", "G#AD"], ["Pod number, per m²", "P#AD"],
+  ["Harvest index", "HIAD"], ["Shelling %", "SH%D"], ["Leaf area index", "LAID"], ["Tops weight, kg/ha", "CWAD"]]), {value: "GWAD", label: "Variable"})
+```
+
+```{ojs}
+cRows = sensCoef.filter(d => d.coefficient === cPick || d.coefficient === "standard MG 7")
+cLabels = cRows.map(d => d.label)
+withDownload(Plot.plot({
+  width: W, height: 340, marginLeft: 60,
+  x: {label: "Days after planting", grid: true},
+  y: {label: cgVar, grid: true},
+  color: {legend: true, domain: cLabels, scheme: "viridis"},
+  marks: [Plot.lineY(sensCoefG.filter(d => cLabels.includes(d.label)), {x: "DAP", y: cgVar, stroke: "label", strokeWidth: d => d.label === "standard MG 7" ? 3 : 1.5, tip: true})]
+}), `module2-${cPick}-${cgVar.replace(/[^A-Z]/gi, "")}`)
+```
+
+```{ojs}
+Inputs.table(sensCoef.filter(d => d.coefficient === cPick || d.coefficient === "standard MG 7" || (cPick === "PODUR" && d.coefficient === "new cultivar")),
+  {columns: ["label", "R1_dap", "maturity_dap", "HWAM", "seed_number", "seed_mg", "HIAM", "LAIX"],
+   header: {label: "Run", R1_dap: "First flower, DAP", maturity_dap: "Maturity, DAP", HWAM: "Seed yield, kg/ha", seed_number: "Seeds per m²", seed_mg: "Seed size, mg", HIAM: "Harvest index", LAIX: "Max LAI"},
+   format: {seed_mg: fmt.int, HIAM: d => d.toFixed(2), LAIX: d => d.toFixed(1)}, layout: "auto"})
+```
+
+```{ojs}
+sensRange = [...coefDesc.keys()].map(k => {
+  const g = sensCoef.filter(d => d.coefficient === k || d.coefficient === "standard MG 7");
+  return {coefficient: k, R1: d3.max(g, d => d.R1_dap) - d3.min(g, d => d.R1_dap), maturity: d3.max(g, d => d.maturity_dap) - d3.min(g, d => d.maturity_dap),
+          yield: d3.max(g, d => d.HWAM) - d3.min(g, d => d.HWAM), seeds: d3.max(g, d => d.seed_number) - d3.min(g, d => d.seed_number), size: d3.max(g, d => d.seed_mg) - d3.min(g, d => d.seed_mg)};
+})
+podur7 = sensCoef.find(d => d.coefficient === "PODUR" && d.value === 7)
+ds1 = sensCoef.find(d => d.coefficient === "new cultivar")
+wt = sensCoef.filter(d => d.coefficient === "WTPSD")
+```
+
+Across the course's values (including the standard MG 7), each coefficient moves these outputs by:
+
+```{ojs}
+Inputs.table(sensRange, {header: {coefficient: "Coefficient", R1: "First flower, days", maturity: "Maturity, days", yield: "Seed yield, kg/ha", seeds: "Seeds per m²", size: "Seed size, mg"},
+  format: {yield: fmt.int, seeds: fmt.int, size: fmt.int}, layout: "auto"})
+```
+
+`EM-FL`, `CSDL` and `PPSEN` move the dates, which is why calibration (module 3) sets them first, from observed
+flowering and maturity. `SFDUR` leaves the dates alone and changes how long each pod cohort fills, so seed yield
+follows it. `WTPSD` is the exercise's puzzle: from ${wt[0].value} to ${wt[wt.length - 1].value} g the seeds grow from ${fmt.int(wt[0].seed_mg)} to ${fmt.int(wt[wt.length - 1].seed_mg)} mg, but the seed number falls from ${fmt.int(wt[0].seed_number)} to ${fmt.int(wt[wt.length - 1].seed_number)} per m² and the yield hardly changes. The new cultivar `DS0001` gives ${fmt.int(ds1.HWAM)} kg/ha with ${fmt.int(ds1.seed_number)} seeds per m², the same as the `PODUR` = 7 run (${fmt.int(podur7.HWAM)} kg/ha): the exercise's self test, that a cultivar entry with a changed coefficient behaves like the
+sensitivity run with that coefficient.
+
+## From one field to a grid: xdssat
+
+Module 2 wrote weather files for one station. For a region, xdssat writes one weather file per 0.1° cell, from the
+gridded AgERA5 data set, derived from the ERA5 reanalysis [@agera5], and the same checks and conversions apply to every cell. The season
+weather of irrigated wet-season rice in the [rice case study](../java/index.qmd), averaged over 1991-2020:
+
+```{ojs}
+import {cellFeatures, adminMarks} from "../assets/js/dl.js"
+gCells = FileAttachment("../java/data/grid_cells.csv").csv({typed: true})
+gOutline = FileAttachment("../java/data/java_outline.geojson").json()
+gProv = FileAttachment("../java/data/provinces.geojson").json()
+gDist = FileAttachment("../java/data/districts.geojson").json()
+gSummary = FileAttachment("../java/data/summary.json").json()
+gMapW = Math.min(width, 960)
+```
+
+```{ojs}
+viewof g2Var = Inputs.radio(new Map([["Mean Tmin, °C", "tmina_wet_irrigated"], ["Mean Tmax, °C", "tmaxa_wet_irrigated"], ["Mean solar radiation, MJ/m²/day", "srada_wet_irrigated"], ["Season rain, mm", "prcp_wet_irrigated"]]), {value: "srada_wet_irrigated", label: "Map"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: gMapW, height: Math.round(gMapW * 0.42),
+  projection: {type: "mercator", domain: gOutline},
+  color: {type: "linear", scheme: g2Var.startsWith("prcp") ? "Blues" : g2Var.startsWith("srada") ? "YlOrRd" : "RdYlBu", reverse: g2Var.startsWith("tm"), legend: true, label: g2Var},
+  marks: [
+    Plot.geo(gProv, {fill: "#f1f1f1", clip: true}),
+    Plot.geo(cellFeatures(gCells.filter(d => d[g2Var] != null)).features, Plot.centroid({fill: d => d.properties[g2Var], tip: true,
+      title: d => `${d.properties.lat.toFixed(1)}, ${d.properties.lon.toFixed(1)}: ${fmt.d1(d.properties[g2Var])}`})),
+    ...adminMarks(Plot, gProv, gDist)
+  ]
+}), `module2-grid-${g2Var}`)
+```
+
+```{ojs}
+g2 = gCells.filter(d => d[g2Var] != null)
+```
+
+Across ${fmt.int(g2.length)} cells this variable ranges from ${fmt.d1(d3.min(g2, d => d[g2Var]))} to ${fmt.d1(d3.max(g2, d => d[g2Var]))}. Hover a cell for its value.
+
+## Self-test
+
+1. Respiration took about 40% of gross photosynthesis. Would you expect that share to be higher or lower in a
+   hotter climate, and why?
+2. Why do the irrigated and rainfed treatments of UFGA7901 yield almost the same?
+3. Your weather data lack PAR. Is that an error? What does the engine do, and how large was the effect here?
+4. Bragg (CSDL 12.33 h) is grown in Java, at about 7° S, where day length changes little over the year.
+   Use the day-length chart to predict its time to flowering compared with Gainesville in June, then test
+   it in the notebook.
+5. Which observation would you use to estimate `WTPSD`, and why not seed yield?
+
+## Where this goes next
+
+Module 3 estimates cultivar coefficients from observations with GLUE, builds soil profiles, and turns the
+water balance on. The plan for all six modules is on the [training overview](index.qmd).
+
+## References {.unnumbered}
+
+::: {#refs}
+:::

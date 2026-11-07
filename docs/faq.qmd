@@ -1,0 +1,129 @@
+---
+title: "Frequently asked questions"
+description: "Short answers about xdssat, the case study and the training, with links to the pages that go deeper."
+---
+
+```{ojs}
+//| echo: false
+summary = FileAttachment("java/data/summary.json").json()
+cur = summary.current
+fmt = ({int: d3.format(",.0f"), d1: d3.format(",.1f")})
+```
+
+## About xdssat
+
+### What is xdssat?
+
+A bridge between the DSSAT crop model and Python. It writes the DSSAT engine's own input files (experiment,
+weather, soil and cultivar files) for every grid cell and season of a region, runs the engine many times in
+parallel, and collects the results into one netCDF file that xarray can read. [What xdssat is](xdssat/index.qmd)
+explains the idea; [How xdssat differs from common DSSAT use](xdssat/gridding.qmd) compares it with running
+DSSAT one field at a time.
+
+### Is xdssat part of DSSAT?
+
+No. xdssat is an independent project, not developed, endorsed or supported by the DSSAT Foundation. It uses the
+DSSAT engine as it is published. See [Acknowledgements and how to cite](acknowledgements.qmd).
+
+### Does xdssat change the crop models?
+
+No. It does not reimplement or patch the models: every simulated number comes from the unmodified DSSAT-CSM
+engine (`dscsm048`). xdssat only prepares the engine's inputs and reads its outputs.
+
+### Which version of DSSAT does it use?
+
+DSSAT-CSM 4.8. The engine on this site was built from version 4.8.6.4 of the
+[published source code](https://github.com/DSSAT/dssat-csm-os).
+
+### Do I need DSSAT installed?
+
+You need the engine, in one of two ways: build it from source with `scripts/build_engine.py` (needs gfortran,
+cmake and make), or point xdssat at an existing DSSAT 4.8 installation on Windows. Both routes are in
+[Getting started](getting-started.md), section 2.
+
+### Which crops can it simulate?
+
+The DSSAT engine covers many crops (48 crop codes in the files listed on the
+[training page](learn/index.qmd)). xdssat builds every experiment file from a template experiment, and the
+repository currently ships one template, for rice (`templates/XDRI8601.RIX`). Another crop needs its own template
+experiment; that has not been tested yet.
+
+### Which regions can it run?
+
+The weather and soil caches are built for all of Indonesia, on the 0.1° grid of AgERA5. One area of interest is
+defined so far, Java (`--aoi java`), because the irrigation classes it uses exist only for Java. Adding another
+region means adding its box and region name in the code and an irrigation map for it.
+
+### Where do the weather and soil data come from?
+
+Weather: daily AgERA5 reanalysis from the Copernicus Climate Change Service, at 0.1°. Soil: SoilGrids 2.0
+texture and organic carbon at six depths, turned into DSSAT soil profiles with the Saxton and Rawls equations.
+Everything is listed on the [case study's Data page](java/data.qmd).
+
+### How long does a run take?
+
+The current case-study run simulated ${fmt.int(cur.seasons)} seasons (${fmt.int(cur.strata)} strata in
+${fmt.int(cur.cells)} cells of Java, 1991-2020) in ${fmt.d1(cur.minutes)} minutes, with ${cur.workers} engine
+processes in parallel. A quick test on 30 cells and 2 years takes about 20 seconds
+([Getting started](getting-started.md), section 7). Preparing the inputs once takes longer: about 1.5 hours
+in total, mostly downloading and caching weather and soil data (section 6).
+
+### What does a run produce?
+
+One netCDF file per run, on the 0.1° grid, with yield, biomass, season length, water and nitrogen variables and
+the key dates for each water regime, season and cell. Its full structure is on
+[How xdssat differs from common DSSAT use](xdssat/gridding.qmd).
+
+## About the case study
+
+### Why do the simulated yields differ from the official statistics?
+
+A crop model simulates the yield its inputs allow: the weather, the soil, the cultivar and the management written
+into the experiment file. Official statistics reflect everything else that happens on real farms as well. The
+case study compares the two district by district and calibrates a soil fertility factor against the
+statistics. The [Scientific method](java/science.qmd) page shows how close they get and what remains.
+
+### Does the website run DSSAT in my browser?
+
+No. The engine runs on the author's machine; the pages read small CSV and JSON files exported from its results
+and draw the charts in the browser. The [Rebuild notes](rebuild.qmd) show how those files are made.
+
+## About the training
+
+### Is this the official DSSAT training?
+
+No. The [DSSAT training](learn/index.qmd) section is adapted from the 2018 DSSAT training in Chiang Mai,
+Thailand, and follows its syllabus and exercises, but it is written for this site. The course's slides and
+exercise sheets are not reproduced. For official training, see the [DSSAT website](https://dssat.net).
+
+### Do I need xdssat to follow the training?
+
+To read the pages, no: every chart is already computed. To run the [notebooks](notebooks/index.qmd) yourself,
+yes: they use xdssat's Python code to write the files and run the engine, plus the DSSAT example data
+(`dssat-csm-data`) next to this repository. The
+[training overview](learn/index.qmd#what-you-need-to-run-the-notebooks) lists what they need.
+
+### Why do some modules end with a map of Java?
+
+Modules 1, 2, 3 and 5 close with a section called "From one field to a grid: xdssat". It takes the module's
+single-field idea (phenology, weather, soil water, yield risk) and shows it for every cell of the case study.
+That is the step xdssat adds to what the course teaches.
+
+## Using and citing
+
+### How do I cite xdssat and DSSAT?
+
+Cite DSSAT as the DSSAT Foundation asks, and xdssat with the version you used. The exact references are on
+[Acknowledgements and how to cite](acknowledgements.qmd).
+
+### What is the licence?
+
+xdssat is released under the
+[Mozilla Public License 2.0](https://github.com/bennyistanto/xdssat/blob/main/LICENSE). DSSAT and the data sets
+keep their own terms.
+
+### Where do I report a problem or ask a question?
+
+In the [xdssat issue tracker](https://github.com/bennyistanto/xdssat/issues). Every page also has a "Report an
+issue" link. Questions about the DSSAT engine itself belong with the [DSSAT team](https://dssat.net), but please
+do not send them problems that come from xdssat.

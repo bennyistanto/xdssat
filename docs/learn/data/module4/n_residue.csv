@@ -1,0 +1,15 @@
+scenario,treatment,HWAM,NUCM,NLCM,NIAM,NMINC
+as in the exercise,"rainfed, 135 kg N",2268,114,66,34,44
+as in the exercise,"irrigated, 135 kg N",8436,130,70,21,51
+no residue,"rainfed, 135 kg N",2310,114,66,32,42
+no residue,"irrigated, 135 kg N",8233,126,70,21,48
+3000 kg/ha residue,"rainfed, 135 kg N",2303,116,66,37,49
+3000 kg/ha residue,"irrigated, 135 kg N",8821,137,69,21,58
+residue 0.4% N,"rainfed, 135 kg N",2289,114,64,32,41
+residue 0.4% N,"irrigated, 135 kg N",8270,128,69,20,48
+residue 1.6% N,"rainfed, 135 kg N",2326,115,69,37,51
+residue 1.6% N,"irrigated, 135 kg N",8684,133,73,22,59
+NO3 3 g/Mg in every layer,"rainfed, 135 kg N",2306,115,119,40,45
+NO3 3 g/Mg in every layer,"irrigated, 135 kg N",8462,130,125,24,51
+NO3 10 g/Mg in every layer,"rainfed, 135 kg N",2290,115,272,58,45
+NO3 10 g/Mg in every layer,"irrigated, 135 kg N",8541,131,286,35,51

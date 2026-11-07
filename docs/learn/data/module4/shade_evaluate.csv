@@ -1,0 +1,11 @@
+TRNO,code,simulated,measured,description,sim/obs
+1,HWAM,5115.0,5283.0,Yield at harvest maturity (kg [dm]/ha),0.968
+1,PWAM,6438.0,6718.0,Pod/Ear/Panicle weight at maturity (kg [dm]/ha),0.958
+1,CWAM,14118.0,14240.0,Biomass at maturity (total crop minus roots) (kg[dm]/ha),0.991
+1,H#AM,873.0,942.0,Number at maturity (no/m2),0.927
+1,HWUM,0.586,0.561,Unit wt at maturity (g [dm]/unit),1.045
+2,HWAM,4170.0,3611.0,Yield at harvest maturity (kg [dm]/ha),1.155
+2,PWAM,5266.0,5037.0,Pod/Ear/Panicle weight at maturity (kg [dm]/ha),1.045
+2,CWAM,12017.0,11431.0,Biomass at maturity (total crop minus roots) (kg[dm]/ha),1.051
+2,H#AM,775.0,658.0,Number at maturity (no/m2),1.178
+2,HWUM,0.538,0.549,Unit wt at maturity (g [dm]/unit),0.981

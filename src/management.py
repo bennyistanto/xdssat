@@ -1,0 +1,265 @@
+"""Strata and the three management modes: uniform, by zone, per cell.
+
+Strata
+------
+A stratum is one AgERA5 weather cell with one water regime. ``strata()``
+builds them from the 100 m rasters: rice area per cell (``rasters.aggregate``),
+the irrigation class (MoA, gaps filled from the nearest class) mapped to a
+regime, and the dominant agro-ecological zone of the cell's rice. Every stratum
+carries ``ha``, so results can be area-weighted. One soil profile and one
+weather file per cell (``soil_id`` XS<iy><ix>, ``wsta`` W<iy><ix>).
+
+Seasons and years
+-----------------
+Dates are placed in an agricultural year that starts on ``ANCHOR`` (1 Aug):
+``season_year`` Y runs from 1 Aug Y to 31 Jul Y+1, so a wet season planted in
+Nov Y and the dry season planted in Apr Y+1 share the label Y.
+
+Modes
+-----
+All three return the units table that ``runner.run_units`` takes (``cell``,
+``wsta``, ``soil_id``, ``pdate``, ``trno_template`` plus stratum columns):
+
+- ``uniform``: the same calendar everywhere (``Season.month_day``).
+- ``by_zone``: a table zone -> season -> month-day, looked up by a stratum
+  column (default ``aez``).
+- ``per_cell``: planting days per cell, e.g. from ``onset`` (rainfall onset
+  computed from AgERA5 per cell).
+
+Template treatments: ``templates/XDRI8601.RIX`` treatment 5 (irrigated,
+constant 50 mm flood) and 11 (rainfed, bunded), see ``scripts/make_templates.py``.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+ANCHOR = (8, 1)                       # agricultural year starts 1 Aug
+TEMPLATE = Path(__file__).resolve().parents[1] / "templates" / "XDRI8601.RIX"
+TRNO = {"irrigated": 5, "rainfed": 11}
+# Template cultivar levels and the N rates of its fertilizer levels (MF 0-4: 0, 35, 70, 105,
+# 140 kg N, 2/3 at 18 and 1/3 at 41 days after transplanting, IRMZ8601).
+CULTIVARS = {"IR 58": (1, "IB0012"), "IR 64": (2, "IB0015")}
+N_LEVELS = {0: 0, 35: 1, 70: 2, 105: 3, 140: 4}
+WATER_LEVEL = {"irrigated": 1, "rainfed": 3}
+
+
+def _grid():
+    g, k = {}, 12
+    for cv in CULTIVARS:
+        for water in WATER_LEVEL:
+            for n in N_LEVELS:
+                g[(cv, water, n)] = k
+                k += 1
+    return g
+
+
+# Template treatment number of every (cultivar, water regime, kg N), from 12 up
+# (scripts/make_templates.py writes them). 1-11 keep IRMZ8601's numbering.
+TREATMENT_GRID = _grid()
+
+
+def trno(water: str, cultivar: str = "IR 58", n: int = 140) -> int:
+    return TREATMENT_GRID[(cultivar, water, n)]
+# MoA irrigation classes (scripts/prepare_rasters.py MOA_CLASSES) -> water regime.
+# All three irrigated classes are treated as fully irrigated for now.
+REGIME = {1: "irrigated", 2: "irrigated", 3: "irrigated", 4: "rainfed"}
+
+
+@dataclass(frozen=True)
+class Season:
+    name: str
+    regimes: tuple = ("irrigated", "rainfed")
+    month_day: str | None = None          # "MM-DD" for uniform calendars
+
+
+# Placeholders, not an agronomic calendar: wet season (MT-I) for all rice,
+# dry season (MT-II) for irrigated rice only. Set your own.
+DEFAULT_SEASONS = (Season("wet", ("irrigated", "rainfed"), "11-15"),
+                   Season("dry", ("irrigated",), "04-01"))
+
+
+# ------------------------------------------------------------ strata
+
+
+def strata(stats: pd.DataFrame, region_codes: dict, region: str = "Jawa",
+           zone_col: str | None = "aez") -> pd.DataFrame:
+    """Strata from a ``rasters.aggregate`` table with ``region`` and ``irr`` columns.
+
+    ``region_codes`` maps region name to its raster code. Rice outside
+    ``region`` is dropped; rice with irrigation class 0 (no MoA data) raises,
+    because the regime would be unknown.
+    """
+    s = stats[stats["region"] == region_codes[region]].copy()
+    if (s["irr"] == 0).any():
+        raise ValueError(f"{(s['irr'] == 0).sum()} strata have no irrigation class; "
+                         "use the filled irrigation raster")
+    s["water"] = s["irr"].map(REGIME)
+    keys = ["iy", "ix", "lat", "lon"]
+    out = s.groupby(keys + ["water"], as_index=False).agg(ha=("ha", "sum"))
+    if zone_col and zone_col in s:
+        dom = (s.groupby(keys + [zone_col]).ha.sum().reset_index()
+                 .sort_values("ha", ascending=False).drop_duplicates(keys))
+        out = out.merge(dom[keys + [zone_col]], on=keys, how="left")
+    out["cell"] = out.iy.astype(int) * 10000 + out.ix.astype(int)
+    out["wsta"] = [f"W{iy:03d}{ix:04d}" for iy, ix in zip(out.iy, out.ix)]
+    out["soil_id"] = [f"XS{iy:04d}{ix:04d}" for iy, ix in zip(out.iy, out.ix)]
+    out["stratum"] = range(len(out))
+    return out.sort_values(["iy", "ix", "water"]).reset_index(drop=True)
+
+
+# ------------------------------------------------------------ dates
+
+
+def anchor_date(season_year: int) -> pd.Timestamp:
+    return pd.Timestamp(season_year, *ANCHOR)
+
+
+def date_in_year(season_year: int, month_day: str) -> pd.Timestamp:
+    """The date of ``month_day`` inside agricultural year ``season_year``."""
+    m, d = (int(v) for v in month_day.split("-"))
+    year = season_year if (m, d) >= ANCHOR else season_year + 1
+    return pd.Timestamp(year, m, d)
+
+
+def _units(rows: list[dict], strata_df: pd.DataFrame) -> pd.DataFrame:
+    u = pd.DataFrame(rows)
+    u = u.merge(strata_df, on="stratum", how="left")
+    u["trno_template"] = u["water"].map(TRNO)
+    return u.sort_values(["season_year", "iy", "ix", "pdate"]).reset_index(drop=True)
+
+
+# ------------------------------------------------------------ modes
+
+
+def uniform(strata_df: pd.DataFrame, years, seasons=DEFAULT_SEASONS) -> pd.DataFrame:
+    """Same calendar for every stratum."""
+    rows = []
+    for st in strata_df.itertuples():
+        for y in years:
+            for s in seasons:
+                if st.water in s.regimes:
+                    rows.append(dict(stratum=st.stratum, season=s.name, season_year=y,
+                                     pdate=date_in_year(y, s.month_day)))
+    return _units(rows, strata_df)
+
+
+def by_zone(strata_df: pd.DataFrame, years, table: pd.DataFrame, zone_col: str = "aez",
+            seasons=DEFAULT_SEASONS) -> pd.DataFrame:
+    """Calendar per zone. ``table`` has columns ``zone``, ``season``, ``month_day``.
+
+    Zones absent from ``table`` use the ``month_day`` of ``seasons``.
+    """
+    look = {(z, s): md for z, s, md in table[["zone", "season", "month_day"]].itertuples(index=False)}
+    rows = []
+    for st in strata_df.itertuples():
+        z = getattr(st, zone_col)
+        for y in years:
+            for s in seasons:
+                if st.water in s.regimes:
+                    md = look.get((z, s.name), s.month_day)
+                    rows.append(dict(stratum=st.stratum, season=s.name, season_year=y,
+                                     pdate=date_in_year(y, md), zone_used=(z, s.name) in look))
+    return _units(rows, strata_df)
+
+
+def per_cell(strata_df: pd.DataFrame, years, plant_days: dict[str, pd.Series],
+             seasons=DEFAULT_SEASONS) -> pd.DataFrame:
+    """Planting day per cell and season, as days after the 1 Aug anchor.
+
+    ``plant_days[season]`` is a Series indexed by (iy, ix). Cells missing from
+    a season's Series fall back to that season's ``month_day``.
+    """
+    rows = []
+    for st in strata_df.itertuples():
+        for y in years:
+            a = anchor_date(y)
+            for s in seasons:
+                if st.water not in s.regimes:
+                    continue
+                days = plant_days.get(s.name, pd.Series(dtype=float)).get((st.iy, st.ix))
+                pdate = (a + pd.Timedelta(days=int(days)) if days is not None and np.isfinite(days)
+                         else date_in_year(y, s.month_day))
+                rows.append(dict(stratum=st.stratum, season=s.name, season_year=y, pdate=pdate))
+    return _units(rows, strata_df)
+
+
+# ------------------------------------------------------------ rainfall onset
+
+
+def dasarian_totals(dates: pd.DatetimeIndex, rain: np.ndarray):
+    """Sum daily rain (time, cells) into dasarian: days 1-10, 11-20, 21-end of month.
+
+    Returns (start date of each dasarian, totals (n_dasarian, cells)).
+    """
+    d = pd.DatetimeIndex(dates)
+    key = d.year * 100 + d.month
+    part = np.minimum((d.day - 1) // 10, 2)
+    lab = key.to_numpy() * 10 + part
+    starts = np.r_[0, np.nonzero(np.diff(lab))[0] + 1]
+    totals = np.add.reduceat(np.nan_to_num(rain, nan=0.0), starts, axis=0)
+    return d[starts], totals
+
+
+def onset(dates, rain, season_year: int, threshold: float = 50.0, n: int = 3) -> np.ndarray:
+    """Wet-season onset per cell for one agricultural year, as days after 1 Aug.
+
+    BMKG rule: the first dasarian with at least ``threshold`` mm of rain that is
+    followed by ``n - 1`` more dasarian also at least ``threshold`` (BMKG
+    Stasiun Klimatologi Sumatera Selatan, Buletin Prakiraan Musim Hujan
+    2025/2026; Jurnal Meteorologi dan Geofisika, doi:10.31172/jmg.v13i1.113).
+    NaN where no onset is found before 31 Jul.
+    """
+    a = anchor_date(season_year)
+    keep = (dates >= a) & (dates < anchor_date(season_year + 1))
+    starts, tot = dasarian_totals(dates[keep], rain[keep])
+    wet = tot >= threshold
+    run = wet.copy()
+    for k in range(1, n):
+        run[:-k] &= wet[k:]
+        run[-k:] = False
+    first = np.where(run.any(axis=0), run.argmax(axis=0), -1)
+    days = (starts - a).days.to_numpy()
+    return np.where(first >= 0, days[np.clip(first, 0, None)], np.nan).astype(float)
+
+
+def onset_climatology(dates, rain, years, **kw) -> tuple[np.ndarray, np.ndarray]:
+    """Onset (days after 1 Aug) per year and cell, and its median over years."""
+    per_year = np.vstack([onset(dates, rain, y, **kw) for y in years])
+    with np.errstate(all="ignore"):
+        med = np.nanmedian(per_year, axis=0)
+    return per_year, med
+
+
+def planting_from_onset(cells: pd.DataFrame, onset_days: np.ndarray, transplant_after: int = 20,
+                        dry_gap: int = 120) -> dict[str, pd.Series]:
+    """Planting days per cell: wet = onset + ``transplant_after``; dry = wet + ``dry_gap``.
+
+    ``transplant_after``: seedbed sown at onset, transplanted about 20 days
+    later (the template transplants 23-day-old seedlings). ``dry_gap``: wet
+    season field duration plus turnaround. Both are assumptions to tune.
+    """
+    idx = pd.MultiIndex.from_arrays([cells.iy.to_numpy(), cells.ix.to_numpy()])
+    wet = pd.Series(np.round(onset_days + transplant_after), index=idx)
+    return {"wet": wet, "dry": wet + dry_gap}
+
+
+def zone_table_from_onset(cells: pd.DataFrame, zone_col: str = "aez", transplant_after: int = 20,
+                          dry_gap: int = 120, ref_year: int = 2001) -> pd.DataFrame:
+    """A by-zone calendar from per-cell onset: the median onset of each zone's cells.
+
+    ``cells`` has ``onset_days`` (days after 1 Aug) and ``zone_col``. Returns
+    columns zone, season, month_day, onset_days, cells (for ``by_zone``).
+    """
+    g = cells.dropna(subset=["onset_days"]).groupby(zone_col).onset_days.agg(["median", "size"])
+    rows = []
+    for z, r in g.iterrows():
+        wet = anchor_date(ref_year) + pd.Timedelta(days=int(round(r["median"])) + transplant_after)
+        dry = wet + pd.Timedelta(days=dry_gap)
+        for name, d in (("wet", wet), ("dry", dry)):
+            rows.append(dict(zone=z, season=name, month_day=d.strftime("%m-%d"),
+                             onset_days=r["median"], cells=int(r["size"])))
+    return pd.DataFrame(rows)

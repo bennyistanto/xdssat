@@ -1,0 +1,61 @@
+*SOILS: Greeley, CO USDA-experiment
+!
+!Soil profile from National Cooperative Soil Survey
+!Soil water holding characteristics of each year and irrigation treatment from T.J. Trout USDA-ARS Fort.Collins, CO 
+!
+!Greeley,CO 2008
+!
+*GRWD080011  91CO123003  SL      120 Olney 2 Fine-loamy for T1(100%)
+@SITE        COUNTRY          LAT     LONG SCS FAMILY
+ Weld        USA            40.512 104.443 mesic Ustollic Haplargid (Pedon_no 91P0867)
+@ SCOM  SALB  SLU1  SLDR  SLRO  SLNF  SLPF  SMHB  SMPX  SMKE
+    BN   .13     6    .6    73     1   .78 IB001 IB001 IB001
+@  SLB  SLMH  SLLL  SDUL  SSAT  SRGF  SSKS  SBDM  SLOC  SLCL  SLSI  SLCF  SLNI  SLHW  SLHB  SCEC  SADC
+     9     A  .136  .271  .347     1  2.59  1.52   1.4  16.5  12.9   -99   .13   6.5   -99  15.9   -99
+    19   Bt1  .133  .267  .325     1  2.59  1.61   .56  18.5  10.9   -99   .07   6.8   -99  16.9   -99
+    40   Bt2   .13   .26  .306  .554  2.59  1.64   .45  17.1   9.5   -99   .06     8   -99  14.8   -99
+    55   Bt3  .122  .274  .296  .387  2.59  1.65    .3  17.2   9.7   -99   .04   8.1   -99  13.7   -99
+    83   Bk1  .115   .26  .309  .252  2.59  1.59   .15  15.5  10.4   -99   .02   8.1   -99    13   -99
+   120   Bk2  .108  .215  .313  .131  2.59  1.56   .07  17.1  10.6   -99   .01   8.3   -99  13.6   -99
+
+*GRWD080016  91CO123003  SL      120 Olney 2 Fine-loamy for T6(40%)
+@SITE        COUNTRY          LAT     LONG SCS FAMILY
+ Weld        USA            40.512 104.443 mesic Ustollic Haplargid (Pedon_no 91P0867)
+@ SCOM  SALB  SLU1  SLDR  SLRO  SLNF  SLPF  SMHB  SMPX  SMKE
+    BN   .13     6    .6    73     1    .8 IB001 IB001 IB001
+@  SLB  SLMH  SLLL  SDUL  SSAT  SRGF  SSKS  SBDM  SLOC  SLCL  SLSI  SLCF  SLNI  SLHW  SLHB  SCEC  SADC
+     9     A  .128  .256  .347     1  2.59  1.52   1.4  16.5  12.9   -99   .13   6.5   -99  15.9   -99
+    19   Bt1  .129  .258  .325     1  2.59  1.61   .56  18.5  10.9   -99   .07   6.8   -99  16.9   -99
+    40   Bt2   .13  .259  .306  .554  2.59  1.64   .45  17.1   9.5   -99   .06     8   -99  14.8   -99
+    55   Bt3  .119  .238  .296  .387  2.59  1.65    .3  17.2   9.7   -99   .04   8.1   -99  13.7   -99
+    83   Bk1  .108  .217  .309  .252  2.59  1.59   .15  15.5  10.4   -99   .02   8.1   -99    13   -99
+   120   Bk2  .045  .201  .313  .101  2.59  1.56   .07  17.1  10.6   -99   .01   8.3   -99  13.6   -99
+!
+!Greeley,CO 2010
+!
+
+*GRWD100011  91CO123003  SL      120 Olney 2 Fine-loamy for T1(100%)
+@SITE        COUNTRY          LAT     LONG SCS FAMILY
+ Weld        USA            40.512 104.443 mesic Ustollic Haplargid (Pedon_no 91P0867)
+@ SCOM  SALB  SLU1  SLDR  SLRO  SLNF  SLPF  SMHB  SMPX  SMKE
+    BN   .13     6    .6    73     1   .78 IB001 IB001 IB001
+@  SLB  SLMH  SLLL  SDUL  SSAT  SRGF  SSKS  SBDM  SLOC  SLCL  SLSI  SLCF  SLNI  SLHW  SLHB  SCEC  SADC
+     9     A  .108  .256  .327     1  2.59  1.52   1.4  16.5  12.9   -99   .13   6.5   -99  15.9   -99
+    19   Bt1  .126  .251  .325     1  2.59  1.61   .56  18.5  10.9   -99   .07   6.8   -99  16.9   -99
+    40   Bt2  .122  .244  .306  .554  2.59  1.64   .45  17.1   9.5   -99   .06     8   -99  14.8   -99
+    55   Bt3  .113  .206  .296  .387  2.59  1.65    .3  17.2   9.7   -99   .04   8.1   -99  13.7   -99
+    83   Bk1  .079  .157  .309  .252  2.59  1.59   .15  15.5  10.4   -99   .02   8.1   -99    13   -99
+   120   Bk2  .078  .157  .313  .131  2.59  1.56   .07  17.1  10.6   -99   .01   8.3   -99  13.6   -99
+
+*GRWD100016  91CO123003    SL    120 Olney 2 Fine-loamy for T6(40%)
+@SITE        COUNTRY          LAT     LONG SCS FAMILY
+ Weld        USA            40.512 104.443 mesic Ustollic Haplargid (Pedon_no 91P0867)
+@ SCOM  SALB  SLU1  SLDR  SLRO  SLNF  SLPF  SMHB  SMPX  SMKE
+    BN   .13     6    .6    73     1   .80 IB001 IB001 IB001
+@  SLB  SLMH  SLLL  SDUL  SSAT  SRGF  SSKS  SBDM  SLOC  SLCL  SLSI  SLCF  SLNI  SLHW  SLHB  SCEC  SADC
+     9     A  .124  .248  .347     1  2.59  1.52   1.4  16.5  12.9   -99   .13   6.5   -99  15.9   -99
+    19   Bt1  .123  .246  .325     1  2.59  1.61   .56  18.5  10.9   -99   .07   6.8   -99  16.9   -99
+    40   Bt2  .121  .243  .306  .554  2.59  1.64   .45  17.1   9.5   -99   .06     8   -99  14.8   -99
+    55   Bt3  .113  .227  .296  .387  2.59  1.65    .3  17.2   9.7   -99   .04   8.1   -99  13.7   -99
+    83   Bk1  .102  .205  .309  .252  2.59  1.59   .15  15.5  10.4   -99   .02   8.1   -99    13   -99
+   120   Bk2  .084  .169  .313  .101  2.59  1.56   .07  17.1  10.6   -99   .01   8.3   -99  13.6   -99

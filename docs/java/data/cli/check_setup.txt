@@ -1,0 +1,15 @@
+usage: check_setup.py [-h] [--no-run]
+
+Check an xdssat setup and say what to do next.
+
+    python scripts/check_setup.py              # everything
+    python scripts/check_setup.py --no-run     # skip the 2-second engine test run
+
+Read-only, except for one short engine run in a temporary folder under
+WORK_ROOT (deleted afterwards). Prints one line per item: OK, WARN or MISSING,
+with the command that fixes it. Exit code 1 if anything required for running
+the engine is missing. See docs/getting-started.md.
+
+options:
+  -h, --help  show this help message and exit
+  --no-run    do not run the engine

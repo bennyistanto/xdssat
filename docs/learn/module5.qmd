@@ -1,0 +1,453 @@
+---
+title: "Module 5: uncertainty and risk, seasonal analysis"
+subtitle: "DSSAT training, module 5 of 6. Follows day 5 of the course, with code instead of the DSSAT shell"
+---
+
+```{ojs}
+import {withDownload, fmt} from "../assets/js/dl.js"
+seas = FileAttachment("data/module5/seasonal.csv").csv({typed: true})
+prices = FileAttachment("data/module5/seasonal_prices.csv").csv({typed: true})
+ufgaClim = FileAttachment("data/module5/ufga_climate.csv").csv({typed: true})
+kad = FileAttachment("data/module5/kadoma.csv").csv({typed: true})
+kadSetup = FileAttachment("data/module5/kadoma_setup.csv").csv({typed: true})
+kadClim = FileAttachment("data/module5/kadoma_climate.csv").csv({typed: true})
+kadFx = FileAttachment("data/module5/kadoma_filex.csv").csv()
+niger = FileAttachment("data/module5/niger.csv").csv({typed: true})
+nigerFarms = FileAttachment("data/module5/niger_farms.csv").csv({typed: true})
+runInfo = FileAttachment("data/module5/run_info.csv").csv()
+dlLinks = html`<a href="${"../notebooks/module5" + ".ipynb"}" download>download .ipynb</a>, helper <a href="../notebooks/learnlib.py" download>learnlib.py</a>`
+W = Math.min(width, 860)
+order = [...new Set(seas.map(d => d.treatment))]
+nYears = new Set(seas.map(d => d.season)).size
+p1 = Object.fromEntries(prices.filter(d => d.TRNO === 1).map(d => [d.item, d]))
+```
+
+::: {.callout-note appearance="simple"}
+**How to use this module.** Read this page for the ideas; every chart comes from the
+[module 5 notebook](../notebooks/module5.ipynb) (${dlLinks}), which runs the DSSAT engine and writes the small
+data files the charts read. The runs on this build were made on ${runInfo[0].run_on}.
+:::
+
+## What you will learn
+
+- Why a management choice has to be judged over many seasons, and how DSSAT runs a seasonal analysis.
+- How to turn simulated yields into money and compare strategies by their whole distribution: cumulative
+  distributions, stochastic dominance, mean and spread, the attitude to risk.
+- How the best fertilizer rate changes from season to season, and what a "blanket" recommendation gives up.
+- How a regional study adds up farms, soils and prices to the response of a whole area.
+
+## 1. Seasonal analysis: irrigation strategies
+
+The seasonal experiment `UFGA7812` of DSSAT runs Bragg soybean at Gainesville, Florida, for ${nYears} seasons
+[@csmdata]. Treatment 1 is rainfed; treatments 2 to 10 irrigate automatically when the available water in the top
+30 cm falls to 10%, 20% ... 90% of its capacity. The weather is **generated**: with `WTHER` = `W` the engine draws
+daily weather from the monthly statistics of the climate file `UFGA.CLI`, so the seasons are samples of
+Gainesville's climate, not the weather of particular years.
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(W, 640), height: 250, marginLeft: 50,
+  x: {label: "Month", domain: d3.range(1, 13), tickFormat: m => "JFMAMJJASOND"[m - 1]},
+  y: {label: "Rain, mm/month", grid: true},
+  marks: [Plot.barY(ufgaClim, {x: "MTH", y: "RTOT", fill: "#4a6fa5", fillOpacity: 0.75, tip: true,
+    title: d => `month ${d.MTH}: ${d.RTOT} mm on ${d.RNUM} days, Tmax ${d.XAMN} °C, Tmin ${d.NAMN} °C`})]
+}), "module5-ufga-climate")
+```
+
+::: {.source-note}
+Monthly means of `Weather/Climate/UFGA.CLI` (dssat-csm-data), the input of the weather generator.
+:::
+
+```{ojs}
+viewof sVar = Inputs.radio(new Map([["Seed yield, kg/ha", "HWAM"], ["Irrigation, mm", "IRCM"], ["Number of irrigations", "IR#M"]]), {value: "HWAM", label: "Show"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 330, marginLeft: 60, marginBottom: 45,
+  x: {label: null, domain: order},
+  y: {label: sVar, grid: true},
+  marks: [
+    Plot.dot(seas, Plot.dodgeX("middle", {x: "treatment", y: sVar, r: 2.5, fill: "#3f7a34", fillOpacity: 0.6, tip: true, channels: {season: "season", "season rain, mm": "PRCM"}})),
+    Plot.tickY(seas, Plot.groupX({y: "mean"}, {x: "treatment", y: sVar, stroke: "#f2a33a", strokeWidth: 3}))
+  ]
+}), `module5-seasonal-${sVar.replace(/[^A-Z]/gi, "")}`)
+```
+
+### From yields to money
+
+The experiment's price and cost file `UFGA7812.PRI` (codes defined in the engine's `ECONOMIC.CDE`) draws the
+soybean price from a normal distribution with mean ${fmt.int(p1.GRAN.PAR1)} and standard deviation ${fmt.int(p1.GRAN.PAR2)} $/t, and sets base costs of ${fmt.int(p1.BASE.PAR1)} $/ha, ${p1.IRRI.PAR1} $ per mm of irrigation and ${p1.IRCO.PAR1} $ per application. The notebook drew one price per season, used for all ten
+strategies. The gross margin of strategy \(s\) in season \(t\) is
+
+\[
+GM_{s,t} = p_t\,Y_{s,t} - C_{base} - c_{mm}\,I_{s,t} - c_{app}\,n_{s,t}
+\]
+
+with \(p_t\) the price, \(Y\) the yield, \(I\) the irrigation in mm and \(n\) the number of applications (seed is left
+out: the file prices it per kg but gives no seeding rate).
+
+The course's first exercise asks what happens when each irrigation costs $25.00 instead of $0.50:
+
+```{ojs}
+viewof irco = Inputs.range([0, 40], {step: 0.5, value: p1.IRCO.PAR1, label: "Cost per irrigation, $"})
+viewof irri = Inputs.range([0, 2], {step: 0.05, value: p1.IRRI.PAR1, label: "Cost per mm, $"})
+```
+
+```{ojs}
+seasM = seas.map(d => ({...d, margin: d.price * d.HWAM / 1000 - p1.BASE.PAR1 - irri * d.IRCM - irco * d["IR#M"]}))
+riskM = order.map(t => {
+  const r = seasM.filter(d => d.treatment === t);
+  return {treatment: t, mean_yield: d3.mean(r, d => d.HWAM), mean_irr: d3.mean(r, d => d.IRCM), mean_margin: d3.mean(r, d => d.margin),
+          sd_margin: d3.deviation(r, d => d.margin), p10_margin: d3.quantile(r, 0.1, d => d.margin), min_margin: d3.min(r, d => d.margin)};
+})
+bioBest = riskM.reduce((a, b) => b.mean_yield > a.mean_yield ? b : a)
+ecoBest = riskM.reduce((a, b) => b.mean_margin > a.mean_margin ? b : a)
+Inputs.table(riskM, {header: {treatment: "Strategy", mean_yield: "Mean yield, kg/ha", mean_irr: "Mean irrigation, mm", mean_margin: "Mean margin, $/ha",
+  sd_margin: "SD of margin", p10_margin: "10th percentile", min_margin: "Worst season"},
+  format: Object.fromEntries(["mean_yield", "mean_irr", "mean_margin", "sd_margin", "p10_margin", "min_margin"].map(k => [k, fmt.int])), layout: "auto"})
+```
+
+At ${irco} $ per irrigation and ${irri} $ per mm, the biologically best strategy (highest mean yield) is ${bioBest.treatment} and the economically best (highest mean margin) is ${ecoBest.treatment}.
+
+### Comparing whole distributions
+
+The cumulative distribution shows, for every margin, the share of seasons below it; a curve further to the right
+is better.
+
+```{ojs}
+viewof cdfPick = Inputs.checkbox(order, {value: ["rainfed", "auto 20%", "auto 50%", "auto 90%"], label: "Strategies"})
+```
+
+```{ojs}
+cdfRows = cdfPick.flatMap(t => {
+  const m = seasM.filter(d => d.treatment === t).map(d => d.margin).sort(d3.ascending);
+  return m.map((v, i) => ({treatment: t, margin: v, p: (i + 1) / m.length}));
+})
+withDownload(Plot.plot({
+  width: Math.min(W, 680), height: 340, marginLeft: 55,
+  x: {label: "Gross margin, $/ha", grid: true},
+  y: {label: "Share of seasons with a lower or equal margin", grid: true, tickFormat: "%"},
+  color: {legend: true, domain: order},
+  marks: [Plot.lineY(cdfRows, {x: "margin", y: "p", stroke: "treatment", curve: "step-after", tip: true})]
+}), "module5-margin-cdf")
+```
+
+```{ojs}
+dominates = (a, b) => {
+  const A = seasM.filter(d => d.treatment === a).map(d => d.margin), B = seasM.filter(d => d.treatment === b).map(d => d.margin);
+  const grid = [...A, ...B].sort(d3.ascending);
+  const F = (x, v) => x.filter(y => y <= v).length / x.length;
+  return grid.every(v => F(A, v) <= F(B, v) + 1e-12) && grid.some(v => F(A, v) < F(B, v) - 1e-12);
+}
+domPairs = order.flatMap(a => order.filter(b => a !== b && dominates(a, b)).map(b => `${a} dominates ${b}`))
+domText = domPairs.length ? domPairs.join("; ") : "no strategy dominates another"
+```
+
+Where one curve lies entirely to the right of another, its strategy is better in every respect that money
+measures: **first-degree stochastic dominance**, \(F_A(m) \le F_B(m)\) for every margin \(m\), with \(F\) the
+cumulative distribution. At the costs set above: ${domText}. Between the other
+strategies the choice depends on how much the farmer minds a bad season.
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(W, 640), height: 340, marginLeft: 60,
+  x: {label: "Standard deviation of the margin, $/ha", grid: true},
+  y: {label: "Mean margin, $/ha", grid: true},
+  marks: [
+    Plot.dot(riskM, {x: "sd_margin", y: "mean_margin", r: 6, fill: "#3f7a34", tip: true, channels: {"10th percentile": "p10_margin", "worst season": "min_margin"}}),
+    Plot.text(riskM, {x: "sd_margin", y: "mean_margin", text: "treatment", dx: 8, textAnchor: "start", fontSize: 10})
+  ]
+}), "module5-mean-sd")
+```
+
+### Attitude to risk
+
+A farmer who dislikes risk values a sure margin more than an uncertain one with the same mean. With an
+exponential utility \(u(m) = -e^{-r m}\), the **certainty equivalent**
+
+\[
+CE = -\frac{1}{r}\,\ln\!\left(\frac{1}{n}\sum_{t=1}^{n} e^{-r\,GM_t}\right)
+\]
+
+is the sure margin worth as much as the uncertain one; \(r\) is the risk aversion (\(r \to 0\): only the mean
+counts).
+
+```{ojs}
+viewof rAvers = Inputs.range([0, 0.05], {step: 0.001, value: 0, label: "Risk aversion r, per $"})
+```
+
+```{ojs}
+ceRows = order.map(t => {
+  const m = seasM.filter(d => d.treatment === t).map(d => d.margin), mu = d3.mean(m);
+  const ce = rAvers === 0 ? mu : mu - Math.log(d3.mean(m, v => Math.exp(-rAvers * (v - mu)))) / rAvers;
+  return {treatment: t, CE: ce, mean: mu};
+})
+ceBest = ceRows.reduce((a, b) => b.CE > a.CE ? b : a)
+withDownload(Plot.plot({
+  width: W, height: 280, marginLeft: 60, marginBottom: 45,
+  x: {label: null, domain: order},
+  y: {label: "Certainty equivalent, $/ha", grid: true, zero: false},
+  marks: [Plot.barY(ceRows, {x: "treatment", y: "CE", fill: d => d.treatment === ceBest.treatment ? "#f2a33a" : "#9bb8ad", tip: true, channels: {"mean margin": "mean"}})]
+}), `module5-certainty-equivalent-${rAvers}`)
+```
+
+With r = ${rAvers}, the best strategy is ${ceBest.treatment}, with a certainty equivalent of ${fmt.int(ceBest.CE)} $/ha.
+
+## 2. The nitrogen exercise: maize at Kadoma, Zimbabwe
+
+```{ojs}
+ks = kadSetup[0]
+kadSeasons = [...new Set(kad.map(d => d.season))]
+kRates = [...new Set(kad.map(d => d.rate))].sort(d3.ascending)
+```
+
+The course asks for the urea rate that maximizes the gross margin of rainfed maize at the Cotton Research
+Institute, Kadoma, in Natural Region II of central Zimbabwe: first for one season (part A, one per participant),
+then as a "blanket" rate over all ${kadSeasons.length} seasons of measured weather (part B). The experiment,
+`KADO9901.SNX`, is hypothetical and fully specified by the exercise: the Malawian hybrid MH-16 (entered in the
+cultivar file with the coefficients the exercise gives), the Millhopper fine sand, initial conditions on 7 October
+(previous crop maize, 100 kg/ha of residue with 0.5% N, soil water at 50% of the available range, 5 kg/ha of soil
+N), planting on 15 October at 3.7 plants/m², urea in two equal splits at planting and 30 days later, no
+irrigation. The notebook writes the file in code:
+
+```{ojs}
+html`<pre class="filex">${kadFx[0].text}</pre>`
+```
+
+::: {.source-note}
+The exercise's "5 kg/ha of soil N" is spread here as nitrate at the same concentration in every layer
+(${ks.ppm_no3.toFixed(2)} ppm), a choice: the exercise does not say how XBuild divides it.
+:::
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(W, 640), height: 230, marginLeft: 50,
+  x: {label: "Month", domain: [7, 8, 9, 10, 11, 12, 1, 2, 3, 4, 5, 6], tickFormat: m => "JFMAMJJASOND"[m - 1]},
+  y: {label: "Mean rain 1977-1990, mm/month", grid: true},
+  marks: [Plot.barY(kadClim, {x: "month", y: "RAIN", fill: d => [10, 11, 12, 1, 2, 3].includes(d.month) ? "#3f7a34" : "#9bb8ad", tip: true})]
+}), "module5-kadoma-rain")
+```
+
+### Part A: one season
+
+The exercise's prices, in Zimbabwean dollars:
+
+\[
+GM = Y \cdot P - N \cdot C - F
+\]
+
+with `Y` the yield in t/ha, `P` = Z$
+${ks.P}/t, `C` = Z$ ${ks.C}/kg and `F` = Z$ ${ks.F}/ha of fixed costs. The exercise calls `N` both "the amount of
+urea used" and "the amount of urea N"; the page prices each kilogram of N, and you can change the price (Z$ 2.0
+per kilogram of urea, which is 46% N, would be about Z$ 4.35 per kilogram of N).
+
+```{ojs}
+viewof kSeason = Inputs.select(kadSeasons, {value: kadSeasons[0], label: "Your season"})
+viewof kP = Inputs.range([100, 1000], {step: 10, value: kadSetup[0].P, label: "Maize price, Z$/t"})
+viewof kC = Inputs.range([0, 10], {step: 0.05, value: kadSetup[0].C, label: "Cost per kg N, Z$"})
+```
+
+```{ojs}
+kadM = kad.map(d => ({...d, GM: d.HWAM / 1000 * kP - d.rate * kC - ks.F}))
+kSel = kadM.filter(d => d.season === kSeason)
+kOpt = kSel.reduce((a, b) => b.GM > a.GM ? b : a)
+withDownload(Plot.plot({
+  width: Math.min(W, 680), height: 320, marginLeft: 60,
+  x: {label: "Urea N, kg N/ha", grid: true},
+  y: {label: "Z$/ha or kg/ha", grid: true},
+  color: {legend: true, domain: ["gross margin, Z$/ha", "grain yield, kg/ha"], range: ["#f2a33a", "#3f7a34"]},
+  marks: [
+    Plot.lineY(kSel, {x: "rate", y: "GM", stroke: () => "gross margin, Z$/ha", marker: "dot", tip: true}),
+    Plot.lineY(kSel, {x: "rate", y: "HWAM", stroke: () => "grain yield, kg/ha", marker: "dot", tip: true, channels: {"N leached": "NLCM", "N uptake": "NUCM"}}),
+    Plot.ruleX([kOpt.rate], {stroke: "#f2a33a", strokeDasharray: "4,3"})
+  ]
+}), `module5-kadoma-${kSeason.replace("/", "-")}`)
+```
+
+In ${kSeason} (${fmt.int(kSel[0].PRCM)} mm of rain over the season) the best rate is ${kOpt.rate} kg N/ha, for ${fmt.int(kOpt.HWAM)} kg/ha of grain and a gross margin of Z$ ${fmt.int(kOpt.GM)}/ha.
+
+### Part B: the blanket rate
+
+```{ojs}
+kBlanket = kRates.map(r => { const g = kadM.filter(d => d.rate === r); return {rate: r, mean: d3.mean(g, d => d.GM), sd: d3.deviation(g, d => d.GM), leached: d3.mean(g, d => d.NLCM)}; })
+kB = kBlanket.reduce((a, b) => b.mean > a.mean ? b : a)
+kBestSeason = kadSeasons.map(s => kadM.filter(d => d.season === s).reduce((a, b) => b.GM > a.GM ? b : a))
+kRegret = d3.mean(kBestSeason, b => b.GM - kadM.find(d => d.season === b.season && d.rate === kB.rate).GM)
+withDownload(Plot.plot({
+  width: Math.min(W, 680), height: 300, marginLeft: 70, marginBottom: 55,
+  x: {label: "Season", domain: kadSeasons, tickRotate: -35},
+  y: {label: "Best rate in hindsight, kg N/ha", grid: true, domain: [0, d3.max(kRates)]},
+  marks: [
+    Plot.ruleY([kB.rate], {stroke: "#3f7a34", strokeDasharray: "5,3"}),
+    Plot.dot(kBestSeason, {x: "season", y: "rate", r: 6, fill: "#f2a33a", tip: true, channels: {"season rain, mm": "PRCM", "grain, kg/ha": "HWAM"}})
+  ]
+}), "module5-kadoma-best-rate")
+```
+
+The best rate in hindsight varies from ${d3.min(kBestSeason, d => d.rate)} to ${d3.max(kBestSeason, d => d.rate)} kg N/ha between seasons (dots). The blanket rate, the one with the highest mean margin over all ${kadSeasons.length} seasons, is ${kB.rate} kg N/ha (dashed line), with a margin of Z$ ${fmt.int(kB.mean)} ± ${fmt.int(kB.sd)}/ha. Not knowing the season costs on average Z$ ${fmt.int(kRegret)}/ha against perfect foresight: an upper limit on what a seasonal forecast could be worth for this decision.
+
+### Part C: beyond yield and profit, the nitrogen that is lost
+
+Risk is not only money. The course's lecture on uncertainty listed environmental outcomes beside the
+biophysical and economic ones (nitrogen leaching, runoff, pollution), and its nitrogen lectures used the models
+to improve **best management practices** (BMPs) for nitrogen that minimize nitrate leaching, by looking at the
+rate and timing of fertilizer over many seasons. The same Kadoma runs give the nitrogen leached below the profile
+at each rate:
+
+```{ojs}
+kEnv = kRates.map(r => { const g = kadM.filter(d => d.rate === r); return {rate: r, yield: d3.mean(g, d => d.HWAM), uptake: d3.mean(g, d => d.NUCM), leached: d3.mean(g, d => d.NLCM), GM: d3.mean(g, d => d.GM)}; })
+kEnv0 = kEnv[0]
+kEnvB = kEnv.find(d => d.rate === kB.rate)
+kEnvMax = kEnv[kEnv.length - 1]
+withDownload(Plot.plot({
+  width: Math.min(W, 680), height: 300, marginLeft: 60,
+  x: {label: "N rate, kg N/ha", grid: true},
+  y: {label: "kg N/ha, mean over seasons", grid: true},
+  color: {legend: true, domain: ["taken up by the crop", "leached"], range: ["#3f7a34", "#f2a33a"]},
+  marks: [
+    Plot.lineY(kEnv.flatMap(d => [{rate: d.rate, k: "taken up by the crop", v: d.uptake}, {rate: d.rate, k: "leached", v: d.leached}]),
+      {x: "rate", y: "v", stroke: "k", marker: "dot", tip: true}),
+    Plot.ruleX([kB.rate], {stroke: "#888", strokeDasharray: "5,3"})
+  ]
+}), "module5-kadoma-n-lost")
+```
+
+Without fertilizer ${fmt.int(kEnv0.leached)} kg N/ha is leached in a mean season; at the blanket rate of ${kB.rate} kg N/ha (dashed line) ${fmt.int(kEnvB.leached)}, and at ${kEnvMax.rate} kg N/ha ${fmt.int(kEnvMax.leached)}. The margin peaks at the blanket rate, so rates above it cost money and add to the nitrogen lost. A rate somewhat below it, or the same amount split into more doses, are the kinds of practice a BMP analysis would compare, with leaching as a criterion beside the margin.
+
+## 3. Regional risk analysis and adoption: millet in Niger
+
+The course's third exercise is a small regional study. Should the farmers around Tillabery, Niger, change from
+millet cultivar Niger 1 to Niger 2? The course's `NIGE1101.SNX` simulates both cultivars on the area's two soils,
+a medium alfisol (soil type A) and a Niger sandy soil (type B), for 10 years of measured weather. There are 100
+farms on soil A (2 ha each on average; 20% of these farmers do not grow millet) and 150 farms on soil B (1.8 ha
+each). The cultivars are entered as the exercise gives them; Niger 2's coefficients turn out to be identical to the
+cultivar file's generic "NORTH VARIETY".
+
+### Part A: yield and the regional response
+
+```{ojs}
+ngGroups = d3.rollups(niger, v => ({yield: d3.mean(v, d => d.HWAM), sd: d3.deviation(v, d => d.HWAM), D: d3.mean(v, d => d.D)}), d => d.soil, d => d.cultivar)
+  .flatMap(([soil, arr]) => arr.map(([cultivar, v]) => ({soil, cultivar, ...v})))
+withDownload(Plot.plot({
+  width: Math.min(W, 640), height: 300, marginLeft: 60,
+  x: {label: "Year", tickFormat: "d", grid: true},
+  y: {label: "Millet grain yield, kg/ha", grid: true},
+  color: {legend: true, domain: ["Niger 1", "Niger 2"], range: ["#3f7a34", "#f2a33a"]},
+  fy: {label: "Soil"},
+  marks: [Plot.lineY(niger, {x: "year", y: "HWAM", stroke: "cultivar", fy: "soil", marker: "dot", tip: true, channels: {"days to maturity": "D"}})]
+}), "module5-niger-yields")
+```
+
+```{ojs}
+area = Object.fromEntries(nigerFarms.map(d => [d.soil, d.millet_ha]))
+regional = ["Niger 1", "Niger 2"].map(c => ({cultivar: c,
+  tonnes: d3.sum(["A", "B"], s => area[s] * ngGroups.find(g => g.soil === s && g.cultivar === c).yield / 1000)}))
+ng = (s, c) => ngGroups.find(g => g.soil === s && g.cultivar === c)
+```
+
+On soil A Niger 2 yields ${fmt.int(ng("A", "Niger 2").yield)} kg/ha against ${fmt.int(ng("A", "Niger 1").yield)} for Niger 1; on soil B ${fmt.int(ng("B", "Niger 2").yield)} against ${fmt.int(ng("B", "Niger 1").yield)}. Over the region's ${fmt.int(area.A + area.B)} ha of millet (${fmt.int(area.A)} ha on soil A after leaving out the 20% of farmers who do not grow it, ${fmt.int(area.B)} ha on soil B), full adoption of Niger 2 would change the expected harvest from ${fmt.int(regional[0].tonnes)} to ${fmt.int(regional[1].tonnes)} t.
+
+### Part B: a price penalty for late maturity, and the farmer's utility
+
+Late millet is paid less, and the exercise compares the cultivars by a mean-variance utility:
+
+\[
+\begin{gathered}
+p = 300 - 0.02\,D^2 \ \ \text{(CFA/t)}, \qquad GM = Y\,p \\[4pt]
+U = E[GM] - 0.35\,\mathrm{Var}[GM]
+\end{gathered}
+\]
+
+with \(D\) the days from planting to maturity and \(Y\) the yield in t/ha (other costs ignored). Change the penalty and the weight on risk:
+
+```{ojs}
+viewof pen = Inputs.range([0, 0.04], {step: 0.001, value: 0.02, label: "Penalty coefficient"})
+viewof lam = Inputs.range([0, 1], {step: 0.01, value: 0.35, label: "Weight on the variance"})
+```
+
+```{ojs}
+ngU = ngGroups.map(g => {
+  const v = niger.filter(d => d.soil === g.soil && d.cultivar === g.cultivar).map(d => ({...d, price: 300 - pen * d.D ** 2, GM: d.HWAM / 1000 * (300 - pen * d.D ** 2)}));
+  const E = d3.mean(v, d => d.GM), V = d3.variance(v, d => d.GM);
+  return {...g, price: d3.mean(v, d => d.price), E, V, U: E - lam * V};
+})
+choice = Object.fromEntries(["A", "B"].map(s => [s, ngU.filter(d => d.soil === s).reduce((a, b) => b.U > a.U ? b : a).cultivar]))
+regionalU = d3.sum(["A", "B"], s => area[s] * ngGroups.find(g => g.soil === s && g.cultivar === choice[s]).yield / 1000)
+Inputs.table(ngU, {columns: ["soil", "cultivar", "yield", "D", "price", "E", "V", "U"],
+  header: {soil: "Soil", cultivar: "Cultivar", yield: "Mean yield, kg/ha", D: "Days to maturity", price: "Mean price, CFA/t", E: "E, CFA/ha", V: "V", U: "Utility"},
+  format: {yield: fmt.int, D: fmt.d1, price: fmt.int, E: fmt.int, V: fmt.int, U: fmt.int}, layout: "auto"})
+```
+
+With these settings a farmer who maximizes utility grows ${choice.A} on soil A and ${choice.B} on soil B. The region would then harvest about ${fmt.int(regionalU)} t of millet. Niger 1 yields more but matures about ${fmt.d1(ng("A", "Niger 1").D - ng("A", "Niger 2").D)} days later, and the penalty grows with the square of the season length; move the penalty to see where the choice turns.
+
+## From one field to a grid: xdssat
+
+A seasonal analysis gives a distribution of outcomes for one field. xdssat gives one for every cell: in the
+[rice case study](../java/index.qmd), 30 seasons of measured weather (1991-2020) for each 0.1° cell of Java. The
+coefficient of variation of the simulated yield over those seasons, and the share of seasons below a yield you
+choose, are a map of production risk:
+
+```{ojs}
+import {cellFeatures, adminMarks} from "../assets/js/dl.js"
+gCells = FileAttachment("../java/data/grid_cells.csv").csv({typed: true})
+gOutline = FileAttachment("../java/data/java_outline.geojson").json()
+gProv = FileAttachment("../java/data/provinces.geojson").json()
+gDist = FileAttachment("../java/data/districts.geojson").json()
+gSummary = FileAttachment("../java/data/summary.json").json()
+gMapW = Math.min(width, 960)
+```
+
+```{ojs}
+gYear = FileAttachment("../java/data/grid_yearly.json").json()
+viewof g5Sys = Inputs.radio(new Map([["Rainfed, wet season", "wet_rainfed"], ["Irrigated, wet season", "wet_irrigated"], ["Irrigated, dry season", "dry_irrigated"]]), {value: "wet_rainfed", label: "System"})
+viewof g5Thr = Inputs.range([1000, 8000], {step: 250, value: 4000, label: "Yield below, kg/ha"})
+viewof g5Var = Inputs.radio(new Map([["Coefficient of variation", "cv"], ["Share of seasons below the yield", "p"]]), {value: "cv", label: "Map"})
+```
+
+```{ojs}
+g5 = gYear.lat.map((lat, i) => {
+  const v = gYear.systems[g5Sys].map(y => y[i]).filter(x => x != null);
+  if (v.length < 10) return null;
+  const m = d3.mean(v);
+  return {lat, lon: gYear.lon[i], n: v.length, mean: m, cv: d3.deviation(v) / m, p: v.filter(x => x < g5Thr).length / v.length};
+}).filter(d => d)
+withDownload(Plot.plot({
+  width: gMapW, height: Math.round(gMapW * 0.42),
+  projection: {type: "mercator", domain: gOutline},
+  color: g5Var === "cv" ? {type: "linear", scheme: "YlOrRd", legend: true, label: "Coefficient of variation of yield, 1991-2020", tickFormat: ".0%"}
+    : {type: "linear", scheme: "Reds", domain: [0, 1], legend: true, label: `Share of seasons below ${g5Thr} kg/ha`, tickFormat: ".0%"},
+  marks: [
+    Plot.geo(gProv, {fill: "#f1f1f1", clip: true}),
+    Plot.geo(cellFeatures(g5).features, Plot.centroid({fill: d => d.properties[g5Var], tip: true,
+      title: d => `${d.properties.lat.toFixed(1)}, ${d.properties.lon.toFixed(1)}: mean ${fmt.int(d.properties.mean)} kg/ha, CV ${fmt.pct(d.properties.cv)}, ${fmt.pct(d.properties.p)} of seasons below ${g5Thr}`})),
+    ...adminMarks(Plot, gProv, gDist)
+  ]
+}), `module5-grid-${g5Sys}-${g5Var}`)
+```
+
+```{ojs}
+g5med = (sys) => d3.median(gYear.lat.map((_, i) => { const v = gYear.systems[sys].map(y => y[i]).filter(x => x != null); return v.length >= 10 ? d3.deviation(v) / d3.mean(v) : null; }).filter(x => x != null))
+```
+
+The median cell's yield varies from season to season by ${fmt.pct(g5med("wet_rainfed"))} (coefficient of variation) for rainfed wet-season rice and ${fmt.pct(g5med("wet_irrigated"))} for irrigated. The same tools as above (cumulative distributions, dominance, certainty equivalents) apply cell by cell; xdssat writes the seasons as a netCDF grid for that.
+
+## Self-test
+
+1. Strategy A has a higher mean margin than B; B has a smaller spread. When would you recommend B?
+2. Why does the comparison use the same price draw for all strategies in a season?
+3. The weather of part 1 is generated. What can such a run tell you that measured weather from 30 years cannot,
+   and what can it not?
+4. At Kadoma, what would change the blanket rate more: doubling the price of N, or a run of dry seasons?
+5. Exercise 4 of the course: set up a seasonal experiment of your own, 4 to 8 treatments over at least 8 years,
+   with costs and prices that fit the place, and report what you assumed.
+
+## Where this goes next
+
+Module 6 turns from single seasons to crop sequences, where each crop starts from the soil the previous one left.
+The plan for all six modules is on the [training overview](index.qmd).
+
+## References {.unnumbered}
+
+::: {#refs}
+:::

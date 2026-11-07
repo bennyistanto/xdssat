@@ -1,0 +1,179 @@
+---
+title: "Implementation"
+subtitle: "Each step: the script, the settings that change what it does, and what it writes"
+---
+
+```{ojs}
+import {withDownload, fmt} from "../assets/js/dl.js"
+summary = FileAttachment("../java/data/summary.json").json()
+runs = FileAttachment("../java/data/runs.json").json()
+runYears = FileAttachment("../java/data/run_years.csv").csv({typed: true})
+settings = FileAttachment("../java/data/settings.csv").csv()
+cli = ({
+  fit_slpf: FileAttachment("../java/data/cli/fit_slpf.txt"),
+  check_setup: FileAttachment("../java/data/cli/check_setup.txt"),
+  build_engine: FileAttachment("../java/data/cli/build_engine.txt"),
+  build_agera5_cache: FileAttachment("../java/data/cli/build_agera5_cache.txt"),
+  prepare_rasters: FileAttachment("../java/data/cli/prepare_rasters.txt"),
+  fetch_soilgrids: FileAttachment("../java/data/cli/fetch_soilgrids.txt"),
+  build_soilgrids_cache: FileAttachment("../java/data/cli/build_soilgrids_cache.txt"),
+  prepare_soils: FileAttachment("../java/data/cli/prepare_soils.txt"),
+  make_templates: FileAttachment("../java/data/cli/make_templates.txt"),
+  run_aoi: FileAttachment("../java/data/cli/run_aoi.txt"),
+  make_netcdf: FileAttachment("../java/data/cli/make_netcdf.txt"),
+  compare_bps: FileAttachment("../java/data/cli/compare_bps.txt"),
+  fetch_bdsp: FileAttachment("../java/data/cli/fetch_bdsp.txt"),
+  clean_bdsp: FileAttachment("../java/data/cli/clean_bdsp.txt"),
+  clean_moa_yields: FileAttachment("../java/data/cli/clean_moa_yields.txt"),
+  compare_districts: FileAttachment("../java/data/cli/compare_districts.txt")
+})
+```
+
+Setup from an empty machine (Python environment, building or reusing the DSSAT engine, data locations,
+timings on the reference machine) is in
+[`docs/getting-started.md`](https://github.com/bennyistanto/xdssat/blob/main/docs/getting-started.md). This
+page does not repeat it; it maps each step to its script and to the settings that change the result.
+
+## Settings: where things live
+
+All locations are read in `src/config.py` from environment variables. The defaults are the author's machine.
+The table is what `config.py` resolved when the site data were exported.
+
+```{ojs}
+Inputs.table(settings, {header: {setting: "config.py name", variable: "Environment variable", value: "Value at export", from: "From"}, layout: "auto"})
+```
+
+| Variable | Changes |
+|---|---|
+| `XDSSAT_ENGINE` | Which `dscsm048` build runs, so which DSSAT version produces the results. Must be a short path outside OneDrive. |
+| `XDSSAT_WORK` | Where the per-process run folders are made. Short path (the engine keeps paths in fixed 80-102 character buffers; `config.MAX_RUN_DIR_LEN` = 60). |
+| `XDSSAT_AGERA5`, `XDSSAT_SOILGRIDS`, `XDSSAT_INPUTS` | Source data read by the preparation scripts. |
+| `XDSSAT_CACHE` | Where every derived product and run is written and read back. |
+
+## The steps
+
+| # | Step | Script | Reads | Writes (under `XDSSAT_CACHE`) | Options that change process or output |
+|---|---|---|---|---|---|
+| 0 | Check the setup | `check_setup.py` | config, engine | nothing | `--no-run` (skip the engine test) |
+| 0 | Build the engine | `build_engine.py` | `dssat-csm-os` | engine folder + `BUILD_INFO.txt` | `--source`, `--clone --ref` (engine version), `--engine-dir` |
+| 1 | Weather cache | `build_agera5_cache.py` | AgERA5 global netCDF | `agera5/idn/<VAR>/` int16, DSSAT units | `--vars`, `--years` |
+| 2 | 100 m rasters | `prepare_rasters.py` | rice, MoA, AEZ, soil, admin2 polygons | `rasters/idn_*.tif` + class tables | `--layers` (which layers), `--adm2` (district boundaries), `--aoi` (test window) |
+| 3 | SoilGrids tiles | `fetch_soilgrids.py` | ISRIC server | tiles in `XDSSAT_SOILGRIDS` | `--props`, `--depths`, `--dry-run` |
+| 4 | SoilGrids cache | `build_soilgrids_cache.py` | SoilGrids mirror | `soilgrids/idn/*.tif` | `--region` |
+| 5 | Soil profiles | `prepare_soils.py` | rasters, SoilGrids cache | `soils/<aoi>.SOL`, `<aoi>_soilgrids_cells.csv` | `--aoi` (none = Indonesia), **`--no-soc-scale`** (keep SoilGrids SOC) |
+| 6 | Template FileX | `make_templates.py` | `dssat-csm-data` IRMZ8601 | `templates/XDRI8601.RIX` | none; treatments from `management.TREATMENT_GRID` |
+| 7 | Run | `run_aoi.py` | all of the above | `runs/<aoi>_<mode>_<y0>-<y1>[suffix]/` | see below |
+| 8 | netCDF | `make_netcdf.py` (also called by `run_aoi.py`) | run folder | `<run>.nc` | `--out` |
+| 9 | Observations | `fetch_bdsp.py`, `clean_bdsp.py` | BDSP portal | `obs/bdsp_rice_*_adm2.csv` + flags | `--boundary` (code moves) |
+| 10 | Compare | `compare_districts.py`, `compare_bps.py` | run, obs, rasters | `checks/districts/`, `checks/bps/` | **`--moisture`** (GKG), `--min-ha` (districts kept) |
+| 11 | Fit SLPF | `fit_slpf.py` | three or more runs differing only in SLPF, obs, rasters | `checks/districts/fit_slpf.json`, `fit_slpf_grid.csv`, `slpf_table.csv` (for `--slpf-table`) | **`--runs`** (the SLPF sweep), `--step` (grid step), `--moisture`, `--min-ha` |
+
+::: {.source-note}
+Compiled from the scripts' docstrings and their `--help` (below). Step order and timings:
+`docs/getting-started.md`, section 6.
+:::
+
+### `run_aoi.py`: the options that change the simulation
+
+| Option | Default | Effect on the run | Effect on the output |
+|---|---|---|---|
+| `--mode` | | `uniform` (15 Nov / 1 Apr), `by_zone` (one calendar per AEZ), `per_cell` (BMKG onset per cell) | planting dates; `onset.csv` or `zone_table.csv` |
+| `--years FIRST LAST` | | agricultural years (1 Aug to 31 Jul) | `time` axis of the netCDF; folder name |
+| `--onset-years` | `--years` | years in the onset median (`per_cell`) | planting dates |
+| `--zone-table` | median onset per zone | `by_zone` calendar | planting dates |
+| `--cultivar` | `IR 58` | `IR 58` (IB0012) or `IR 64` (IB0015): template treatment | folder suffix `_ir64...` |
+| `--n` | 140 | 0 / 35 / 70 / 105 / 140 kg N as urea, 2/3 at 18 and 1/3 at 41 days after transplanting | folder suffix `_n...` |
+| `--slpf` | profile value (1) | multiplies daily carbohydrate (`RI_Grosub.for:648-649`): level calibration | suffix `_slpf...`; netCDF attribute `soil_fertility_factor_SLPF` |
+| `--slpf-rainfed` | same as `--slpf` | SLPF of rain-fed strata only; their cells get a copy of the soil profile (`XR...` IDs) with this value | suffix `_rf...`; netCDF attribute `soil_fertility_factor_SLPF_rainfed` |
+| `--slpf-table` | none | CSV `iy, ix, water, slpf` (from `fit_slpf.py`): SLPF per stratum, rain-fed strata on `XR...` profile copies; replaces `--slpf` and `--slpf-rainfed` | suffix `_<table name>`; netCDF attribute `soil_fertility_factor_SLPF_table` |
+| `--tcldf` | CUL value | cold sterility threshold of the cultivar, written into the run's own copy of `RICER048.CUL` (`src/genotype.py`) | suffix `_tcldf...` |
+| `--sample N` | all cells | run only N cells, sampled by rice area | fewer strata |
+| `--block` | 5 | agricultural years per batch | none (memory and progress only) |
+| `--chunk-size` | 200 | treatments per FileX and engine process | none |
+| `--workers` | 32 | engine processes in parallel | none (wall time only) |
+| `--out` | `XDSSAT_CACHE/runs/...` | where the run is written | |
+
+::: {.source-note}
+Defaults from the argument parser of `scripts/run_aoi.py`; the current run used ${summary.current.workers}
+workers and chunk size ${summary.current.chunk_size} (`run_info.json`). `--slpf` and `--tcldf` effects per
+their `--help` text and `src/genotype.py`. The current run, ${summary.current_run}, was made with ${currentSettings}; the SLPF values come from
+`fit_slpf.py` (step 11).
+
+```{ojs}
+currentSettings = summary.current.slpf_table && summary.current.slpf_table !== "None"
+  ? `--slpf-table ${summary.current.slpf_table} --tcldf ${summary.current.tcldf}`
+  : `--slpf ${summary.current.slpf} --slpf-rainfed ${summary.current.slpf_rainfed} --tcldf ${summary.current.tcldf}`
+```
+:::
+
+### What the settings do to the results
+
+Every run folder in the cache, as Java area-weighted yield per season year. Switch the system to see how mode,
+the initial-N fix, SLPF and TCLDF move the series.
+
+```{ojs}
+viewof rySys = Inputs.radio(new Map([["Wet, irrigated", "wet_irrigated"], ["Wet, rain-fed", "wet_rainfed"], ["Dry, irrigated", "dry_irrigated"]]), {value: "wet_irrigated", label: "System"})
+viewof ryRuns = Inputs.checkbox(runs.map(d => d.run), {value: runs.map(d => d.run), label: "Runs"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(width, 900), height: 380, marginLeft: 55,
+  x: {label: "Season year (1 Aug start)", tickFormat: d => String(d)},
+  y: {label: "Java yield, kg/ha dry matter (production / harvested area)", grid: true},
+  color: {legend: true, domain: runs.map(d => d.run)},
+  marks: [
+    Plot.lineY(runYears.filter(d => d.system === rySys && ryRuns.includes(d.run)), {x: "season_year", y: "yield_kg_ha", stroke: "run", tip: true})
+  ]
+}), `xdssat-runs-${rySys}`)
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(width, 900), height: 60 + runs.length * 42, marginLeft: 260,
+  x: {label: "Area-weighted yield over all years, kg/ha dry matter", grid: true},
+  y: {label: null},
+  fy: {label: null},
+  color: {legend: true},
+  marks: [
+    Plot.barX(runs.flatMap(r => ["wet_irrigated", "wet_rainfed", "dry_irrigated"].map(s => ({run: r.run, system: s, v: r[`yield_${s}`]}))).filter(d => d.v != null),
+      {y: "system", fy: "run", x: "v", fill: "system", tip: true})
+  ]
+}), "xdssat-runs-yield-by-system")
+```
+
+::: {.source-note}
+From each run's netCDF: `production.sum() / harvested_area.sum() * 1000` per system (and per season year in
+the line chart). Runs made before the initial soil-N fix are kept for comparison only.
+:::
+
+## Run outputs
+
+| File | Content |
+|---|---|
+| `strata.csv` | one row per weather cell and water regime, with rice ha and zone |
+| `units.csv` | one row per simulated season (cell, regime, planting date, template treatment) |
+| `summary.csv` | DSSAT seasonal summary joined to the units (`HWAH`, `MDAT`, `TMINA`, ...) |
+| `failed.csv` | seasons the engine rejected, with its error message |
+| `onset.csv` | `per_cell`: onset per cell (days after 1 Aug, date, years with an onset) |
+| `run_info.json` | arguments, counts, timings, engine path |
+| `<run>.nc` | CF-1.10 netCDF, `(system, time, lat, lon)`; layout on [How xdssat differs](gridding.qmd#cf-netcdf-output) |
+
+## Command-line help of every script
+
+The text below is each script's own `--help`, captured when the site data were exported, so it follows the
+code.
+
+```{ojs}
+viewof cliPick = Inputs.select(Object.keys(cli), {value: "run_aoi", label: "Script"})
+```
+
+```{ojs}
+cliText = cli[cliPick].text()
+html`<pre class="cli-help">${cliText}</pre>`
+```
+
+## Tests
+
+`python -m pytest tests`; tests marked `engine` run the real DSSAT executable and are skipped when it is
+absent. Counts change as tests are added; see `HANDOFF.md` and the test folder rather than a number here.

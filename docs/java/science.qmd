@@ -1,0 +1,522 @@
+---
+title: "Scientific method"
+subtitle: "Why each step is done the way it is, with the source behind it"
+---
+
+```{ojs}
+import {withDownload, adminMarks, cellFeatures, fmt, pearson} from "../assets/js/dl.js"
+summary = FileAttachment("data/summary.json").json()
+cells = FileAttachment("data/grid_cells.csv").csv({typed: true})
+outline = FileAttachment("data/java_outline.geojson").json()
+provinces = FileAttachment("data/provinces.geojson").json()
+districtsGeo = FileAttachment("data/districts.geojson").json()
+soilLayers = FileAttachment("data/soil_layers.csv").csv({typed: true})
+sens = FileAttachment("data/sensitivity.csv").csv({typed: true})
+tcCells = FileAttachment("data/tcldf_cells.csv").csv({typed: true})
+districts = FileAttachment("data/districts.csv").csv({typed: true})
+districtYears = FileAttachment("data/district_years.csv").csv({typed: true})
+javaYears = FileAttachment("data/java_years.csv").csv({typed: true})
+cultivars = FileAttachment("data/cultivars.csv").csv()
+fit = FileAttachment("data/fit_slpf.json").json()
+fitGrid = FileAttachment("data/fit_slpf_grid.csv").csv({typed: true})
+slpfCells = FileAttachment("data/slpf_cells.csv").csv({typed: true})
+slpfPointsText = fit.slpf_points.join(", ")
+slpfRange = `${d3.min(fit.slpf_points)} to ${d3.max(fit.slpf_points)}`
+usesTable = summary.current.slpf_table != null && summary.current.slpf_table !== "None"
+currentSlpf = usesTable && fit.temp ? [fit.temp.slpf_irrigated, fit.temp.slpf_rainfed]
+  : [summary.current.slpf, summary.current.slpf_rainfed].filter(v => v != null && v !== "None").map(Number)
+runsAll = FileAttachment("data/runs.json").json()
+tcText = tcRun ? `(${fmt.int(tcRun.yield_wet_rainfed)} vs ${fmt.int(tcRun.yield_wet_irrigated)} kg/ha in run ${tcRun.run}),` : ","
+// one SLPF for all rice with the TCLDF of the current run, if that run exists
+tcRun = runsAll.find(r => r.tcldf === summary.current.tcldf && (r.slpf_rainfed === "None" || r.slpf_rainfed == null) && r.slpf !== "None" && r.yield_wet_rainfed != null && Math.abs(+r.slpf - 0.75) < 0.05)
+cur = summary.current
+runOptions = new Map(Object.entries(summary.districts).map(([k, v]) => [v.label, k]))
+mapW = Math.min(width, 960)
+```
+
+The model is CERES-Rice in DSSAT-CSM 4.8 [@jones2003], built from the DSSAT source at version 4.8.6.4
+[@dssatcsmos]. File and line references below (`RI_Grosub.for:648`) point into that source
+(`dssat-csm-os`, commit `25c93b9a`).
+
+## Soil profiles from SoilGrids {#soil}
+
+**What.** For each weather cell, SoilGrids 2.0 [@poggio2021] properties are averaged over the cell's rice
+pixels, weighted by rice area, at the six SoilGrids depths. Stored integers are converted with ISRIC's factors
+[@isricfaq]. Water limits come from the pedotransfer functions of @saxton2006: lower limit (LL, 1500 kPa),
+drained upper limit (DUL, 33 kPa), saturation (SAT) and saturated conductivity, from sand, clay and organic
+matter (organic matter = 1.724 x organic carbon, the conventional van Bemmelen factor; an assumption, not from
+the paper). Code: `soils.saxton_rawls`.
+
+**Why.** Saxton and Rawls give all four properties DSSAT needs from texture and organic matter alone, which
+is what a global grid provides, and the coefficients were checked against USDA-ARS WEPP `saxpar.for`
+(`src/soils.py` docstring).
+
+**Why scale organic carbon.** At 26 WISE sites on Java, SoilGrids organic carbon is about twice the measured
+value (median 3.67 vs 1.70% at 0-30 cm; `temp/inputs-detail.md`). xdssat multiplies SoilGrids organic carbon
+by the median WISE/SoilGrids ratio over 78 Indonesian WISE profiles [@romero2012]: 0.70 (0-30 cm), 0.63
+(30-100 cm), 0.47 (100-200 cm), `soils.SOC_SCALE`. The scaled value also enters the pedotransfer.
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(width, 760), height: 380, marginLeft: 55,
+  y: {reverse: true, label: "Depth, layer mid-point (cm)", grid: true},
+  x: {label: "Volumetric water content, cm³/cm³ (band: 10th-90th percentile over cells)", grid: true},
+  color: {legend: true, domain: ["LL", "DUL", "SAT"], range: ["#b5651d", "#2a7f62", "#3a6fb0"]},
+  marks: [
+    ...[["LL", "slll"], ["DUL", "sdul"], ["SAT", "ssat"]].flatMap(([lab, v]) => [
+      Plot.areaX(soilLayers, {y: "mid", x1: `${v}_p10`, x2: `${v}_p90`, fill: () => lab, fillOpacity: 0.2, curve: "step"}),
+      Plot.lineX(soilLayers, {y: "mid", x: `${v}_p50`, stroke: () => lab, strokeWidth: 2, marker: "dot", tip: true})
+    ])
+  ]
+}), "xdssat-soil-water-limits-by-depth")
+```
+
+**Root growth factor (SRGF).** DSSAT needs a relative root growth factor per layer. xdssat uses 1 for layers
+ending at or above 15 cm and `exp(-0.02 x mid-depth)` below (`soils.root_growth_factor`). This is not taken
+from a paper: it is the rule that reproduces 96.8% of the 16,360 layers of DSSAT's `WI.SOL`, measured in this
+repository on 2026-11-06 (`src/soils.py` docstring). The line is the rule, the dots are the layers of the
+current profiles.
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(width, 560), height: 340, marginLeft: 55,
+  y: {reverse: true, label: "Depth (cm)", grid: true, domain: [0, 200]},
+  x: {label: "SRGF", domain: [0, 1.05], grid: true},
+  marks: [
+    Plot.lineX(d3.range(0, 201, 1), {y: d => d, x: d => d <= 15 ? 1 : Math.exp(-0.02 * d), stroke: "#888", strokeDasharray: "4,3"}),
+    Plot.dot(soilLayers, {y: "mid", x: "srgf_p50", r: 5, fill: "#2a7f62", tip: true, channels: {"layer bottom, cm": "slb"}})
+  ]
+}), "xdssat-srgf-rule")
+```
+
+## Planting dates: BMKG rainfall onset {#onset}
+
+**What.** In `per_cell` mode, the wet season starts at the rainfall onset of each cell: the first *dasarian*
+(10-day period) with at least 50 mm of rain that is followed by two more dasarian of at least 50 mm, the rule
+used by Indonesia's meteorological agency BMKG [@giarno2012], and in BMKG Stasiun Klimatologi Sumatera
+Selatan's *Buletin Prakiraan Musim Hujan 2025/2026* (both cited in `management.onset`). Onset is computed per
+agricultural year from AgERA5 rain and the median over the years is used (`management.onset`,
+`management.onset_climatology`).
+
+**Why.** Rain-fed paddies can only be planted once the rain has come, and the onset is not the same
+everywhere: across Java's rice cells the median onset spans ${onsetSpread} days between the 10th and 90th
+percentile of rice area (computed from `onset.csv` of the current run). A uniform calendar would plant some
+cells before the rain and others late.
+
+**Assumptions.** Seedbeds are sown at onset and transplanted 20 days later (the template transplants
+23-day-old seedlings); the dry season is planted 120 days after the wet season (`planting_from_onset`). Both
+offsets are placeholders, not calibrated.
+
+```{ojs}
+onsetSpread = {
+  const r = cells.filter(d => d.onset_days != null && isFinite(d.onset_days)).sort((a, b) => a.onset_days - b.onset_days);
+  const tot = d3.sum(r, d => d.ha); let c = 0, p10 = null, p90 = null;
+  for (const d of r) { c += d.ha; if (p10 == null && c >= 0.1 * tot) p10 = d.onset_days; if (p90 == null && c >= 0.9 * tot) p90 = d.onset_days; }
+  return Math.round(p90 - p10);
+}
+onsetRows = cells.filter(d => d.onset_days != null && isFinite(d.onset_days)).map(d => ({...d, date: new Date(Date.UTC(2001, 7, 1) + d.onset_days * 864e5)}))
+withDownload(Plot.plot({
+  width: mapW, height: Math.round(mapW * 0.42),
+  projection: {type: "mercator", domain: outline},
+  color: {type: "linear", scheme: "Viridis", legend: true, label: "Median wet-season onset, days after 1 Aug",
+          tickFormat: d => d3.utcFormat("%d %b")(new Date(Date.UTC(2001, 7, 1) + d * 864e5))},
+  marks: [
+    Plot.geo(provinces, {fill: "#f1f1f1", clip: true}),
+    Plot.geo(cellFeatures(onsetRows).features, Plot.centroid({fill: d => d.properties.onset_days,
+      title: d => `onset ${d.properties.onset_date_md} (${d.properties.years_with_onset} years with an onset)`, tip: true})),
+    ...adminMarks(Plot, provinces, districtsGeo)
+  ]
+}), "xdssat-onset-map")
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(width, 760), height: 260, marginLeft: 50,
+  x: {label: "Date (onset, transplanting = onset + 20 d)", type: "utc", tickFormat: "%d %b"},
+  y: {label: "Rice ha, thousands", grid: true},
+  color: {legend: true},
+  marks: [
+    Plot.rectY(onsetRows.flatMap(d => [{date: d.date, ha: d.ha / 1000, what: "onset"}, {date: new Date(+d.date + 20 * 864e5), ha: d.ha / 1000, what: "wet-season transplanting"}]),
+      Plot.binX({y: "sum"}, {x: "date", y: "ha", fill: "what", mixBlendMode: "multiply", fillOpacity: 0.7, interval: d3.utcDay.every(10), tip: true})),
+    Plot.ruleY([0])
+  ]
+}), "xdssat-onset-histogram")
+```
+
+## Level calibration: SLPF {#slpf}
+
+**What the factor does.** `SLPF` is the soil fertility factor in the soil profile. In CERES-Rice it multiplies
+the day's carbohydrate production after all stresses (`Plant/CERES-Rice/RI_Grosub.for:648-649`):
+
+```fortran
+      CARBO = PCARB*AMIN1(PRFT,SWFAC,NSTRES,TSHOCK,PStres1,KSTRES,PRFO3)
+     &       * SLPF
+```
+
+that is,
+
+\[
+\begin{aligned}
+CARBO = {} & PCARB \cdot \min(f_T,\ SWFAC,\ NSTRES, \\
+& \qquad f_{shock},\ f_P,\ f_K,\ f_{O_3}) \cdot SLPF ,
+\end{aligned}
+\]
+
+so SLPF scales the day's growth after the most limiting stress, by the same fraction every day.
+
+**Why use it.** The uncalibrated model simulates the yield allowed by weather, water and nitrogen, and
+overshoots the district statistics by a factor of ${fmt.d2(summary.districts[Object.keys(summary.districts).find(k => summary.districts[k].slpf == null)]?.level_area_weighted)}.
+The losses it does not simulate (pests, diseases, weeds, uneven water, management) act on growth, which is
+what SLPF scales. Nitrogen rate and cultivar alone do not close the gap (see
+[Data, AOI and variety](data.qmd#variety-ir-58-and-ir-64)). `SLNF` was considered and rejected: DSSAT 4.8
+reads it but does not use it in the crop model (`HANDOFF.md`).
+
+**How strongly.** Yield falls faster than SLPF; the reason has not been traced in the source here. The sweep
+on the 40-cell sample:
+
+```{ojs}
+slpfRows = {
+  const r = sens.filter(d => d.cultivar === "IR 58" && d.n_kg === 140 && d.water === "all" && d.soc === 1 && (d.tcldf == null || !isFinite(d.tcldf)) && d.slpf != null && isFinite(d.slpf));
+  const base = r.find(d => d.slpf === 1)?.hwah;
+  return r.map(d => ({...d, rel: d.hwah / base})).sort((a, b) => a.slpf - b.slpf);
+}
+withDownload(Plot.plot({
+  width: Math.min(width, 560), height: 360, marginLeft: 55,
+  x: {label: "SLPF", domain: [0.4, 1.05], grid: true},
+  y: {label: "Yield relative to SLPF 1", domain: [0, 1.05], grid: true, tickFormat: ".0%"},
+  marks: [
+    Plot.line([[0, 0], [1, 1]], {stroke: "#bbb", strokeDasharray: "4,3"}),
+    Plot.lineY(slpfRows, {x: "slpf", y: "rel", stroke: "#2a7f62", strokeWidth: 2, tip: true}),
+    Plot.dot(slpfRows, {x: "slpf", y: "rel", fill: "#2a7f62", r: 4, tip: true, channels: {"kg/ha": "hwah"}}),
+    Plot.text(slpfRows, {x: "slpf", y: "rel", text: d => `${Math.round(d.rel * 100)}%`, dy: -12}),
+    Plot.ruleX(currentSlpf, {stroke: "#d9822b"})
+  ]
+}), "xdssat-slpf-sweep")
+```
+
+::: {.source-note}
+`checks/n_cultivar_sensitivity_soc1_slpf*.csv`: IR 58, 140 kg N, 40 cells, season years 1992-2014,
+area-weighted. Dashed: proportional response. Orange lines: SLPF of the current run for irrigated and
+rain-fed strata (with a per-cell table: its values at the reference minimum temperature).
+:::
+
+One SLPF for all of Java fixes the level, not the pattern; the current run therefore uses one value for
+irrigated and one for rain-fed rice ([below](#slpf-rainfed)), each changing with the cell's night
+temperature ([further below](#slpf-temp)). Its Java mean is ${fmt.d1(summary.districts[summary.current_run].java_sim)} simulated vs ${fmt.d1(summary.districts[summary.current_run].java_obs)} observed ku/ha.
+
+## Cold sterility: TCLDF {#tcldf}
+
+::: {.gap-box}
+**Status.** ${tcldfStatus} The value is a calibration choice tested on the district data, not a measured
+property of the varieties grown in the Javanese highlands.
+:::
+
+```{ojs}
+tcldfStatus = cur.tcldf && cur.tcldf !== "None"
+  ? `The current run uses TCLDF ${cur.tcldf} °C (the cultivar file's value is ${cultivars.find(d => d.coefficient === "TCLDF")?.IB0012} °C).`
+  : "The current run uses the cultivar file's TCLDF."
+```
+
+**The problem it should address.** Simulated district yields rise with season length, and the long seasons are
+in the cool highlands; observed yields do not show this (see the [Story](index.qmd#the-map-better-not-yet-right)).
+
+**What the coefficient does.** `TCLDF` is a cultivar coefficient: the critical low temperature (°C) for
+spikelet sterility (the CUL file's definition is in the table on the [Data](data.qmd) page). In the phase that
+ends at heading (`CASE (3)`, `Plant/CERES-Rice/RI_Phenol.for:592`), once 65% of its thermal time has passed
+(`RI_Phenol.for:600`), CERES-Rice estimates canopy temperature from the daily minimum
+(`TCANOPY = 0.87 + 0.92*TMIN`, after Heenan and Lewis 1981 per the source comment) and accumulates the
+degrees below TCLDF (`RI_Phenol.for:607-614`):
+
+```fortran
+             TCANOPY = 0.87 + 0.92*TMIN
+             IF (TCANOPY .LE. TCLDF) THEN
+                CUMTMP = CUMTMP + (TCLDF-TCANOPY)
+             ENDIF
+```
+
+That sum becomes a cold factor `STRCOLD = 1.0-(0.01*CUMTMP)**1.667` (`RI_Phenol.for:641`), which caps the
+number of grains: `GPP = SPIKE*AMIN1(STRCOLD,STRHEAT)` (`RI_Grosub.for:409`). Raising TCLDF makes cool nights
+cost grains, which lowers yield where the model's long seasons come from cool nights. The cultivar file gives
+IR 58 and IR 64 a TCLDF of ${cultivars.find(d => d.coefficient === "TCLDF")?.IB0012} and ${cultivars.find(d => d.coefficient === "TCLDF")?.IB0015} °C.
+
+```{ojs}
+tcBase = new Map(tcCells.filter(d => d.tcldf === 0).map(d => [`${d.iy}-${d.ix}-${d.water}`, d.hwah]))
+tcRows = tcCells.filter(d => d.tcldf > 0 && tcBase.has(`${d.iy}-${d.ix}-${d.water}`)).map(d => ({...d, change: d.hwah / tcBase.get(`${d.iy}-${d.ix}-${d.water}`) - 1, TCLDF: `TCLDF ${d.tcldf}`}))
+withDownload(Plot.plot({
+  width: Math.min(width, 760), height: 380, marginLeft: 55,
+  x: {label: "Mean seasonal minimum temperature of the stratum, °C", grid: true},
+  y: {label: "Yield change vs TCLDF 0 (no cold sterility)", grid: true, tickFormat: "+.0%"},
+  color: {legend: true, scheme: "Blues", type: "ordinal"},
+  marks: [
+    Plot.ruleY([0]),
+    Plot.dot(tcRows, {x: "tmina", y: "change", fill: "TCLDF", stroke: "white", strokeWidth: 0.4, r: 4, tip: true, channels: {water: "water", "season, d": "season_days"}})
+  ]
+}), "xdssat-tcldf-sample")
+```
+
+::: {.source-note}
+`checks/n_cultivar_sensitivity_soc1_slpf0.73_tcldf{0,17,19,21}.csv`: 40-cell sample, IR 58, 140 kg N, SLPF
+0.73, season years 1992-2014; one dot per stratum (cell and water regime), mean over the seasons.
+:::
+
+Full runs with a changed TCLDF, if any have been checked against the districts, show up in the selector below
+next to the runs without it. The chart is the diagnostic that matters: simulated/observed ratio against
+simulated season length. A flat cloud would mean the highland bias is gone.
+
+```{ojs}
+viewof drvRun = Inputs.select(runOptions, {value: [...runOptions.values()].at(-1), label: "Run", width: 460})
+```
+
+```{ojs}
+{
+  const rows = districts.filter(d => d.run === drvRun && d.season_len != null && isFinite(d.season_len));
+  const r = pearson(rows.map(d => d.season_len), rows.map(d => d.ratio));
+  return withDownload(Plot.plot({
+    width: Math.min(width, 760), height: 380, marginLeft: 55,
+    caption: `${drvRun}: r(season length, sim/obs) = ${fmt.d2(r)}, ${rows.length} districts`,
+    x: {label: "Simulated season length, district mean (days)", grid: true},
+    y: {label: "Simulated / observed yield", grid: true},
+    color: {type: "linear", scheme: "RdYlBu", reverse: true, label: "Mean minimum temperature, °C", legend: true},
+    marks: [
+      Plot.ruleY([1], {stroke: "#888"}),
+      Plot.dot(rows, {x: "season_len", y: "ratio", fill: "tmina", stroke: "#333", strokeWidth: 0.3, r: 4.5, tip: true, channels: {District: "name"}}),
+      Plot.linearRegressionY(rows, {x: "season_len", y: "ratio", stroke: "#d9822b"})
+    ]
+  }), `xdssat-ratio-vs-season-${drvRun}`);
+}
+```
+
+## Irrigated and rain-fed SLPF {#slpf-rainfed}
+
+**Why two factors.** With one SLPF and TCLDF ${cur.tcldf}, simulated rain-fed rice still out-yielded irrigated
+rice in the wet season ${tcText} while observed district yields rise with the irrigated share. The losses SLPF stands for need not be the
+same in both systems, so `run_aoi.py --slpf-rainfed` gives rain-fed strata their own SLPF (their cells get a
+copy of the soil profile with that value).
+
+**How it is fitted** (`scripts/fit_slpf.py`). Four full runs that differ only in SLPF
+(${slpfPointsText}, all TCLDF 19) give every simulated season its yield at those values; a
+polynomial per season interpolates between them, which is possible because SLPF changes growth but not the
+season's dates. Seasons are then summed to districts and harvest years exactly as in
+`compare_districts.py`, and a grid search over (irrigated, rain-fed) pairs minimises the rice-area-weighted
+mean squared log ratio of simulated to observed district means over ${fit.districts} districts.
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(width, 620), height: 520, marginLeft: 55,
+  x: {label: "SLPF, irrigated strata"},
+  y: {label: "SLPF, rain-fed strata"},
+  color: {type: "log", scheme: "YlGnBu", reverse: true, legend: true, label: "Objective: weighted mean squared log ratio (log scale)"},
+  marks: [
+    Plot.raster(fitGrid, {x: "slpf_irrigated", y: "slpf_rainfed", fill: "objective", interpolate: "nearest"}),
+    Plot.contour(fitGrid, {x: "slpf_irrigated", y: "slpf_rainfed", fill: null, value: "objective", stroke: "white", strokeOpacity: 0.6, thresholds: 12}),
+    Plot.line([[d3.min(fitGrid, d => d.slpf_irrigated), d3.min(fitGrid, d => d.slpf_rainfed)], [d3.max(fitGrid, d => d.slpf_irrigated), d3.max(fitGrid, d => d.slpf_rainfed)]], {stroke: "#555", strokeDasharray: "4,3"}),
+    Plot.dot([{x: fit.two.slpf_irrigated, y: fit.two.slpf_rainfed, label: `pair ${fit.two.slpf_irrigated} / ${fit.two.slpf_rainfed}`},
+              {x: fit.one.slpf, y: fit.one.slpf, label: `one SLPF ${fit.one.slpf}`}],
+      {x: "x", y: "y", r: 6, fill: "#d9822b", stroke: "white", tip: true, title: "label"}),
+    Plot.text([{x: fit.two.slpf_irrigated, y: fit.two.slpf_rainfed, label: "pair"}, {x: fit.one.slpf, y: fit.one.slpf, label: "one SLPF"}],
+      {x: "x", y: "y", text: "label", dx: 10, textAnchor: "start", fill: "#111", stroke: "white", strokeWidth: 3})
+  ]
+}), "xdssat-fit-slpf-surface", "Dashed: one SLPF for both systems.")
+```
+
+```{ojs}
+Inputs.table([
+  {fit: `One SLPF (${fit.one.slpf})`, ...fit.one},
+  {fit: `Pair (${fit.two.slpf_irrigated} irrigated, ${fit.two.slpf_rainfed} rain-fed)`, ...fit.two}
+], {columns: ["fit", "level", "rmse_log", "spatial_r", "sd_sim", "sd_obs"],
+    header: {fit: "Fit", level: "Level (sim/obs)", rmse_log: "RMSE of log ratio", spatial_r: "Spatial r", sd_sim: "SD sim, ku/ha", sd_obs: "SD obs, ku/ha"},
+    format: {level: fmt.d2, rmse_log: d => (+d).toFixed(3), spatial_r: fmt.d2, sd_sim: fmt.d1, sd_obs: fmt.d1}, layout: "auto"})
+```
+
+**Does the second factor predict, or only fit?** Leaving out one province at a time, refitting on the others
+and scoring the left-out districts:
+
+```{ojs}
+cvRows = fit.cv.flatMap(d => [
+  {province: `${d.province} (${d.districts})`, fit: "one SLPF", v: d.one_rmse_log, slpf: `${d.one_slpf}`},
+  {province: `${d.province} (${d.districts})`, fit: "pair", v: d.two_rmse_log, slpf: `${d.two_irr} / ${d.two_rf}`},
+  ...(d.temp_rmse_log != null ? [{province: `${d.province} (${d.districts})`, fit: "pair + Tmin slope", v: d.temp_rmse_log,
+      slpf: `${fmt.d2(d.temp_irr)} / ${fmt.d2(d.temp_rf)}, slope ${d.temp_slope.toFixed(4)}`}] : [])])
+withDownload(Plot.plot({
+  width: Math.min(width, 700), height: 260, marginLeft: 190,
+  x: {label: "RMSE of log(sim/obs), left-out province's districts", grid: true, domain: [0, d3.max(cvRows, d => d.v) * 1.1]},
+  y: {label: null},
+  color: {legend: true, domain: ["one SLPF", "pair", "pair + Tmin slope"], range: ["#9bb8ad", "#2a7f62", "#d9822b"]},
+  marks: [
+    Plot.link(fit.cv, {y1: d => `${d.province} (${d.districts})`, y2: d => `${d.province} (${d.districts})`, x1: "one_rmse_log",
+      x2: d => d.temp_rmse_log ?? d.two_rmse_log, stroke: "#bbb", strokeWidth: 2}),
+    Plot.dot(cvRows, {y: "province", x: "v", fill: "fit", r: 6, tip: true, channels: {"SLPF fitted without it": "slpf"}, sort: {y: "-x"}})
+  ]
+}), "xdssat-fit-slpf-cv")
+```
+
+```{ojs}
+cvRange = ({irr: d3.extent(fit.cv, d => d.two_irr), rf: d3.extent(fit.cv, d => d.two_rf)})
+```
+
+Refitted without each province, the irrigated SLPF stays within ${cvRange.irr.join("-")} and the rain-fed one
+within ${cvRange.rf.join("-")}. The pair reduces the error in ${fit.cv.filter(d => d.two_rmse_log < d.one_rmse_log).length} of ${fit.cv.length}
+left-out provinces. The orange dots belong to the next step.
+
+::: {.source-note}
+`checks/districts/fit_slpf.json` and `fit_slpf_grid.csv` from `scripts/fit_slpf.py`; the surface is for the
+pair without the temperature term.
+:::
+
+## SLPF that changes with night temperature {#slpf-temp}
+
+**Why.** With TCLDF 19 and the pair, simulated district yield still rose with season length: the cool cells
+keep a long-season yield bonus that the district statistics do not show. `fit_slpf.py` therefore adds one
+more parameter, a slope of SLPF on the cell's mean season minimum temperature:
+
+\[
+\begin{aligned}
+SLPF_{c,w} = \min\big(& SLPF_{max}, \\
+& \max\big(SLPF_{min},\ s_w + b\,(\bar T_{min,c} - T_{ref})\big)\big)
+\end{aligned}
+\]
+
+for cell \(c\) and water regime \(w\) (irrigated or rain-fed), with \(\bar T_{min,c}\) the cell's mean season
+minimum temperature, \(T_{ref}\) = ${fit.temp?.tref} °C, and the limits the range of the SLPF runs, ${slpfRange}.
+
+The fit gives s = ${fmt.d2(fit.temp?.slpf_irrigated)} for irrigated and ${fmt.d2(fit.temp?.slpf_rainfed)} for
+rain-fed strata and b = ${fit.temp?.slope_per_C.toFixed(4)} per °C: a cell 3 °C cooler than the reference gets
+an SLPF about ${fmt.d2(3 * (fit.temp?.slope_per_C ?? 0))} lower. ${fmt.pct(fit.temp?.share_rows_clipped)} of the
+strata hit the clipping range. This is a **statistical correction** of the model's long-season bonus in cool
+cells, not a mechanism: nothing in it says why those districts yield less than the model expects.
+`run_aoi.py --slpf-table` takes the resulting per-stratum table.
+
+```{ojs}
+viewof slpfWater = Inputs.radio(["irrigated", "rainfed"], {value: "irrigated", label: "Strata"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(width, 960), height: Math.round(Math.min(width, 960) * 0.42),
+  projection: {type: "mercator", domain: outline},
+  color: {type: "linear", scheme: "RdYlGn", domain: [d3.min(fit.slpf_points), d3.max(fit.slpf_points)], legend: true, label: `SLPF of the ${slpfWater} stratum (${slpfCells[0]?.table})`},
+  marks: [
+    Plot.geo(provinces, {fill: "#f1f1f1", clip: true}),
+    Plot.geo(cellFeatures(slpfCells.filter(d => d.water === slpfWater)).features, Plot.centroid({fill: d => d.properties.slpf,
+      title: d => `SLPF ${d.properties.slpf}, Tmin ${fmt.d1(d.properties.tmin)} °C, ${fmt.int(d.properties.ha)} ha`, tip: true})),
+    ...adminMarks(Plot, provinces, districtsGeo)
+  ]
+}), `xdssat-slpf-table-map-${slpfWater}`)
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(width, 640), height: 340, marginLeft: 50,
+  x: {label: "Cell mean season minimum temperature, °C", grid: true},
+  y: {label: "SLPF", grid: true},
+  color: {legend: true, domain: ["irrigated", "rainfed"], range: ["#2a7f62", "#d9822b"]},
+  r: {range: [1, 6]},
+  marks: [
+    Plot.dot(slpfCells, {x: "tmin", y: "slpf", stroke: "water", r: "ha", fillOpacity: 0.2, fill: "water", tip: true}),
+    Plot.ruleX([fit.temp?.tref], {stroke: "#999", strokeDasharray: "3,3"})
+  ]
+}), "xdssat-slpf-vs-tmin")
+```
+
+```{ojs}
+Inputs.table([
+  {fit: `One SLPF (${fit.one.slpf})`, ...fit.one},
+  {fit: `Pair (${fit.two.slpf_irrigated} / ${fit.two.slpf_rainfed})`, ...fit.two},
+  ...(fit.temp ? [{fit: `Pair + Tmin slope (current)`, ...fit.temp}] : [])
+].map(d => ({...d, heldout: d3.sum(fit.cv, c => c.districts * c[`${d.fit.startsWith("One") ? "one" : d.fit.startsWith("Pair (") ? "two" : "temp"}_rmse_log`]) / d3.sum(fit.cv, c => c.districts)})),
+  {columns: ["fit", "level", "rmse_log", "heldout", "spatial_r", "sd_sim", "sd_obs"],
+   header: {fit: "Fit", level: "Level (sim/obs)", rmse_log: "RMSE of log ratio", heldout: "Held-out RMSE", spatial_r: "Spatial r", sd_sim: "SD sim, ku/ha", sd_obs: "SD obs, ku/ha"},
+   format: {level: fmt.d2, rmse_log: d => (+d).toFixed(3), heldout: d => (+d).toFixed(3), spatial_r: fmt.d2, sd_sim: fmt.d1, sd_obs: fmt.d1}, layout: "auto"})
+```
+
+::: {.source-note}
+Fit statistics from `fit_slpf.json` (interpolated between the SLPF runs, before the confirming run); held-out
+RMSE is the district-weighted mean of the leave-one-province-out scores. The confirming full run is the
+current run of this site, ${summary.current_run}; its own district statistics are on the
+[Story](index.qmd#the-level-calibrated) page. The SLPF table is ${slpfCells[0]?.table}.
+:::
+
+## Comparing like with like: harvest years {#harvest-year}
+
+**What.** Statistics are reported per calendar year and include every season harvested in it. xdssat's
+seasons belong to an agricultural year that starts on 1 August (a wet season planted in November and the
+following dry season share one label). For the comparison each simulated season moves to the calendar year
+of its harvest date (`HDAT`, else maturity `MDAT`); only years fully covered by the run are kept. The district
+yield of a year is the area-weighted mean over all seasons harvested in it, with the rice ha of each
+(weather cell, water regime, district) piece from the 100 m rasters, so irrigated rice counts twice a year
+and rain-fed rice once, as in harvested area (`scripts/compare_districts.py`).
+
+```{ojs}
+dyRun = summary.current_run
+distNames = new Map(districts.filter(d => d.run === dyRun).map(d => [d.name + " (" + d.province + ")", String(d.code)]))
+viewof dyCode = Inputs.select(distNames, {label: "District", value: distNames.get([...distNames.keys()].find(k => k.startsWith("Karawang")) ?? [...distNames.keys()][0])})
+viewof dyRunPick = Inputs.select(runOptions, {value: dyRun, label: "Run", width: 460})
+```
+
+```{ojs}
+{
+  const rows = districtYears.filter(d => d.run === dyRunPick && String(d.code) === dyCode).flatMap(d => [
+    {year: d.year, value: d.sim_ku_ha, series: "Simulated"}, {year: d.year, value: d.obs_ku_ha, series: "Observed"}]).filter(d => d.value != null && isFinite(d.value));
+  return withDownload(Plot.plot({
+    width: Math.min(width, 860), height: 320, marginLeft: 50,
+    x: {label: "Harvest year", tickFormat: d => String(d)},
+    y: {label: "ku/ha GKG", grid: true, zero: false},
+    color: {legend: true, domain: ["Simulated", "Observed"], range: ["#2a7f62", "#d9822b"]},
+    marks: [
+      Plot.lineY(rows, {x: "year", y: "value", stroke: "series", tip: true}),
+      Plot.dot(rows, {x: "year", y: "value", fill: "series", r: 3, tip: true})
+    ]
+  }), `xdssat-district-${dyCode}-${dyRunPick}`);
+}
+```
+
+## From dry matter to GKG {#gkg}
+
+**What.** DSSAT reports grain yield (`HWAH`) as dry matter. District statistics report *gabah kering giling*
+(GKG), milled-dry unhusked grain with some moisture. xdssat divides by (1 - moisture), with moisture 0.14
+(`--moisture` in the comparison scripts).
+
+**Why it is flagged.** 14% is the moisture usually quoted for GKG, but no BPS definition has been found to cite
+(`scripts/compare_bps.py` docstring). The choice moves the level a little, not the pattern: try it.
+
+```{ojs}
+viewof moist = Inputs.range([0.10, 0.18], {step: 0.005, value: 0.14, label: "GKG moisture"})
+```
+
+```{ojs}
+gkgRows = {
+  const j = javaYears.filter(d => d.run === summary.current_run);
+  const obs = d3.mean(j, d => d.obs), sim14 = d3.mean(j, d => d.sim);
+  return d3.range(0.10, 0.1801, 0.005).map(m => ({m, ratio: sim14 * 0.86 / (1 - m) / obs}));
+}
+gkgNow = gkgRows.reduce((a, b) => Math.abs(b.m - moist) < Math.abs(a.m - moist) ? b : a)
+```
+
+At ${(moist * 100).toFixed(1)}% moisture the current run's Java level is ${fmt.d2(gkgNow.ratio)} times the
+observed mean (1.00 at the 14% used in the calibration).
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(width, 560), height: 300, marginLeft: 55,
+  x: {label: "Assumed GKG moisture", tickFormat: ".0%", grid: true},
+  y: {label: "Simulated / observed, Java mean", grid: true},
+  marks: [
+    Plot.ruleY([1], {stroke: "#bbb"}),
+    Plot.lineY(gkgRows, {x: "m", y: "ratio", stroke: "#2a7f62", strokeWidth: 2, tip: true}),
+    Plot.dot([gkgNow], {x: "m", y: "ratio", r: 6, fill: "#d9822b", tip: true})
+  ]
+}), "xdssat-gkg-moisture")
+```
+
+## Observations: cleaning before comparing
+
+The district statistics are cleaned by explicit rules before they are used: text with comma decimals, zeros
+meaning missing, production-sized numbers in the yield column, a lost decimal in 1998, and single outliers
+against a 7-year running median. Where production and area are both reported, yield is checked against
+production / area. Every change is written to a flags file with the raw value
+(`scripts/clean_bdsp.py`, `scripts/clean_moa_yields.py`; counts on the [Data](data.qmd) page).
+
+## References {.unnumbered}
+
+::: {#refs}
+:::

@@ -1,0 +1,106 @@
+exp,use,version,variable,simulated,observed
+IUAM8801,calibration,default,ADAP,58.0,51.0
+IUAM8801,calibration,GLUE,ADAP,55.0,51.0
+IUAM8801,calibration,"GLUE, wider ranges",ADAP,55.0,51.0
+IUAM9001,calibration,default,ADAP,63.0,66.0
+IUAM9001,calibration,GLUE,ADAP,61.0,66.0
+IUAM9001,calibration,"GLUE, wider ranges",ADAP,61.0,66.0
+OHWO8801,calibration,default,ADAP,76.0,71.0
+OHWO8801,calibration,GLUE,ADAP,73.0,71.0
+OHWO8801,calibration,"GLUE, wider ranges",ADAP,73.0,71.0
+UFGA7902,calibration,default,ADAP,39.0,38.0
+UFGA7902,calibration,GLUE,ADAP,36.0,38.0
+UFGA7902,calibration,"GLUE, wider ranges",ADAP,36.0,38.0
+IUAM8801,calibration,default,MDAP,125.0,129.0
+IUAM8801,calibration,GLUE,MDAP,129.0,129.0
+IUAM8801,calibration,"GLUE, wider ranges",MDAP,129.0,129.0
+IUAM9001,calibration,default,MDAP,133.0,139.0
+IUAM9001,calibration,GLUE,MDAP,136.0,139.0
+IUAM9001,calibration,"GLUE, wider ranges",MDAP,136.0,139.0
+OHWO8801,calibration,default,MDAP,142.0,145.0
+OHWO8801,calibration,GLUE,MDAP,146.0,145.0
+OHWO8801,calibration,"GLUE, wider ranges",MDAP,146.0,145.0
+OHWO9001,calibration,default,MDAP,145.0,150.0
+OHWO9001,calibration,GLUE,MDAP,148.0,150.0
+OHWO9001,calibration,"GLUE, wider ranges",MDAP,148.0,150.0
+UFGA7902,calibration,default,MDAP,97.0,93.0
+UFGA7902,calibration,GLUE,MDAP,100.0,93.0
+UFGA7902,calibration,"GLUE, wider ranges",MDAP,100.0,93.0
+IUAM8801,calibration,default,HWAM,2817.0,2368.0
+IUAM8801,calibration,GLUE,HWAM,2184.0,2368.0
+IUAM8801,calibration,"GLUE, wider ranges",HWAM,2184.0,2368.0
+IUAM9001,calibration,default,HWAM,3700.0,3168.0
+IUAM9001,calibration,GLUE,HWAM,3701.0,3168.0
+IUAM9001,calibration,"GLUE, wider ranges",HWAM,3700.0,3168.0
+OHWO8801,calibration,default,HWAM,3620.0,3976.0
+OHWO8801,calibration,GLUE,HWAM,3711.0,3976.0
+OHWO8801,calibration,"GLUE, wider ranges",HWAM,3674.0,3976.0
+OHWO9001,calibration,default,HWAM,3541.0,3149.0
+OHWO9001,calibration,GLUE,HWAM,3589.0,3149.0
+OHWO9001,calibration,"GLUE, wider ranges",HWAM,3566.0,3149.0
+UFGA7902,calibration,default,HWAM,2772.0,2474.0
+UFGA7902,calibration,GLUE,HWAM,3006.0,2474.0
+UFGA7902,calibration,"GLUE, wider ranges",HWAM,2940.0,2474.0
+IUAM9701,independent check,default,HWAM,3767.0,3430.0
+IUAM9701,independent check,GLUE,HWAM,4050.0,3430.0
+IUAM9701,independent check,"GLUE, wider ranges",HWAM,4021.0,3430.0
+IUAM9702,independent check,default,HWAM,3084.0,2294.0
+IUAM9702,independent check,GLUE,HWAM,3025.0,2294.0
+IUAM9702,independent check,"GLUE, wider ranges",HWAM,3043.0,2294.0
+IUAM8801,calibration,default,CWAM,6341.0,6117.0
+IUAM8801,calibration,GLUE,CWAM,6600.0,6117.0
+IUAM8801,calibration,"GLUE, wider ranges",CWAM,6369.0,6117.0
+IUAM9001,calibration,default,CWAM,7450.0,6674.0
+IUAM9001,calibration,GLUE,CWAM,7649.0,6674.0
+IUAM9001,calibration,"GLUE, wider ranges",CWAM,7518.0,6674.0
+OHWO8801,calibration,default,CWAM,7491.0,8090.0
+OHWO8801,calibration,GLUE,CWAM,7759.0,8090.0
+OHWO8801,calibration,"GLUE, wider ranges",CWAM,7581.0,8090.0
+OHWO9001,calibration,default,CWAM,7185.0,7113.0
+OHWO9001,calibration,GLUE,CWAM,7407.0,7113.0
+OHWO9001,calibration,"GLUE, wider ranges",CWAM,7230.0,7113.0
+UFGA7902,calibration,default,CWAM,4422.0,3893.0
+UFGA7902,calibration,GLUE,CWAM,4405.0,3893.0
+UFGA7902,calibration,"GLUE, wider ranges",CWAM,4256.0,3893.0
+IUAM8801,calibration,default,PWAM,3659.0,3604.0
+IUAM8801,calibration,GLUE,PWAM,2826.0,3604.0
+IUAM8801,calibration,"GLUE, wider ranges",PWAM,2826.0,3604.0
+IUAM9001,calibration,default,PWAM,4998.0,4552.0
+IUAM9001,calibration,GLUE,PWAM,4798.0,4552.0
+IUAM9001,calibration,"GLUE, wider ranges",PWAM,4794.0,4552.0
+OHWO8801,calibration,default,PWAM,4938.0,5194.0
+OHWO8801,calibration,GLUE,PWAM,4808.0,5194.0
+OHWO8801,calibration,"GLUE, wider ranges",PWAM,4761.0,5194.0
+OHWO9001,calibration,default,PWAM,4822.0,4915.0
+OHWO9001,calibration,GLUE,PWAM,4649.0,4915.0
+OHWO9001,calibration,"GLUE, wider ranges",PWAM,4625.0,4915.0
+IUAM8801,calibration,default,LAIX,5.7111,5.57
+IUAM8801,calibration,GLUE,LAIX,5.9469,5.57
+IUAM8801,calibration,"GLUE, wider ranges",LAIX,6.228,5.57
+IUAM9001,calibration,default,LAIX,6.0664,6.29
+IUAM9001,calibration,GLUE,LAIX,6.1278,6.29
+IUAM9001,calibration,"GLUE, wider ranges",LAIX,6.4268,6.29
+OHWO8801,calibration,default,LAIX,6.6395,7.65
+OHWO8801,calibration,GLUE,LAIX,6.7589,7.65
+OHWO8801,calibration,"GLUE, wider ranges",LAIX,7.0405,7.65
+OHWO9001,calibration,default,LAIX,6.6092,7.21
+OHWO9001,calibration,GLUE,LAIX,6.8095,7.21
+OHWO9001,calibration,"GLUE, wider ranges",LAIX,7.052,7.21
+UFGA7902,calibration,default,LAIX,2.8322,3.15
+UFGA7902,calibration,GLUE,LAIX,2.5308,3.15
+UFGA7902,calibration,"GLUE, wider ranges",LAIX,2.6233,3.15
+IUAM8801,calibration,default,HWUM,0.1577,0.127
+IUAM8801,calibration,GLUE,HWUM,0.1431,0.127
+IUAM8801,calibration,"GLUE, wider ranges",HWUM,0.1376,0.127
+IUAM9001,calibration,default,HWUM,0.1492,0.1682
+IUAM9001,calibration,GLUE,HWUM,0.1538,0.1682
+IUAM9001,calibration,"GLUE, wider ranges",HWUM,0.1471,0.1682
+OHWO8801,calibration,default,HWUM,0.1555,0.151
+OHWO8801,calibration,GLUE,HWUM,0.1723,0.151
+OHWO8801,calibration,"GLUE, wider ranges",HWUM,0.1656,0.151
+OHWO9001,calibration,default,HWUM,0.1497,0.164
+OHWO9001,calibration,GLUE,HWUM,0.1547,0.164
+OHWO9001,calibration,"GLUE, wider ranges",HWUM,0.1516,0.164
+UFGA7902,calibration,default,HWUM,0.1458,0.175
+UFGA7902,calibration,GLUE,HWUM,0.1671,0.175
+UFGA7902,calibration,"GLUE, wider ranges",HWUM,0.159,0.175

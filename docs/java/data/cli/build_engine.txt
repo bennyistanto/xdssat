@@ -1,0 +1,14 @@
+usage: build_engine.py [-h] [--source SOURCE] [--clone] [--ref REF]
+                       [--build-dir BUILD_DIR] [--engine-dir ENGINE_DIR]
+                       [--jobs JOBS]
+
+Build the DSSAT-CSM engine (dscsm048) from source and install it for xdssat.
+
+options:
+  -h, --help            show this help message and exit
+  --source SOURCE       dssat-csm-os checkout (default: sibling folder)
+  --clone               clone the source from GitHub
+  --ref REF             branch or tag to clone (with --clone)
+  --build-dir BUILD_DIR
+  --engine-dir ENGINE_DIR
+  --jobs JOBS

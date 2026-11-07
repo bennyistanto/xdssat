@@ -1,0 +1,86 @@
+model,coefficient,definition,model_name
+MZCER048,P1,Thermal time from seedling emergence to the end of the juvenile phase (expressed in degree days above a base temperature of 8 deg.C) during which the plant is not responsive to changes in photoperiod.,CERES-Maize
+MZCER048,P2,Extent to which development (expressed as days) is delayed for each hour increase in photoperiod above the longest photoperiod at which development proceeds at a maximum rate (which is considered to be 12.5 hours).,CERES-Maize
+MZCER048,P5,Thermal time from silking to physiological maturity (expressed in degree days above a base temperature of 8 deg.C).,CERES-Maize
+MZCER048,G2,Maximum possible number of kernels per plant.,CERES-Maize
+MZCER048,G3,Kernel filling rate during the linear grain filling stage and under optimum conditions (mg/day).,CERES-Maize
+MZCER048,PHINT,Phylochron interval; the interval in thermal time (degree days) between successive leaf tip appearances.,CERES-Maize
+RICER048,P1,"Time period (expressed as growing degree days [GDD] in oC-d above a base temperature of 9oC) from seedling emergence during which the rice plant is not responsive to changes in photoperiod. This period is also referred to as the basic vegetative phase of the plant. Range: 150-800 oC-d. Calibration: flexible, compare with observed panicle initiation and flowering dates.",CERES-Rice
+RICER048,P2R,Extent to which phasic development leading to panicle initiation is delayed (expressed as GDD in oC-d) for each hour increase in photoperiod above P2O. Range 5-300 oC-d. Calibration: Modern rice varieties will have values in the lower range.,CERES-Rice
+RICER048,P5,"Time period in GDD oC-d) from beginning of grain filling (3 to 4 days after flowering) to physiological maturity with a base temperature of 9oC. Range 150-850 oC-d. Calibration: Ensure P1, P2O and P2R are correctly calibrated for anthesis data. Then calibrate P5 for observed maturity date.",CERES-Rice
+RICER048,P2O,"Critical photoperiod or the longest day length (in hours) at which the development occurs at a maximum rate. At values higher than P2O developmental rate is slowed, hence there is delay due to longer day lengths. Range 11-13 h. Default 12 h. Calibration: Do not go below 11 unless data are available.",CERES-Rice
+RICER048,G1,Potential spikelet number coefficient as estimated from the number of spikelets per g of main culm dry weight (less leaf blades and sheaths plus spikes) at anthesis. Range 50-75 #/g. A typical value is 55 #/g.,CERES-Rice
+RICER048,G2,"Single grain weight (g) under ideal growing conditions, i.e. nonlimiting light, water, nutrients, and absence of pests and diseases. Range 0.015-0.030 g. Default 0.025 g. Calibration: Very low flexibility.",CERES-Rice
+RICER048,G3,Tillering coefficient (scalar value) relative to IR64 cultivar under ideal conditions. Range 0.7-1.3. Calibration: A higher tillering cultivar would have a coefficient greater than 1.0.,CERES-Rice
+RICER048,PHINT,Phyllochron Interval (oC-d). Time interval in degree-days for each leaf-tip to appear under non-stressed conditions. Range 55-90 oC-d. Default 83 oC-d. Calibration: Recommend to not change unless field data on leaf numbers are available.,CERES-Rice
+RICER048,THOT,Temperature (oC) above which spikelet sterility is affected by high temperature. Range 25-34 oC. Default 28oC. Calibration: recommended to not change unless hot environment data are available. Convert old cultivars THOT = 28./G4.,CERES-Rice
+RICER048,TCLDP,"Temperature (oC) below which panicle initiation is further delayed (other than P1, P2O and P2R) by low temperature. Range 12-18 oC. Default 15oC. Calibration: recommended to not change unless cold environment data are available. Convert old cultivars TCLDP = 15.*G5.",CERES-Rice
+RICER048,TCLDF,Temperature (oC) below which spikelet sterility is affected by low temperature. Range 10-20 oC. Default 15oC. Calibration: recommended to not change unless cold environment data are available. Convert old cultivars TCLDF = 15.*G5.,CERES-Rice
+RICER048,FOZ1,"Ozone stress factor for photosynthesis (0.00-1.00), 0.00 = off, 0.10 = ozone tolerant, 0.30 = intermediate, 0.65 = sensitive",CERES-Rice
+RICER048,SFOZ1,"Ozone stress factor for leaf senescence (0.00-1.00), 0.00 = off, 0.08 = ozone tolerant, 0.10 = intermediate, 0.12 = sensitive",CERES-Rice
+RICER048,OBASE,"Base mean 7-hour (M7) ozone damage threshold, default = 25.0 ppb",CERES-Rice
+SGCER048,P1,Thermal time from seedling emergence to the end of the juvenile phase (expressed in degree days above TBASE during which the plant is not responsive to changes in photoperiod,CERES-Sorghum
+SGCER048,P2,Thermal time from the end of the juvenile stage to tassel initiation under short days (degree days above TBASE),CERES-Sorghum
+SGCER048,P2O,"Critical photoperiod or the longest day length (in hours) at which development occurs at a maximum rate. At values higher than P2O, the rate of development is reduced",CERES-Sorghum
+SGCER048,P2R,Extent to which phasic development leading to panicle initiation (expressed in degree days) is delayed for each hour increase in photoperiod above P2O,CERES-Sorghum
+SGCER048,PANTH,Thermal time from the end of tassel initiation to anthesis (degree days above TBASE),CERES-Sorghum
+SGCER048,P3,Thermal time from to end of flag leaf expansion to anthesis (degree days above TBASE),CERES-Sorghum
+SGCER048,P4,Thermal time from anthesis to beginning grain filling (degree days above TBASE),CERES-Sorghum
+SGCER048,P5,Thermal time from beginning of grain filling to physiological maturity (degree days above TBASE),CERES-Sorghum
+SGCER048,PHINT,Phylochron interval; the interval in thermal time between successive leaf tip appearances (degree days),CERES-Sorghum
+SGCER048,G1,Scaler for relative leaf size,CERES-Sorghum
+SGCER048,G2,Scaler for partitioning of assimilates to the panicle (head).,CERES-Sorghum
+SGCER048,PBASE,Ceiling photoperiod above which development is delayed indefinitely (optional),CERES-Sorghum
+SGCER048,PSAT,Critical photoperiod below which development is not delayed (optional),CERES-Sorghum
+MLCER048,P1,Thermal time from seedling emergence to the end of the juvenile phase (expressed in degree days above a base temperature of 10ï¿½C) during which the plant is not responsive to changes in photoperiod.,CERES-Millet
+MLCER048,P2O,"Critical photoperiod or the longest day length (in hours) at which development occurs at a maximum rate. At values greater than P2O, the rate of development is reduced.",CERES-Millet
+MLCER048,P2R,Extent to which phasic development leading to panicle initiation (expressed in degree days) is delayed for each hour increase in photoperiod above P2O.,CERES-Millet
+MLCER048,P5,Thermal time (degree days above a base temperature of 10ï¿½C) from beginning of grain filling (3-4 days after flowering) to physiological maturity.,CERES-Millet
+MLCER048,G1,Scaler for relative leaf size.,CERES-Millet
+MLCER048,G4,Scaler for partitioning of assimilates to the panicle (head).,CERES-Millet
+MLCER048,PHINT,Phylochron interval; the interval in thermal time (degree days) between successive leaf tip appearances.,CERES-Millet
+MLCER048,GT,"Tillering coefficient, equivalent to G1, but on tillers",CERES-Millet
+MLCER048,G5,"Potential grain size, mg",CERES-Millet
+WHCER048,P1V,= P1V(v3.5)*10,CERES-Wheat
+WHCER048,P1D,= P1D(V3.5)*20,CERES-Wheat
+WHCER048,P5,= P5(V3.5)*20 + 430,CERES-Wheat
+WHCER048,G1,= G1(V3.5)*5 + 5,CERES-Wheat
+WHCER048,G2,= (G2(V3.5)*0.35+0.65) * P5/20,CERES-Wheat
+WHCER048,G3,= G3(V3.5)*0.7,CERES-Wheat
+WHCER048,PHINT,= PHINT(V3.5),CERES-Wheat
+SBGRO048,CSDL,Critical Short Day Length below which reproductive development progresses with no daylength effect (for shortday plants) (hour),CROPGRO-Soybean
+SBGRO048,PPSEN,Slope of the relative response of development to photoperiod with time (positive for shortday plants) (1/hour),CROPGRO-Soybean
+SBGRO048,EM-FL,Time between plant emergence and flower appearance (R1) (photothermal days),CROPGRO-Soybean
+SBGRO048,FL-SH,Time between first flower and first pod (R3) (photothermal days),CROPGRO-Soybean
+SBGRO048,FL-SD,Time between first flower and first seed (R5) (photothermal days),CROPGRO-Soybean
+SBGRO048,SD-PM,Time between first seed (R5) and physiological maturity (R7) (photothermal days),CROPGRO-Soybean
+SBGRO048,FL-LF,Time between first flower (R1) and end of leaf expansion (photothermal days),CROPGRO-Soybean
+SBGRO048,LFMAX,"Maximum leaf photosynthesis rate at 30 C, 350 vpm CO2, and high light (mg CO2/m2-s)",CROPGRO-Soybean
+SBGRO048,SLAVR,Specific leaf area of cultivar under standard growth conditions (cm2/g),CROPGRO-Soybean
+SBGRO048,SIZLF,Maximum size of full leaf (three leaflets) (cm2),CROPGRO-Soybean
+SBGRO048,XFRT,Maximum fraction of daily growth that is partitioned to seed + shell,CROPGRO-Soybean
+SBGRO048,WTPSD,Maximum weight per seed (g),CROPGRO-Soybean
+SBGRO048,SFDUR,Seed filling duration for pod cohort at standard growth conditions (photothermal days),CROPGRO-Soybean
+SBGRO048,SDPDV,Average seed per pod under standard growing conditions (#/pod),CROPGRO-Soybean
+SBGRO048,PODUR,Time required for cultivar to reach final pod load under optimal conditions (photothermal days),CROPGRO-Soybean
+SBGRO048,THRSH,Threshing percentage. The maximum ratio of (seed/(seed+shell)) at maturity. Causes seeds to stop growing as their dry weight increases until shells are filled in a cohort.,CROPGRO-Soybean
+SBGRO048,SDPRO,Fraction protein in seeds (g(protein)/g(seed)),CROPGRO-Soybean
+SBGRO048,SDLIP,Fraction oil in seeds (g(oil)/g(seed)),CROPGRO-Soybean
+PNGRO048,CSDL,Critical Short Day Length below which reproductive development progresses with no daylength effect (for shortday plants) (hour),CROPGRO-Peanut
+PNGRO048,PPSEN,Slope of the relative response of development to photoperiod with time (positive for shortday plants) (1/hour),CROPGRO-Peanut
+PNGRO048,EM-FL,Time between plant emergence and flower appearance (R1) (photothermal days),CROPGRO-Peanut
+PNGRO048,FL-SH,Time between first flower and first pod (R3) (photothermal days),CROPGRO-Peanut
+PNGRO048,FL-SD,Time between first flower and first seed (R5) (photothermal days),CROPGRO-Peanut
+PNGRO048,SD-PM,Time between first seed (R5) and physiological maturity (R7) (photothermal days),CROPGRO-Peanut
+PNGRO048,FL-LF,Time between first flower (R1) and end of leaf expansion (photothermal days),CROPGRO-Peanut
+PNGRO048,LFMAX,"Maximum leaf photosynthesis rate at 30 C, 350 vpm CO2, and high light (mg CO2/m2-s)",CROPGRO-Peanut
+PNGRO048,SLAVR,Specific leaf area of cultivar under standard growth conditions (cm2/g),CROPGRO-Peanut
+PNGRO048,SIZLF,Maximum size of full leaf (three leaflets) (cm2),CROPGRO-Peanut
+PNGRO048,XFRT,Maximum fraction of daily growth that is partitioned to seed + shell,CROPGRO-Peanut
+PNGRO048,WTPSD,Maximum weight per seed (g),CROPGRO-Peanut
+PNGRO048,SFDUR,Seed filling duration for pod cohort at standard growth conditions (photothermal days),CROPGRO-Peanut
+PNGRO048,SDPDV,Average seed per pod under standard growing conditions (#/pod),CROPGRO-Peanut
+PNGRO048,PODUR,Time required for cultivar to reach final pod load under optimal conditions (photothermal days),CROPGRO-Peanut
+PNGRO048,THRSH,The maximum ratio of (seed/(seed+shell)) at maturity. Causes seed to stop growing as their dry weights increase until shells are filled in a cohort. (Threshing percentage).,CROPGRO-Peanut
+PNGRO048,SDPRO,Fraction protein in seeds (g(protein)/g(seed)),CROPGRO-Peanut
+PNGRO048,SDLIP,Fraction oil in seeds (g(oil)/g(seed)),CROPGRO-Peanut

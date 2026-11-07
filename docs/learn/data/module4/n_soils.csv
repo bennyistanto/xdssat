@@ -1,0 +1,17 @@
+soil,treatment,HWAM,NUCM,NLCM,NIAM,DRCM
+deep silty clay,"rainfed, no N",5161,106,3,29,78
+deep silty clay,"irrigated, no N",5599,120,3,32,78
+deep silty clay,"rainfed, 135 kg N",11352,234,4,30,81
+deep silty clay,"irrigated, 135 kg N",12752,254,4,33,81
+deep silt loam,"rainfed, no N",2091,68,15,29,153
+deep silt loam,"irrigated, no N",2837,79,20,24,196
+deep silt loam,"rainfed, 135 kg N",4466,186,14,42,140
+deep silt loam,"irrigated, 135 kg N",11875,204,18,35,169
+deep sand,"rainfed, no N",301,13,57,10,397
+deep sand,"irrigated, no N",351,12,59,10,447
+deep sand,"rainfed, 135 kg N",4773,127,63,22,257
+deep sand,"irrigated, 135 kg N",8392,126,74,16,313
+Millhopper fine sand,"rainfed, no N",547,25,44,13,411
+Millhopper fine sand,"irrigated, no N",882,27,46,13,451
+Millhopper fine sand,"rainfed, 135 kg N",2268,114,66,34,321
+Millhopper fine sand,"irrigated, 135 kg N",8436,130,70,21,370

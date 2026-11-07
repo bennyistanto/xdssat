@@ -1,0 +1,561 @@
+---
+title: "Module 4: crop measurement files, soil and plant nitrogen, N-limited production"
+subtitle: "DSSAT training, module 4 of 6. Follows day 4 of the course, with code instead of the DSSAT shell"
+---
+
+```{ojs}
+import {withDownload, fmt} from "../assets/js/dl.js"
+codes = FileAttachment("data/module4/codes.csv").csv({typed: true})
+fileA = FileAttachment("data/module4/shade_filea.csv").csv({typed: true})
+fileT = FileAttachment("data/module4/shade_filet.csv").csv({typed: true})
+shEval = FileAttachment("data/module4/shade_evaluate.csv").csv({typed: true})
+shSim = FileAttachment("data/module4/shade_sim.csv").csv({typed: true})
+shObs = FileAttachment("data/module4/shade_obs.csv").csv({typed: true})
+shStats = FileAttachment("data/module4/shade_stats.csv").csv({typed: true})
+shStudy = FileAttachment("data/module4/shade_study.csv").csv({typed: true})
+shSweep = FileAttachment("data/module4/shade_sweep.csv").csv({typed: true})
+shSweepG = FileAttachment("data/module4/shade_sweep_growth.csv").csv({typed: true})
+shFiles = FileAttachment("data/module4/shade_files.csv").csv()
+nBal = FileAttachment("data/module4/n_balance.csv").csv({typed: true})
+soilN = FileAttachment("data/module4/soil_n.csv").csv({typed: true})
+no3 = FileAttachment("data/module4/soil_no3_layers.csv").csv({typed: true})
+layers = FileAttachment("data/module4/engine_layers.csv").csv({typed: true})
+plantN = FileAttachment("data/module4/plant_n.csv").csv({typed: true})
+nFiles = FileAttachment("data/module4/n_files.csv").csv()
+nResp = FileAttachment("data/module4/n_response.csv").csv({typed: true})
+nRespStress = FileAttachment("data/module4/n_response_stress.csv").csv({typed: true})
+nSoils = FileAttachment("data/module4/n_soils.csv").csv({typed: true})
+nRes = FileAttachment("data/module4/n_residue.csv").csv({typed: true})
+nSom = FileAttachment("data/module4/n_som.csv").csv({typed: true})
+runInfo = FileAttachment("data/module4/run_info.csv").csv()
+dlLinks = html`<a href="${"../notebooks/module4" + ".ipynb"}" download>download .ipynb</a>, helper <a href="../notebooks/learnlib.py" download>learnlib.py</a>`
+W = Math.min(width, 860)
+trtName = new Map(nBal.map(d => [d.TRNO, d.treatment]))
+pre = (t) => html`<pre class="filex">${t}</pre>`
+```
+
+::: {.callout-note appearance="simple"}
+**How to use this module.** Read this page for the ideas; every chart comes from the
+[module 4 notebook](../notebooks/module4.ipynb) (${dlLinks}), which runs the DSSAT engine and writes the small
+data files the charts read. The runs on this build were made on ${runInfo[0].run_on}.
+:::
+
+## What you will learn
+
+- What the observed data files of an experiment hold, how their variables are coded, and how to write them from
+  your own measurements (the shell's ATCreate tool).
+- How to change the environment of an experiment (here: shade the crop for three weeks) and evaluate the
+  simulation against the data.
+- How nitrogen moves through the soil and the crop, and what limits a crop when water and nitrogen are both
+  simulated.
+
+## 1. Creating crop measurement files: the 1976 peanut shading study
+
+Field measurements reach DSSAT through two files next to the experiment file. The **FileA** (`.PNA` for peanut)
+has one line per treatment with what was measured at the end of the season; the **FileT** (`.PNT`) has one line
+per treatment and sampling date. Each column is a DSSAT variable code, defined in the engine's `DATA.CDE`; the
+files are fixed-format, 6 characters per column, right-aligned under the code.
+
+The course's exercise uses a shading study done at Gainesville in 1976 [@hang1984]: Florunner peanut, a control
+and a treatment shaded during pod filling. Its final harvest and growth analysis data came as two spreadsheets,
+whose columns already carry the DSSAT codes:
+
+```{ojs}
+viewof codeFile = Inputs.radio(["FileA", "FileT"], {value: "FileT", label: "File"})
+```
+
+```{ojs}
+Inputs.table(codes.filter(d => d.file === codeFile), {columns: ["code", "label", "description"],
+  header: {code: "Code", label: "Label", description: "Description (DATA.CDE)"}, layout: "auto"})
+```
+
+### Building the experiment: `UFGA7609.PNX`
+
+The exercise starts from the 1976 Florunner experiment `UFGA7601.PNX` and changes only what differs: experiment
+number 9, planting and simulation start on 22 April 1976, automatic irrigation, and a second treatment with an
+**environmental modification** that sets solar radiation to 20% of normal from 4 to 24 August 1976. The notebook
+edits the file section by section, as XBuild would. The two sections that change most:
+
+```{ojs}
+pre(shFiles.find(d => d.section === "TREATMENTS").text)
+```
+
+```{ojs}
+pre(shFiles.find(d => d.section === "ENVIRONMENT MODIFICATIONS").text)
+```
+
+In the `ERAD` column, `M .20` multiplies radiation by 0.20 from day 217 (4 August). A modification stays in force
+until another replaces it, so the second line, `M   1` on day 238 (25 August), restores full radiation.
+
+### Writing the FileA and FileT
+
+`learnlib.write_observed` writes both files from the spreadsheets, as ATCreate does:
+
+```{ojs}
+pre(shFiles.find(d => d.section === "FileA").text)
+```
+
+```{ojs}
+pre(shFiles.find(d => d.section === "FileT (first lines)").text)
+```
+
+The alignment is not cosmetic: the engine reads these files by column position. A first version of this writer
+put every name one character to the left of its values. Read back by whitespace the file looked fine, but the
+engine's evaluation reported anthesis about 11,000 days after planting. Checking the engine's `Evaluate` output
+against the spreadsheet is the test that caught it.
+
+### Simulated against measured
+
+```{ojs}
+Inputs.table(shEval.map(d => ({...d, treatment: d.TRNO === 1 ? "control" : "shaded"})), {columns: ["treatment", "code", "description", "simulated", "measured", "sim/obs"],
+  header: {treatment: "Treatment", code: "Code", description: "Variable", simulated: "Simulated", measured: "Measured", "sim/obs": "Sim/obs"},
+  format: {"sim/obs": d => d.toFixed(2)}, layout: "auto"})
+```
+
+```{ojs}
+viewof sVar = Inputs.select(new Map([["Pod weight, kg/ha", "PWAD"], ["Seed weight, kg/ha", "GWAD"], ["Seed number, per m²", "G#AD"], ["Pod number, per m²", "P#AD"], ["Tops weight, kg/ha", "CWAD"], ["Weight per seed, mg", "GWGD"]]), {value: "PWAD", label: "Variable"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 340, marginLeft: 60,
+  x: {label: "Days after planting", grid: true},
+  y: {label: sVar, grid: true},
+  color: {legend: true, domain: ["control", "shaded 4-24 August"], range: ["#3f7a34", "#f2a33a"]},
+  marks: [
+    Plot.rectX([{a: 217 - 113, b: 238 - 113}], {x1: "a", x2: "b", fill: "#f2a33a", fillOpacity: 0.12}),
+    Plot.lineY(shSim, {x: "DAP", y: sVar, stroke: d => d.TRNO === 1 ? "control" : "shaded 4-24 August", tip: true}),
+    Plot.dot(shObs.filter(d => d[sVar] != null), {x: "DAP", y: sVar, fill: d => d.TRNO === 1 ? "control" : "shaded 4-24 August", r: 4, tip: true})
+  ]
+}), `module4-shade-${sVar.replace(/[^A-Z]/gi, "")}`)
+```
+
+```{ojs}
+Inputs.table(shStats.map(d => ({...d, treatment: d.TRNO === 1 ? "control" : "shaded"})), {columns: ["treatment", "variable", "n", "rmse", "d"],
+  header: {treatment: "Treatment", variable: "Code", n: "Samples", rmse: "RMSE", d: "Willmott d"}, format: {rmse: d => d < 10 ? d.toFixed(2) : fmt.int(d), d: d => d.toFixed(2)}, layout: "auto"})
+```
+
+```{ojs}
+ev = (t, c) => shEval.find(d => d.TRNO === t && d.code === c)
+lossSim = 1 - ev(2, "HWAM").simulated / ev(1, "HWAM").simulated
+lossObs = 1 - ev(2, "HWAM").measured / ev(1, "HWAM").measured
+```
+
+The field lost ${fmt.pct(lossObs)} of its seed yield to three weeks of shade; the model loses ${fmt.pct(lossSim)}. The control is reproduced well (seed yield ${fmt.int(ev(1, "HWAM").simulated)} kg/ha against ${fmt.int(ev(1, "HWAM").measured)}); the shaded treatment has only ${shStats.find(d => d.TRNO === 2).n} samples, from the middle of the shade period onwards, which is why its d values say little.
+
+### Collecting the data: sampling and the order of calibration
+
+The measurement files are only as good as the samples behind them. The course's lecture on experimental data
+collection gave a principle and a procedure:
+
+- **Take a large sample for biomass, a small one for its parts.** Total biomass varies a lot from plant to plant,
+  so it is cut from about 1 m² of land, with a border on all four sides about as wide as the crop is tall (2 m
+  for maize at the end of the season). Fractions and ratios (leaf, stem, pod, seed) vary much less, so a
+  representative subsample is split into parts, oven-dried (about 40 hours at 60 °C) and weighed, and the
+  fractions are scaled to the large sample.
+- **Sample often enough.** Weekly during vegetative growth; the key stages (flowering, first seed, maturity)
+  dated as exactly as possible; four or more replications.
+- **Record what the model does not simulate**: pests, diseases and weeds, so that a missed yield can be explained.
+
+Calibration then follows a fixed order, on treatments with as little stress as possible (enough water and
+nitrogen, good pest control):
+
+1. **Development**: flowering, then maturity dates (for example `CSDL`, `EM-FL`, `SD-PM` in CROPGRO; `P1`, `P5`
+   in CERES-Maize).
+2. **Dry matter accumulation**: biomass over time (`LFMAX` or radiation use efficiency only when cultivars on the
+   same soil differ; the soil fertility factor `SLPF` when sites differ in fertility).
+3. **Leaf area and partitioning, then yield and its components** (`SLAVR`, `FL-SH`, `FL-SD`, seed size).
+
+The statistics below (RMSE and Willmott's d on time series and end-of-season values) judge each step; the course
+warned that R² alone can mislead, and that a plot of simulated against observed says more than any single number.
+
+### How good is the fit? The course's statistics
+
+The course evaluates a simulation with a handful of statistics computed for each variable: the means of the
+observed and simulated values and their ratio, the r² of their regression, the RMSE, and Willmott's d
+[@willmott1981]. With \(O_i\) observed and \(S_i\) simulated values:
+
+\[
+\begin{gathered}
+\text{ratio} = \frac{\bar S}{\bar O}, \qquad
+\mathrm{RMSE} = \sqrt{\frac{1}{n}\sum_i (S_i - O_i)^2} \\[6pt]
+r^2 = \frac{\left(\sum_i (O_i - \bar O)(S_i - \bar S)\right)^2}{\sum_i (O_i - \bar O)^2 \sum_i (S_i - \bar S)^2}
+\end{gathered}
+\]
+
+and \(d\) as in module 1. A 1:1 plot, observed against simulated, shows at a glance what the numbers summarize.
+
+```{ojs}
+evalStats = (() => {
+  const out = [];
+  for (const t of [1, 2]) for (const v of ["PWAD", "GWAD", "G#AD", "P#AD", "CWAD", "GWGD"]) {
+    const o = shObs.filter(d => d.TRNO === t && d[v] != null);
+    const pairs = o.map(d => [d[v], shSim.find(s => s.TRNO === t && s.DAP === d.DAP)?.[v]]).filter(p => p[1] != null);
+    if (pairs.length < 3) continue;
+    const mo = d3.mean(pairs, p => p[0]), ms = d3.mean(pairs, p => p[1]);
+    const r = d3.sum(pairs, p => (p[0] - mo) * (p[1] - ms)) / Math.sqrt(d3.sum(pairs, p => (p[0] - mo) ** 2) * d3.sum(pairs, p => (p[1] - ms) ** 2));
+    const rmse = Math.sqrt(d3.mean(pairs, p => (p[1] - p[0]) ** 2));
+    const dd = 1 - d3.sum(pairs, p => (p[1] - p[0]) ** 2) / d3.sum(pairs, p => (Math.abs(p[1] - mo) + Math.abs(p[0] - mo)) ** 2);
+    out.push({treatment: t === 1 ? "control" : "shaded", variable: v, n: pairs.length, obs: mo, sim: ms, ratio: ms / mo, r2: r * r, rmse, d: dd, pairs});
+  }
+  return out;
+})()
+Inputs.table(evalStats, {columns: ["treatment", "variable", "n", "obs", "sim", "ratio", "r2", "rmse", "d"],
+  header: {treatment: "Treatment", variable: "Code", n: "n", obs: "Mean observed", sim: "Mean simulated", ratio: "Ratio", r2: "r²", rmse: "RMSE", d: "d"},
+  format: {obs: d => d < 10 ? d.toFixed(2) : fmt.int(d), sim: d => d < 10 ? d.toFixed(2) : fmt.int(d), ratio: d => d.toFixed(2), r2: d => d.toFixed(2), rmse: d => d < 10 ? d.toFixed(2) : fmt.int(d), d: d => d.toFixed(2)}, layout: "auto"})
+```
+
+```{ojs}
+viewof oneVar = Inputs.select(["PWAD", "GWAD", "G#AD", "P#AD", "CWAD", "GWGD"], {value: "CWAD", label: "1:1 plot of"})
+```
+
+```{ojs}
+{
+  const rows = evalStats.filter(d => d.variable === oneVar).flatMap(d => d.pairs.map(p => ({treatment: d.treatment, observed: p[0], simulated: p[1]})));
+  const hi = d3.max(rows, d => Math.max(d.observed, d.simulated)) * 1.05;
+  return withDownload(Plot.plot({
+    width: Math.min(W, 420), height: 380, marginLeft: 60,
+    x: {label: `Observed ${oneVar}`, domain: [0, hi], grid: true},
+    y: {label: `Simulated ${oneVar}`, domain: [0, hi], grid: true},
+    color: {legend: true, domain: ["control", "shaded"], range: ["#3f7a34", "#f2a33a"]},
+    marks: [Plot.line([[0, 0], [hi, hi]], {stroke: "#bbb", strokeDasharray: "4,3"}), Plot.dot(rows, {x: "observed", y: "simulated", fill: "treatment", r: 5, tip: true})]
+  }), `module4-one-to-one-${oneVar.replace(/[^A-Z]/gi, "")}`);
+}
+```
+
+### The whole study: when does shade hurt most?
+
+The published experiment `UFGA7604.PNX` in dssat-csm-data holds the full study: a control and four 21-day periods
+of 25% radiation, from flowering to late pod filling.
+
+```{ojs}
+Inputs.table(shStudy, {columns: ["TNAM", "HWAM", "HWAM_obs", "CWAM", "CWAM_obs", "H#AM", "H#AM_obs"],
+  header: {TNAM: "Treatment", HWAM: "Seed yield, sim", HWAM_obs: "Seed yield, obs", CWAM: "Tops, sim", CWAM_obs: "Tops, obs", "H#AM": "Seeds/m², sim", "H#AM_obs": "Seeds/m², obs"}, layout: "auto"})
+```
+
+With the exercise's experiment as a template, the notebook moves a 21-day shade window through the season a
+week at a time, at two strengths. Pick a window:
+
+```{ojs}
+shStarts = [...new Set(shSweep.filter(d => d.start != null).map(d => d.start))].sort(d3.ascending)
+viewof shStart = Inputs.range([0, shStarts.length - 1], {step: 1, value: 5, label: "Shade from day", format: i => `${shStarts[i]} (${shStarts[i] - 113} days after planting)`})
+viewof shF = Inputs.radio(new Map([["25% of normal radiation", 0.25], ["50%", 0.5]]), {value: 0.25, label: "Radiation"})
+```
+
+```{ojs}
+shSel = shSweep.find(d => d.start === shStarts[shStart] && d.radiation === shF)
+shCtl = shSweep.find(d => d.TRNO === 1)
+withDownload(Plot.plot({
+  width: W, height: 320, marginLeft: 60,
+  x: {label: "Days after planting", grid: true},
+  y: {label: "Seed weight, kg/ha", grid: true},
+  color: {legend: true, domain: ["no shade", "shaded"], range: ["#999999", "#f2a33a"]},
+  marks: [
+    Plot.rectX([shSel], {x1: d => d.start - 113, x2: d => d.start - 113 + 21, fill: "#f2a33a", fillOpacity: 0.12}),
+    Plot.lineY(shSweepG.filter(d => d.TRNO === 1), {x: "DAP", y: "GWAD", stroke: () => "no shade", strokeDasharray: "4,3"}),
+    Plot.lineY(shSweepG.filter(d => d.TRNO === shSel.TRNO), {x: "DAP", y: "GWAD", stroke: () => "shaded", strokeWidth: 2.5, tip: true})
+  ]
+}), `module4-shade-window-${shSel.start}-${shF}`)
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(W, 640), height: 280, marginLeft: 60,
+  x: {label: "First day of the 21-day shade, days after planting", grid: true},
+  y: {label: "Seed yield lost", grid: true, tickFormat: "%"},
+  color: {legend: true, domain: [0.25, 0.5], range: ["#b5651d", "#f2a33a"], tickFormat: d => `${d * 100}% radiation`},
+  marks: [
+    Plot.lineY(shSweep.filter(d => d.start != null), {x: "start_dap", y: "loss", stroke: "radiation", marker: "dot", tip: true}),
+    Plot.dot([shSel], {x: "start_dap", y: "loss", r: 9, stroke: "#222", strokeWidth: 1.5})
+  ]
+}), "module4-shade-loss")
+```
+
+```{ojs}
+worst = shSweep.filter(d => d.radiation === 0.25 && d.start != null).reduce((a, b) => b.loss > a.loss ? b : a)
+```
+
+Shade from day ${shSel.start} at ${shF * 100}% radiation costs ${fmt.pct(shSel.loss)} of the seed yield (${fmt.int(shSel.HWAM)} against ${fmt.int(shCtl.HWAM)} kg/ha). At 25% radiation the most damaging three weeks start ${worst.start_dap} days after planting, a loss of ${fmt.pct(worst.loss)}. Shade early in the season costs less, and so does shade late in pod filling.
+
+## 2. Nitrogen-limited production: `UFGA8213.MZX`
+
+The course's nitrogen exercise builds on the water-limited maize experiment of module 3 and adds what the nitrogen
+balance needs: initial conditions with 1000 kg/ha of maize residue at 0.8% N incorporated to 15 cm, the initial
+ammonium and nitrate of each layer, nitrogen fertilizer on reported dates, and both balances switched on. Four
+treatments: rainfed and automatically irrigated, each without N and with 60 kg N/ha on 15 March plus 75 kg N/ha on
+12 April (ammonium nitrate, broadcast and incorporated at 10 cm). The sections as the notebook writes them:
+
+```{ojs}
+viewof nSec = Inputs.radio(nFiles.map(d => d.section), {value: "*INITIAL CONDITIONS", label: "Section"})
+```
+
+```{ojs}
+pre(nFiles.find(d => d.section === nSec).text)
+```
+
+The soil N model keeps ammonium and nitrate in every layer; they change with fertilizer, mineralization of organic
+matter, nitrification, leaching with drainage water and uptake by roots
+([`SOILNI.for`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Soil/Inorganic_N/SOILNI.for)).
+
+### Where the nitrogen went
+
+```{ojs}
+flows = ["applied as fertilizer", "mineralized (net)", "taken up by the crop", "leached", "left in the soil at maturity"]
+nLong = nBal.flatMap(d => [
+  {treatment: d.treatment, flow: flows[0], v: d.NICM}, {treatment: d.treatment, flow: flows[1], v: d.NMINC},
+  {treatment: d.treatment, flow: flows[2], v: d.NUCM}, {treatment: d.treatment, flow: flows[3], v: d.NLCM}, {treatment: d.treatment, flow: flows[4], v: d.NIAM}])
+withDownload(Plot.plot({
+  width: W, height: 420, marginLeft: 150, marginRight: 140,
+  x: {label: "kg N/ha", grid: true},
+  y: {label: null, domain: flows, axis: null},
+  fy: {label: null, domain: nBal.map(d => d.treatment)},
+  color: {legend: true, domain: flows, range: ["#4a6fa5", "#9bb8ad", "#3f7a34", "#f2a33a", "#c4a35a"]},
+  marks: [Plot.barX(nLong, {y: "flow", x: "v", fill: "flow", fy: "treatment", tip: true}), Plot.ruleX([0])]
+}), "module4-n-balance")
+```
+
+```{ojs}
+Inputs.table(nBal, {columns: ["treatment", "HWAM", "CWAM", "NICM", "NUCM", "NLCM", "NIAM", "IRCM"],
+  header: {treatment: "Treatment", HWAM: "Grain, kg/ha", CWAM: "Tops, kg/ha", NICM: "N applied", NUCM: "N uptake", NLCM: "N leached", NIAM: "Soil N at maturity", IRCM: "Irrigation, mm"}, layout: "auto"})
+```
+
+```{ojs}
+t3 = nBal.find(d => d.TRNO === 3)
+t4 = nBal.find(d => d.TRNO === 4)
+t2 = nBal.find(d => d.TRNO === 2)
+```
+
+Neither water nor nitrogen alone does much: irrigation without N gives ${fmt.int(t2.HWAM)} kg/ha, nitrogen without irrigation ${fmt.int(t3.HWAM)} kg/ha, and both together ${fmt.int(t4.HWAM)} kg/ha. With irrigation the crop takes up ${fmt.int(t4.NUCM)} kg N/ha, without it ${fmt.int(t3.NUCM)}: water and nitrogen limits interact.
+
+### Nitrate in the soil over the season
+
+```{ojs}
+viewof nTrt = Inputs.select(nBal.map(d => d.TRNO), {value: 4, label: "Treatment", format: t => trtName.get(t)})
+```
+
+```{ojs}
+{
+  const lay = new Map(layers.map(d => [d.layer, d]));
+  const rows = no3.filter(d => d.TRNO === nTrt && lay.has(d.layer)).map(d => ({...d, top: lay.get(d.layer).top, bottom: lay.get(d.layer).bottom}));
+  return withDownload(Plot.plot({
+    width: W, height: 300, marginLeft: 55,
+    x: {label: "Days after planting"},
+    y: {label: "Depth, cm", reverse: true},
+    color: {type: "sqrt", scheme: "YlGnBu", legend: true, label: "NO3, ppm"},
+    marks: [Plot.rect(rows, {x1: "DAP", x2: d => d.DAP + 1, y1: "top", y2: "bottom", fill: "NO3", tip: true})]
+  }), `module4-no3-${nTrt}`);
+}
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 300, marginLeft: 55,
+  x: {label: "Days after planting", grid: true},
+  y: {label: "kg N/ha", grid: true},
+  color: {legend: true, domain: ["applied, cumulative", "inorganic N in the soil", "taken up, cumulative", "leached, cumulative"], range: ["#4a6fa5", "#c4a35a", "#3f7a34", "#f2a33a"]},
+  marks: [
+    Plot.lineY(soilN.filter(d => d.TRNO === nTrt), {x: "DAP", y: "NAPC", stroke: () => "applied, cumulative", tip: true}),
+    Plot.lineY(soilN.filter(d => d.TRNO === nTrt), {x: "DAP", y: "NIAD", stroke: () => "inorganic N in the soil", tip: true}),
+    Plot.lineY(soilN.filter(d => d.TRNO === nTrt), {x: "DAP", y: "NUCM", stroke: () => "taken up, cumulative"}),
+    Plot.lineY(soilN.filter(d => d.TRNO === nTrt), {x: "DAP", y: "NLCC", stroke: () => "leached, cumulative"})
+  ]
+}), `module4-soil-n-${nTrt}`)
+```
+
+::: {.source-note}
+NO3 by layer in ppm, as the engine writes it
+([`OPSOILNI.for:132`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Soil/Inorganic_N/OPSOILNI.for#L132));
+the depths are the engine's simulation layers (module 3). Totals in kg N/ha.
+:::
+
+### Nitrogen in the plant
+
+CERES-Maize compares the N concentration of the tops (`TANC`) with a critical concentration (`TCNP`, below which
+growth suffers) and a minimum (`TMNC`), both falling as the crop develops, and turns the shortfall into a 0-1
+factor ([`MZ_NFACTO.for:61`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Plant/CERES-Maize/MZ_NFACTO.for#L61)):
+\[
+NFAC = 1 - \frac{TCNP - TANC}{TCNP - TMNC}
+\]
+
+```{ojs}
+viewof tcnp = Inputs.range([1, 5], {step: 0.05, value: 3, label: "TCNP, %"})
+viewof tmnc = Inputs.range([0.2, 2], {step: 0.05, value: 1, label: "TMNC, %"})
+viewof tanc = Inputs.range([0.2, 5], {step: 0.05, value: 2, label: "TANC, %"})
+```
+
+${nfacText}
+
+```{ojs}
+nfacText = tmnc >= tcnp ? "TMNC must be below TCNP." : tanc >= tcnp ? "TANC is at or above the critical concentration: NFAC = 1, no N stress."
+  : `NFAC = ${Math.max(0, 1 - (tcnp - tanc) / (tcnp - tmnc)).toFixed(2)}: the plant is ${fmt.pct((tcnp - tanc) / (tcnp - tmnc))} of the way from the critical to the minimum concentration.`
+```
+
+```{ojs}
+viewof pnVar = Inputs.radio(new Map([["Tops N, kg/ha", "CNAD"], ["Stem and leaf N, %", "VN%D"], ["N stress index (0 = none)", "NSTD"], ["Water stress index (0 = none)", "WSGD"]]), {value: "NSTD", label: "Show"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 320, marginLeft: 55,
+  x: {label: "Days after planting", grid: true},
+  y: {label: pnVar, grid: true},
+  color: {legend: true, domain: nBal.map(d => d.treatment), range: ["#c4a35a", "#4a6fa5", "#f2a33a", "#3f7a34"]},
+  marks: [Plot.lineY(plantN, {x: "DAP", y: pnVar, stroke: d => trtName.get(d.TRNO), tip: true})]
+}), `module4-plant-n-${pnVar.replace(/[^A-Z]/gi, "")}`)
+```
+
+::: {.source-note}
+The stress indices are `NSTD` and `WSGD` of PlantGro, written as 1 minus the factor
+([`MZ_OPGROW.for:175-176`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Plant/CERES-Maize/MZ_OPGROW.for#L175)).
+:::
+
+### Nitrogen fixation in a legume
+
+Grain legumes have a source of nitrogen that cereals lack: fixation by bacteria in root nodules. In CROPGRO the
+crop grows nodules when its nitrogen demand exceeds what the roots take up from the soil and what it mobilizes
+from older tissue; the nodules then fix nitrogen at a rate set by their mass and by temperature, the crop's water status,
+flooding, nodule age and the carbohydrate they receive ([`Plant/CROPGRO/NFIX.for`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Plant/CROPGRO/NFIX.for)). The
+`SYMBI` switch of the simulation controls turns fixation on or off. Bragg soybean at Gainesville in 1978
+(`UFGA7801.SBX`, a sandy soil and no nitrogen fertilizer), with the nitrogen balance on and fixation on or off,
+and with the nitrogen balance off for comparison:
+
+```{ojs}
+nFix = FileAttachment("data/module4/n_fixation.csv").csv({typed: true})
+nFixD = FileAttachment("data/module4/n_fixation_daily.csv").csv({typed: true})
+Inputs.table(nFix, {columns: ["case", "treatment", "HWAM", "CWAM", "NUCM", "NFXM", "NLCM"],
+  header: {case: "Case", treatment: "Treatment", HWAM: "Seed, kg/ha", CWAM: "Tops, kg/ha", NUCM: "N uptake from soil, kg/ha", NFXM: "N fixed, kg/ha", NLCM: "N leached, kg/ha"}, layout: "auto"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(W, 680), height: 300, marginLeft: 60,
+  x: {label: "Days after planting", grid: true},
+  y: {label: "Cumulative N, kg/ha", grid: true},
+  color: {legend: true, domain: ["fixed", "taken up from the soil"], range: ["#3f7a34", "#d9822b"]},
+  marks: [Plot.lineY(nFixD.filter(d => d.case === "fixation" && d.treatment === "irrigated").flatMap(d => [{DAP: d.DAP, k: "fixed", v: d.NFXC}, {DAP: d.DAP, k: "taken up from the soil", v: d.NUPC}]),
+    {x: "DAP", y: "v", stroke: "k", tip: true})]
+}), "module4-n-fixation")
+```
+
+```{ojs}
+nfPick = (c, t) => nFix.find(d => d.case === c && d.treatment === t)
+nfOn = nfPick("fixation", "irrigated")
+nfOff = nfPick("no fixation", "irrigated")
+nfPot = nfPick("nitrogen not limiting", "irrigated")
+```
+
+Irrigated, the soybean fixes ${fmt.int(nfOn.NFXM)} kg N/ha and takes only ${fmt.int(nfOn.NUCM)} kg N/ha from the soil. With fixation it yields ${fmt.int(nfOn.HWAM)} kg/ha, close to the ${fmt.int(nfPot.HWAM)} kg/ha it yields when nitrogen does not limit at all; without fixation, on this soil, it yields ${fmt.int(nfOff.HWAM)} kg/ha. In this experiment, fixation supplies almost all the nitrogen the crop needs.
+
+### Two soil organic matter models
+
+DSSAT can simulate soil organic matter in two ways, chosen with the `MESOM` switch of the simulation controls:
+`G`, the original CERES approach, and `P`, a model based on CENTURY. The four treatments of the exercise under both:
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 260, marginLeft: 150,
+  x: {label: "Grain yield, kg/ha", grid: true},
+  y: {label: null},
+  fy: {label: null},
+  color: {legend: true, domain: ["CERES (Godwin)", "CENTURY (Parton)"], range: ["#3f7a34", "#f2a33a"]},
+  marks: [Plot.barX(nSom, {y: "model", x: "HWAM", fill: "model", fy: "treatment", tip: true, channels: {"net mineralization": "NMINC", "N uptake": "NUCM", "N leached": "NLCM"}})]
+}), "module4-som-models")
+```
+
+```{ojs}
+somG = (m, t) => nSom.find(d => d.model === m && d.treatment === t)
+```
+
+Without fertilizer the choice matters most: net mineralization over the season is ${fmt.int(somG("CERES (Godwin)", "irrigated, no N").NMINC)} kg N/ha with the CERES option and ${fmt.int(somG("CENTURY (Parton)", "irrigated, no N").NMINC)} with CENTURY, and the irrigated unfertilized maize yields ${fmt.int(somG("CERES (Godwin)", "irrigated, no N").HWAM)} against ${fmt.int(somG("CENTURY (Parton)", "irrigated, no N").HWAM)} kg/ha. With 135 kg N/ha of fertilizer the two give similar yields. Where a soil's own nitrogen supply matters, the organic matter option is a choice to justify, not a default to accept.
+
+### Self test 1: the response to nitrogen
+
+0 to 200 kg N/ha in total, in the exercise's two applications (60:75), rainfed and automatically irrigated:
+
+```{ojs}
+viewof nrVar = Inputs.select(new Map([["Grain yield, kg/ha", "HWAM"], ["N uptake, kg N/ha", "NUCM"], ["N leached, kg N/ha", "NLCM"],
+  ["Extra grain per kg N (agronomic efficiency)", "agronomic_efficiency"], ["Share of the extra N taken up (recovery)", "recovery"]]), {value: "HWAM", label: "Show"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(W, 640), height: 320, marginLeft: 60,
+  x: {label: "N rate, kg N/ha", grid: true},
+  y: {label: nrVar, grid: true},
+  color: {legend: true, domain: ["rainfed", "irrigated"], range: ["#f2a33a", "#3f7a34"]},
+  marks: [Plot.lineY(nResp.filter(d => d[nrVar] != null), {x: "rate", y: nrVar, stroke: "water", marker: "dot", tip: true})]
+}), `module4-n-response-${nrVar}`)
+```
+
+```{ojs}
+viewof nsRate = Inputs.range([0, 200], {step: 50, value: 100, label: "N rate for the stress curve, kg N/ha"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 280, marginLeft: 55,
+  x: {label: "Days after planting", grid: true},
+  y: {label: "N stress index (0 = none)", domain: [0, 1], grid: true},
+  color: {legend: true, domain: ["rainfed", "irrigated"], range: ["#f2a33a", "#3f7a34"]},
+  marks: [
+    Plot.lineY(nRespStress, {x: "DAP", y: "NSTD", z: d => `${d.water}${d.rate}`, stroke: "#e5e5e5"}),
+    Plot.lineY(nRespStress.filter(d => d.rate === nsRate), {x: "DAP", y: "NSTD", stroke: "water", strokeWidth: 2.5, tip: true})
+  ]
+}), `module4-n-stress-${nsRate}`)
+```
+
+```{ojs}
+rf = nResp.filter(d => d.water === "rainfed")
+ir = nResp.filter(d => d.water === "irrigated")
+```
+
+Irrigated, yield climbs from ${fmt.int(ir[0].HWAM)} to ${fmt.int(ir[ir.length - 1].HWAM)} kg/ha over the five rates. Rainfed it peaks at ${fmt.int(d3.max(rf, d => d.HWAM))} kg/ha and falls again at the higher rates, to ${fmt.int(rf[rf.length - 1].HWAM)} kg/ha at ${rf[rf.length - 1].rate}; at that rate the rainfed crop takes up ${fmt.int(rf[rf.length - 1].NUCM)} kg N/ha against ${fmt.int(ir[ir.length - 1].NUCM)} irrigated.
+
+### Self test 2: three soils
+
+The four treatments on a deep clay, silt loam and sand from the soil file, and on the Millhopper fine sand:
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 300, marginLeft: 140, marginRight: 10,
+  x: {label: "Grain yield, kg/ha", grid: true},
+  y: {label: null},
+  fy: {label: null},
+  color: {legend: true, domain: nBal.map(d => d.treatment), range: ["#c4a35a", "#4a6fa5", "#f2a33a", "#3f7a34"]},
+  marks: [Plot.barX(nSoils, {y: "treatment", x: "HWAM", fill: "treatment", fy: "soil", tip: true, channels: {"N leached": "NLCM", "N uptake": "NUCM"}})]
+}), "module4-n-soils")
+```
+
+### Self test 3: residue and initial nitrogen
+
+The fertilized treatments with the residue, its N content and the initial nitrate changed one at a time:
+
+```{ojs}
+Inputs.table(nRes, {columns: ["scenario", "treatment", "HWAM", "NUCM", "NLCM", "NMINC", "NIAM"],
+  header: {scenario: "Initial conditions", treatment: "Treatment", HWAM: "Grain, kg/ha", NUCM: "N uptake", NLCM: "N leached", NMINC: "Net mineralization", NIAM: "Soil N at maturity"}, layout: "auto", rows: 14})
+```
+
+```{ojs}
+resRange = d3.extent(nRes.filter(d => d.treatment.startsWith("irrigated")), d => d.HWAM)
+```
+
+In this sandy soil with 135 kg N/ha of fertilizer, the residue and initial nitrogen move the irrigated yield only between ${fmt.int(resRange[0])} and ${fmt.int(resRange[1])} kg/ha.
+
+## Self-test
+
+1. Which codes would you put in a FileT for a rice trial that sampled leaf area, tops and grain weight every two
+   weeks?
+2. Why does the engine's evaluation of a written FileA catch errors that reading it back with pandas does not?
+3. Why does three weeks of shade at the start of pod filling cost more than the same shade at flowering?
+4. Rainfed, yield falls at the highest N rates. Look at the water stress index of those runs: what could explain
+   it, and how would you test that in the model?
+
+## Where this goes next
+
+Module 5 repeats management comparisons over many seasons and adds economics and risk. The plan for all six
+modules is on the [training overview](index.qmd).
+
+## References {.unnumbered}
+
+::: {#refs}
+:::

@@ -1,0 +1,7 @@
+case,treatment,HWAM,CWAM,NUCM,NFXM,NLCM
+no fixation,irrigated,75,119,9,0,39.0
+no fixation,rainfed,85,146,10,0,36.0
+fixation,irrigated,2806,5988,14,276,34.0
+fixation,rainfed,1088,3363,10,180,33.0
+nitrogen not limiting,irrigated,2849,6016,0,0,
+nitrogen not limiting,rainfed,1115,3400,0,0,

@@ -218,3 +218,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Session scratch (see ~/.claude/CLAUDE.md temp convention)
+temp/
+
+# Quarto documentation site (docs/): render output, cache and notebook copies, regenerated on every build
+docs/_site/
+docs/.quarto/
+docs/**/*.quarto_ipynb
+
+# Claude Code: per-machine settings (launch.json has local paths), project agents and skills,
+# and the session handover note. Working aids, not part of xdssat.
+.claude/
+HANDOFF.md

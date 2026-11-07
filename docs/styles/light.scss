@@ -1,0 +1,24 @@
+/*-- scss:defaults --*/
+// xdssat light theme, layered on Bootswatch "cosmo". Colours taken from the logo:
+// the orange of the grid and the green of the leaves.
+$xd-orange: #f2a33a;
+$xd-orange-soft: #fdbd56;
+$xd-green: #3f7a34;
+$xd-ink: #1f2421;
+
+$primary: $xd-green;
+$link-color: $xd-green;
+$navbar-bg: #ffffff;
+$navbar-fg: $xd-ink;
+$navbar-hl: $xd-green;
+$body-color: $xd-ink;
+$footer-bg: #fafaf7;
+
+/*-- scss:rules --*/
+.navbar { border-bottom: 3px solid $xd-orange; }
+.navbar-brand img { max-height: 40px; }
+h1.title, h2 { color: $xd-ink; }
+h2 { border-bottom: 2px solid rgba($xd-orange, 0.45); padding-bottom: 0.2rem; }
+.callout-note { border-left-color: $xd-green !important; }
+.track-card { border-top: 4px solid $xd-orange; }
+.kpi .v { color: $xd-green; }

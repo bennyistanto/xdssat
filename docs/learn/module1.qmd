@@ -1,0 +1,590 @@
+---
+title: "Module 1: running a crop model, phenology, sensitivity and potential production"
+subtitle: "DSSAT training, module 1 of 6. Follows day 1 of the course, with code instead of the DSSAT shell"
+---
+
+```{ojs}
+import {withDownload, fmt, pearson} from "../assets/js/dl.js"
+treatments = FileAttachment("data/module1/treatments.csv").csv({typed: true})
+final = FileAttachment("data/module1/final.csv").csv({typed: true})
+gsim = FileAttachment("data/module1/growth_sim.csv").csv({typed: true})
+gobs = FileAttachment("data/module1/growth_obs.csv").csv({typed: true})
+stats = FileAttachment("data/module1/stats.csv").csv({typed: true})
+weather = FileAttachment("data/module1/weather.csv").csv({typed: true})
+stages = FileAttachment("data/module1/stages.csv").csv({typed: true})
+coef = FileAttachment("data/module1/coefficients.csv").csv({typed: true})
+potential = FileAttachment("data/module1/potential.csv").csv({typed: true})
+potGrowth = FileAttachment("data/module1/potential_growth.csv").csv({typed: true})
+sensCul = FileAttachment("data/module1/sens_cultivar.csv").csv({typed: true})
+sensCulG = FileAttachment("data/module1/sens_cultivar_growth.csv").csv({typed: true})
+sensPd = FileAttachment("data/module1/sens_pdate.csv").csv({typed: true})
+sensPdG = FileAttachment("data/module1/sens_pdate_growth.csv").csv({typed: true})
+sensCoef = FileAttachment("data/module1/sens_coef.csv").csv({typed: true})
+sensCoefG = FileAttachment("data/module1/sens_coef_growth.csv").csv({typed: true})
+runInfo = FileAttachment("data/module1/run_info.csv").csv()
+csmMods = FileAttachment("data/module1/csm_modules.csv").csv({typed: true})
+csmPlants = FileAttachment("data/module1/csm_plant_models.csv").csv({typed: true})
+tfun = FileAttachment("data/module1/cropgro_temperature.csv").csv({typed: true})
+eco = coef[0]
+// built at runtime so Quarto does not rewrite the .ipynb link to the rendered page
+dlLinks = html`<a href="${"../notebooks/module1" + ".ipynb"}" download>download .ipynb</a>, helper <a href="../notebooks/learnlib.py" download>learnlib.py</a>`
+W = Math.min(width, 860)
+trtName = new Map(treatments.map(d => [d.TRNO, `T${d.TRNO} ${d.water}, ${d.nitrogen} N`]))
+```
+
+::: {.callout-note appearance="simple"}
+**How to use this module.** Read this page for the ideas; every chart here comes from the notebook
+[module 1 notebook](../notebooks/module1.ipynb) (${dlLinks}), which runs the
+DSSAT engine and writes the small data files the charts read. The page itself never runs the engine. The
+runs on this build were made on ${runInfo[0].run_on} with model ${runInfo[0].model}.
+:::
+
+## What you will learn
+
+- What a crop simulation model does, and what an *experiment* (FileX) and its *treatments* are.
+- How to run DSSAT on an existing experiment and compare its results with field measurements.
+- How the maize model decides when the crop flowers and matures (phenology, thermal time).
+- How to change one input at a time (sensitivity analysis) and read the result.
+- How to set up the simplest experiment, **potential production**, in which only weather, CO2 and the
+  cultivar limit the crop.
+
+The topics follow the first day of the 2018 International Training Program on DSSAT in Chiang Mai
+([syllabus](https://github.com/bennyistanto/site/blob/main/docs/blog/20180911-dssat-training-in-chiang-mai-2018.qmd)).
+The course used the DSSAT shell and its tools (XBuild, the Sensitivity Analysis tool, GBuild); here each
+of those steps is a few lines of Python, using xdssat's modules and the stock DSSAT engine, version 4.8.
+
+## 0. DSSAT and its Cropping System Model
+
+### Where DSSAT comes from
+
+The course opened with the history of crop modelling and of DSSAT. In outline, as its first lecture told it:
+
+| When | What |
+|---|---|
+| Late 1960s | Crop simulation starts with Dutch (C. T. de Wit) and US researchers, who wanted to predict growth and yield to design management and quantify the effect of weather |
+| 1982 to 1993 | The IBSNAT project (International Benchmark Sites Network for Agrotechnology Transfer), based at the University of Hawaii and funded by USAID, builds a network of researchers, data standards and DSSAT itself |
+| 1983 | The minimum data set for running crop models is defined (module 2) |
+| 1985 to 1986 | DSSAT is named (1985) and first released (1986) with maize, wheat, soybean and peanut. Its models came from CERES-Maize and CERES-Wheat and from SOYGRO and PNUTGRO, each until then a separate program with its own soil, weather and management code |
+| December 1993 to October 2014 | ICASA (International Consortium for Agricultural Systems Applications) carries the work on, joining IBSNAT with the Dutch systems effort, and maintains the data standards |
+| From 2004 | The Cropping System Model replaces the separate programs with one modular engine [@jones2003] |
+| 2012 onwards | The DSSAT Foundation develops and distributes DSSAT ([dssat.net](https://dssat.net/about/)) |
+
+The separate programs were hard to keep compatible, to maintain and to extend to new crops, which the course
+gave as the reason DSSAT was created. The Cropping System Model later joined them into one modular engine with
+shared soil, weather and management modules [@jones2003], and that engine is what every page of this site runs.
+
+Today DSSAT centres on one program, the Cropping System Model
+(CSM): a single Fortran engine built from modules for the weather, the soil (water, nitrogen, carbon,
+temperature), the exchange between soil, plant and atmosphere (`SPAM`), management, and a family of plant models
+that share one interface [@jones2003]. Counting the source code of the engine used on this site shows how the work
+is divided:
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(W, 640), height: 260, marginLeft: 100,
+  x: {label: "Lines of Fortran", grid: true},
+  y: {label: null},
+  marks: [Plot.barX(csmMods, {y: "module", x: "lines", fill: d => d.module === "Plant" ? "#3f7a34" : "#9bb8ad", sort: {y: "-x"}, tip: true, channels: {"source files": "source_files"}})]
+}), "module1-csm-modules")
+```
+
+The plant part alone holds ${csmPlants.length} model families, from CERES (cereals) and CROPGRO (grain legumes and
+more) to models for potato, sugarcane, cassava and pineapple:
+
+```{ojs}
+Inputs.table(csmPlants, {header: {plant_model: "Plant model folder", source_files: "Source files"}, layout: "auto", rows: 12})
+```
+
+::: {.source-note}
+Counted by the module 1 notebook in [DSSAT/dssat-csm-os](https://github.com/DSSAT/dssat-csm-os) at the commit
+pinned on this site (folders `Plant`, `Soil`, `SPAM`, `Weather`, `Management`, `InputModule`, `Utilities`,
+`CSM_Main`; files ending `.for` or `.f90`).
+:::
+
+The same engine serves very different questions. The course listed diagnosing yield gaps, precision agriculture,
+water, irrigation and soil fertility management, plant breeding and genotype by environment interactions,
+gene-based modelling, yield prediction, and the effects of climate variability and climate change; the DSSAT
+Foundation's own list today is similar ([About DSSAT](https://dssat.net/about/)). [Module 6](module6.qmd#applications-and-needs-a-discussion)
+returns to these applications and what each one needs.
+
+## 1. A crop model, an experiment, a treatment
+
+DSSAT's Cropping System Model grows a crop one day at a time [@jones2003]. Each day it reads the weather
+(radiation, temperature, rain), works out how far the crop has developed, how much it has grown, and how
+much water and nitrogen the roots took from each soil layer. Its inputs are the weather, the soil profile,
+the cultivar's genetic coefficients and the management: planting, irrigation, fertilizer.
+
+A useful way to think about what limits a crop is the hierarchy of **production levels**
+[@vanittersum1997]. *Potential* yield is set by radiation, temperature, CO2 and the cultivar alone.
+*Attainable* (water- and nutrient-limited) yield is lower where water or nitrogen run short. *Actual* yield
+is lower still where weeds, pests and diseases reduce it. DSSAT simulates the first two levels; this
+module starts with real treatments and ends with the potential.
+
+The example is a maize experiment from Gainesville, Florida, in 1982 (`UFGA8201`, cultivar McCurdy 84aa),
+one of the example experiments shipped with DSSAT [@csmdata]. It has six **treatments**: every combination
+of three water regimes and two nitrogen rates. In the experiment file each treatment is a row that picks one
+*level* of each factor (cultivar, field, initial conditions, planting, irrigation, fertilizer, simulation
+controls).
+
+```{ojs}
+Inputs.table(treatments, {header: {TRNO: "Treatment", TNAME: "Name in the FileX", water: "Water", nitrogen: "Nitrogen"}, layout: "auto"})
+```
+
+## 2. Running the model and checking it against the field
+
+The notebook copies the experiment, its weather and soil files and the field measurements into a short
+work folder and runs the engine on all six treatments. The engine writes one summary row per treatment and
+daily time series. The field data come in two files: end-of-season values (FileA) and samples taken during
+the season (FileT).
+
+```{ojs}
+viewof finalVar = Inputs.select([...new Set(final.map(d => d.variable))], {label: "Variable", value: "Grain yield, kg/ha"})
+```
+
+```{ojs}
+{
+  const rows = final.filter(d => d.variable === finalVar);
+  const hi = d3.max(rows, d => Math.max(d.simulated, d.observed)) * 1.08;
+  const lo = finalVar.includes("DAP") ? d3.min(rows, d => Math.min(d.simulated, d.observed)) * 0.95 : 0;
+  return withDownload(Plot.plot({
+    width: Math.min(W, 520), height: 420, marginLeft: 60,
+    x: {label: `Observed: ${finalVar}`, domain: [lo, hi], grid: true},
+    y: {label: `Simulated: ${finalVar}`, domain: [lo, hi], grid: true},
+    color: {legend: true, domain: ["rainfed", "irrigated", "vegetative stress"]},
+    symbol: {legend: true},
+    marks: [
+      Plot.line([[lo, lo], [hi, hi]], {stroke: "#999", strokeDasharray: "4,3"}),
+      Plot.dot(rows.map(d => ({...d, water: treatments.find(t => t.TRNO === d.TRNO).water,
+                                nitrogen: treatments.find(t => t.TRNO === d.TRNO).nitrogen + " N"})),
+        {x: "observed", y: "simulated", stroke: "water", symbol: "nitrogen", r: 6, strokeWidth: 2, tip: true,
+         channels: {treatment: "treatment"}})
+    ]
+  }), `module1-sim-vs-obs-${finalVar.replace(/[^a-z]+/gi, "-")}`);
+}
+```
+
+```{ojs}
+yieldRows = final.filter(d => d.variable === "Grain yield, kg/ha")
+```
+
+Across the six treatments, simulated grain yield ranges from ${fmt.int(d3.min(yieldRows, d => d.simulated))} to ${fmt.int(d3.max(yieldRows, d => d.simulated))} kg/ha against ${fmt.int(d3.min(yieldRows, d => d.observed))} to ${fmt.int(d3.max(yieldRows, d => d.observed))} kg/ha measured. The model ranks the treatments the way the field did: the rainfed plots yield least, and the
+irrigated high-N plot most. It does not separate the two rainfed treatments: with too little water,
+extra nitrogen makes no simulated difference to grain.
+
+### Growth during the season
+
+Pick a variable; the lines are the daily simulation, the dots the field samples.
+
+```{ojs}
+viewof gVar = Inputs.radio(new Map([["Leaf area index", "LAID"], ["Tops weight, kg/ha", "CWAD"], ["Grain weight, kg/ha", "GWAD"]]), {value: "CWAD", label: "Variable"})
+viewof gTrt = Inputs.checkbox(treatments.map(d => d.TRNO), {value: [1, 4, 6], label: "Treatments", format: t => trtName.get(t)})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 380, marginLeft: 60,
+  x: {label: "Days after planting", grid: true},
+  y: {label: gVar, grid: true},
+  color: {legend: true, domain: gTrt.map(t => trtName.get(t))},
+  marks: [
+    Plot.lineY(gsim.filter(d => gTrt.includes(d.TRNO)), {x: "DAP", y: gVar, stroke: d => trtName.get(d.TRNO), tip: true}),
+    Plot.dot(gobs.filter(d => gTrt.includes(d.TRNO) && d[gVar] != null), {x: "DAP", y: gVar, fill: d => trtName.get(d.TRNO), r: 4, tip: true})
+  ]
+}), `module1-growth-${gVar}`)
+```
+
+GBuild's *Statistics* option reports how far the simulation is from the samples. The notebook computes the
+same two numbers: the root mean square error (RMSE, in the variable's units) and Willmott's index of
+agreement *d*, which is 1 for a perfect match and has no units [@willmott1981]. For \(n\) pairs of observed
+\(O_i\) and simulated \(S_i\) values, with \(\bar O\) the mean of the observations:
+
+\[
+\begin{gathered}
+\mathrm{RMSE} = \sqrt{\frac{1}{n}\sum_{i=1}^{n} (S_i - O_i)^2} \\[4pt]
+d = 1 - \frac{\sum_i (S_i - O_i)^2}{\sum_i \left(|S_i - \bar O| + |O_i - \bar O|\right)^2}
+\end{gathered}
+\]
+
+```{ojs}
+Inputs.table(stats.map(d => ({...d, treatment: trtName.get(d.TRNO), variable: ({LAID: "LAI", CWAD: "Tops, kg/ha", GWAD: "Grain, kg/ha"})[d.variable]})),
+  {columns: ["treatment", "variable", "n", "rmse", "d"], header: {n: "Samples", rmse: "RMSE", d: "Willmott d"},
+   format: {rmse: d => d.toFixed(2), d: d => d.toFixed(2)}, layout: "auto", rows: 18})
+```
+
+## 3. Phenology: when does the crop flower?
+
+**Development** (moving through life stages) is not the same as **growth** (adding mass). A crop that
+develops fast has a short life; that does not make it bigger. Temperature drives development in all crops;
+day length matters for some cultivars.
+
+CERES-Maize counts development in **thermal time**, degree-days above a base temperature. Each day adds
+`DTT` degree-days; each phase ends when its requirement is met. For maize: emergence, the end of the
+juvenile phase after `P1` degree-days, a floral induction phase that day length can slow (`P2`), tassel
+initiation, silking, grain filling for `P5` degree-days, and maturity.
+
+How one day's `DTT` is computed is set in the engine's Fortran
+([`MZ_PHENOL.for`, lines 437-517](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Plant/CERES-Maize/MZ_PHENOL.for#L437)).
+The base temperature `TBASE` is ${eco.TBASE} °C here and the optimum `TOPT` is ${eco.TOPT} °C; both come
+from the ecotype file `MZCER048.ECO`. Try it: the function below is a direct port of the air-temperature branches
+(the engine uses an estimated soil temperature while the plant has 10 leaves or fewer, when its growing
+point is still near the ground; that branch is left out here). With \(T_{base}\), the optimum \(T_{opt}\) and the
+day's \(T_{max}\) and \(T_{min}\):
+
+\[
+\begin{gathered}
+DTT =
+\begin{cases}
+0 & T_{max} < T_{base} \\
+T_{opt} - T_{base} & T_{min} > T_{opt} \\
+DTT_{hourly} & T_{min} < T_{base} \text{ or } T_{max} > T_{opt} \\
+\dfrac{T_{max} + T_{min}}{2} - T_{base} & \text{otherwise}
+\end{cases} \\[6pt]
+DTT_{hourly} = \frac{1}{24}\sum_{h=1}^{24} \left(\min\left(\max(T_h, T_{base}), T_{opt}\right) - T_{base}\right)
+\end{gathered}
+\]
+
+with hourly temperatures from a sine curve,
+\(T_h = \frac{T_{max} + T_{min}}{2} + \frac{T_{max} - T_{min}}{2}\,\sin\!\left(\frac{3.14\,h}{12}\right)\). A phase ends
+on the day its sum reaches the cultivar's requirement, \(\sum DTT \ge P1\) for the juvenile phase.
+
+```{ojs}
+function dtt(tmax, tmin, tbase = eco.TBASE, dopt = eco.TOPT) {
+  if (tmax < tbase) return 0;
+  if (tmin > dopt) return dopt - tbase;
+  if (tmin < tbase || tmax > dopt) {
+    let s = 0;
+    for (let i = 1; i <= 24; i++) {
+      let th = (tmax + tmin) / 2 + (tmax - tmin) / 2 * Math.sin(3.14 / 12 * i);
+      th = Math.min(Math.max(th, tbase), dopt);
+      s += (th - tbase) / 24;
+    }
+    return s;
+  }
+  return (tmax + tmin) / 2 - tbase;
+}
+viewof tRange = Inputs.range([0, 25], {step: 1, value: 12, label: "Daily range Tmax - Tmin, °C"})
+```
+
+```{ojs}
+dttRows = d3.range(-5, 46, 0.5).flatMap(tm => [
+  {tmean: tm, dtt: dtt(tm + tRange / 2, tm - tRange / 2), rule: `Engine rule, range ${tRange} °C`},
+  {tmean: tm, dtt: Math.max(0, tm - eco.TBASE), rule: "Simple mean - TBASE, no cap"}])
+withDownload(Plot.plot({
+  width: Math.min(W, 640), height: 330, marginLeft: 50,
+  x: {label: "Daily mean temperature, °C", grid: true},
+  y: {label: "Thermal time added that day, °C-day", grid: true},
+  color: {legend: true},
+  marks: [
+    Plot.ruleX([eco.TBASE, eco.TOPT], {stroke: "#bbb", strokeDasharray: "3,3"}),
+    Plot.text([{x: eco.TBASE, t: "TBASE"}, {x: eco.TOPT, t: "TOPT"}], {x: "x", y: 30, text: "t", dx: 4, textAnchor: "start", fill: "#666"}),
+    Plot.lineY(dttRows, {x: "tmean", y: "dtt", stroke: "rule", strokeWidth: 2, tip: true})
+  ]
+}), "module1-thermal-time-function")
+```
+
+With a wide daily range, part of the day is below `TBASE` or above `TOPT` even when the mean is not; the
+hourly sine curve gives those hours less (or no) thermal time, so the curve bends before it reaches the
+cap. Above `TOPT` the rate does not fall: the model has no penalty for heat in this function.
+
+Over the 1982 season, the thermal time adds up like this (air-temperature branches only, so slightly
+different from the engine's own sum early in the season). The vertical lines are the stage changes the
+engine simulated for treatment 4:
+
+```{ojs}
+stageName = new Map([[0, "planting"], [1, "emergence"], [2, "end of juvenile phase"], [3, "tassel initiation"], [4, "end of leaf growth, silking"], [5, "start of effective grain fill"], [6, "end of grain fill"]])
+withDownload(Plot.plot({
+  width: W, height: 330, marginLeft: 55,
+  x: {type: "utc", label: "Date, 1982"},
+  y: {label: "Cumulative thermal time from planting, °C-day", grid: true},
+  marks: [
+    Plot.lineY(weather, {x: d => new Date(d.date), y: "GDD_cum", stroke: "#2a7f62", strokeWidth: 2, tip: true}),
+    Plot.ruleX(stages, {x: d => new Date(d.date), stroke: "#d9822b"}),
+    Plot.text(stages, {x: d => new Date(d.date), y: (d, i) => 2600 - i * 380, text: d => `${stageName.get(d.stage)} (DAP ${d.DAP})`, dx: 4, textAnchor: "start", fontSize: 10, fill: "#333", stroke: "white", strokeWidth: 3}),
+    Plot.dot(stages, {x: d => new Date(d.date), y: "GDD_cum", fill: "#d9822b", tip: true})
+  ]
+}), "module1-thermal-time-1982")
+```
+
+::: {.source-note}
+Stage numbers are the PlantGro `GSTD` values of treatment 4. For CERES-Maize `GSTD` is the phenology
+stage `ISTAGE` once the plant has leaves (`MZ_GROSUB.for:1847-1851`); each line marks the day a stage
+begins, named after the stage comments in `MZ_PHENOL.for` (lines 647-875). McCurdy 84aa: P1 = ${coef[0].P1} °C-day, P2 = ${coef[0].P2} d/h,
+P5 = ${coef[0].P5} °C-day (engine's `MZCER048.CUL`).
+:::
+
+### Temperature responses in CROPGRO
+
+CERES-Maize uses one base temperature and one optimum. CROPGRO, the model of the grain legumes in module 2, uses a
+four-point function instead: no development below a base `TB`, a rise to a first optimum `TO1`, a plateau to a
+second optimum `TO2`, and a decline to zero at a maximum `TM`,
+
+\[
+f(T) =
+\begin{cases}
+0 & T \le T_B \text{ or } T \ge T_M \\
+\dfrac{T - T_B}{T_{O1} - T_B} & T_B < T < T_{O1} \\
+1 & T_{O1} \le T \le T_{O2} \\
+1 - \dfrac{T - T_{O2}}{T_M - T_{O2}} & T_{O2} < T < T_M
+\end{cases}
+\]
+
+([`UTILS.for:353-358`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Utilities/UTILS.for#L353), curve type `LIN`, called in
+[`PHENOL.for:237`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Plant/CROPGRO/PHENOL.for#L237)). Soybean's species file sets one function for each of
+three phases of development:
+
+```{ojs}
+function curvLin(x, xb, x1, x2, xm) {
+  if (x <= xb || x >= xm) return 0;
+  if (x < x1) return (x - xb) / (x1 - xb);
+  if (x <= x2) return 1;
+  return 1 - (x - x2) / (xm - x2);
+}
+viewof tPhase = Inputs.radio(tfun.map(d => d.phase), {value: tfun[0].phase, label: "Phase"})
+```
+
+```{ojs}
+tf = tfun.find(d => d.phase === tPhase)
+withDownload(Plot.plot({
+  width: Math.min(W, 640), height: 300, marginLeft: 50,
+  x: {label: "Hourly temperature, °C", domain: [-5, 50], grid: true},
+  y: {label: "Relative rate of development", domain: [0, 1.05], grid: true},
+  color: {legend: true, domain: tfun.map(d => d.phase), range: ["#3f7a34", "#f2a33a", "#4a6fa5"]},
+  marks: [
+    ...tfun.map(p => Plot.line(d3.range(-5, 50.1, 0.25).map(x => [x, curvLin(x, p.TB, p.TO1, p.TO2, p.TM)]), {stroke: () => p.phase, strokeWidth: p.phase === tPhase ? 3 : 1, strokeOpacity: p.phase === tPhase ? 1 : 0.4})),
+    Plot.dot([tf.TB, tf.TO1, tf.TO2, tf.TM].map((x, i) => ({x, y: i === 1 || i === 2 ? 1 : 0, k: ["TB", "TO1", "TO2", "TM"][i]})), {x: "x", y: "y", r: 5, fill: "#222", tip: true, channels: {point: "k"}})
+  ]
+}), "module1-cropgro-temperature")
+```
+
+::: {.source-note}
+Values from the engine's `SBGRO048.SPE` (phenology parameters): TB ${tf.TB}, TO1 ${tf.TO1}, TO2 ${tf.TO2}, TM ${tf.TM} °C for this phase. CROPGRO applies the function to hourly temperatures.
+:::
+
+## 4. Potential production
+
+Now the simplest experiment: water and nitrogen are not simulated at all (`WATER` and `NITRO` switched to
+`N` in the simulation controls), so only weather, CO2 and the cultivar limit growth. In the DSSAT shell
+this is a new FileX made in XBuild. In the notebook it is built from treatment 4 of UFGA8201 with
+`filex.build_filex`, keeping the same field, cultivar and planting date. With the water switch off, DSSAT
+skips the soil water balance
+([`SPAM.for:269`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/SPAM/SPAM.for#L269));
+with the N switch off, CERES-Maize has no N stress
+([`MZ_GROSUB.for:2059`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Plant/CERES-Maize/MZ_GROSUB.for#L2059)).
+
+```{ojs}
+potM = potential.find(d => d.scenario.endsWith("CO2 M"))
+potD = potential.find(d => d.scenario.endsWith("CO2 D"))
+withDownload(Plot.plot({
+  width: W, height: 360, marginLeft: 230,
+  x: {label: "Grain yield, kg/ha", grid: true},
+  y: {label: null},
+  color: {legend: true, domain: ["potential", "UFGA8201 treatments", "observed"], range: ["#2a7f62", "#9bb8ad", "#d9822b"]},
+  marks: [
+    Plot.barX(potential, {y: "scenario", x: "HWAM", fill: "group", tip: true, channels: {"share of potential": d => fmt.pct(d.share_of_potential)}, sort: {y: "-x"}}),
+    Plot.dot(potential.filter(d => d.HWAM_obs != null), {y: "scenario", x: "HWAM_obs", fill: () => "observed", r: 5, stroke: "white", tip: true}),
+    Plot.ruleX([potM.HWAM], {stroke: "#2a7f62", strokeDasharray: "4,3"})
+  ]
+}), "module1-potential-vs-treatments")
+```
+
+The potential run (measured CO2) gives ${fmt.int(potM.HWAM)} kg/ha. The irrigated high-N treatment
+reached ${fmt.pct(potential.find(d => d.scenario.startsWith("T4")).share_of_potential)} of it in the model;
+the rainfed treatments ${fmt.pct(potential.find(d => d.scenario.startsWith("T1")).share_of_potential)}.
+Water, not nitrogen, made the largest difference in this season.
+
+**CO2.** DSSAT can take CO2 from a measured series (option `M`, Mauna Loa) or use a fixed value (option `D`,
+380 ppm from `CO2048.WDA`), see
+[`CO2VAL.for`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Weather/CO2VAL.for#L5).
+The 1982 series averages ${fmt.d1(potM.CO2_mean)} ppm over the season; with 380 ppm the potential yield is ${fmt.int(potD.HWAM)} kg/ha, ${fmt.pct(potD.HWAM / potM.HWAM - 1)} more: a small effect for a ${fmt.int(380 - potM.CO2_mean)} ppm difference.
+
+## 5. Sensitivity analysis: one thing at a time
+
+The Sensitivity Analysis tool changes one input and reruns. All runs below are potential production, so
+that water and nitrogen do not blur the effect.
+
+### Cultivars
+
+Six maize cultivars from the engine's cultivar file, from a short to a long juvenile phase (`P1`):
+
+```{ojs}
+viewof culPick = Inputs.checkbox(sensCul.map(d => d.var), {value: sensCul.map(d => d.var), label: "Cultivars",
+  format: v => { const c = sensCul.find(d => d.var === v); return `${c.name} (P1 ${c.P1})`; }})
+viewof culVar = Inputs.radio(new Map([["Leaf area index", "LAID"], ["Grain weight, kg/ha", "GWAD"], ["Tops weight, kg/ha", "CWAD"]]), {value: "LAID", label: "Variable"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 360, marginLeft: 60,
+  x: {label: "Days after planting", grid: true},
+  y: {label: culVar, grid: true},
+  color: {legend: true, domain: culPick.map(v => sensCul.find(d => d.var === v).name)},
+  marks: [Plot.lineY(sensCulG.filter(d => culPick.includes(d.var)), {x: "DAP", y: culVar, stroke: d => sensCul.find(c => c.var === d.var).name, tip: true})]
+}), `module1-cultivars-${culVar}`)
+```
+
+```{ojs}
+Inputs.table(sensCul, {columns: ["name", "P1", "P2", "P5", "G2", "G3", "anthesis_dap", "maturity_dap", "HWAM", "LAIX"],
+  header: {name: "Cultivar", anthesis_dap: "Anthesis, DAP", maturity_dap: "Maturity, DAP", HWAM: "Yield, kg/ha", LAIX: "Max LAI"}, layout: "auto"})
+```
+
+A longer juvenile phase delays anthesis (from ${d3.min(sensCul, d => d.anthesis_dap)} to ${d3.max(sensCul, d => d.anthesis_dap)} days after planting here) and builds more leaf area, but the highest yield is
+not the latest cultivar: yield also depends on grain filling (`P5`, `G2`, `G3`), and McCurdy 84aa has the
+longest grain filling of the six. A potential yield like this belongs to a cultivar at one place in one
+year; it is not a fixed property of the cultivar.
+
+### Planting date
+
+Pick a planting date; 26 February is the experiment's own date, the others follow in steps of two weeks.
+
+```{ojs}
+viewof pdPick = Inputs.range([0, sensPd.length - 1], {step: 1, value: 0, label: "Planting", format: i => sensPd[i].planting})
+```
+
+```{ojs}
+pdSel = sensPd[pdPick]
+withDownload(Plot.plot({
+  width: W, height: 340, marginLeft: 60,
+  x: {label: "Days after planting", grid: true},
+  y: {label: "Leaf area index", grid: true},
+  marks: [
+    Plot.lineY(sensPdG, {x: "DAP", y: "LAID", z: "planting", stroke: "#ccc"}),
+    Plot.lineY(sensPdG.filter(d => d.planting === pdSel.planting), {x: "DAP", y: "LAID", stroke: "#2a7f62", strokeWidth: 3, tip: true})
+  ]
+}), `module1-planting-${pdSel.planting.replace(" ", "")}`)
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(W, 640), height: 300, marginLeft: 60,
+  x: {label: "Planting date", domain: sensPd.map(d => d.planting)},
+  y: {label: "Days after planting", grid: true},
+  color: {legend: true},
+  marks: [
+    Plot.lineY(sensPd.flatMap(d => [{p: d.planting, v: d.anthesis_dap, k: "anthesis"}, {p: d.planting, v: d.maturity_dap, k: "maturity"}]), {x: "p", y: "v", stroke: "k", marker: "dot", tip: true}),
+    Plot.dot([pdSel], {x: "planting", y: "maturity_dap", r: 8, stroke: "#d9822b", strokeWidth: 2})
+  ]
+}), "module1-planting-dates-phenology")
+```
+
+Planted ${pdSel.planting}: anthesis after ${pdSel.anthesis_dap} days, maturity after ${pdSel.maturity_dap} days, potential yield ${fmt.int(pdSel.HWAM)} kg/ha; mean temperature over the season ${fmt.d1(pdSel.season_tmean)} °C and mean radiation ${fmt.d1(pdSel.season_srad)} MJ/m²/day. Later plantings grow in warmer
+weather, so they accumulate thermal time faster and mature sooner. Yield does not follow a simple line
+over the six dates; the notebook has the daily weather to dig into why.
+
+### One genetic coefficient
+
+Change `P1` (thermal time of the juvenile phase) or `P5` (thermal time of grain filling) of McCurdy 84aa.
+The notebook writes a copy of the cultivar file with the new value into each run folder; the engine reads
+the local file first, so its own file is never changed.
+
+```{ojs}
+viewof coefPick = Inputs.radio(["P1", "P5"], {value: "P1", label: "Coefficient"})
+```
+
+```{ojs}
+coefVals = sensCoef.filter(d => d.coefficient === coefPick).map(d => d.value)
+viewof coefVal = Inputs.range([d3.min(coefVals), d3.max(coefVals)], {step: coefVals[1] - coefVals[0], value: coefPick === "P1" ? 250 : 950, label: `${coefPick}, °C-day`})
+```
+
+```{ojs}
+coefSel = sensCoef.find(d => d.coefficient === coefPick && d.value === coefVal)
+withDownload(Plot.plot({
+  width: W, height: 340, marginLeft: 60,
+  x: {label: "Days after planting", grid: true},
+  y: {label: "Grain weight, kg/ha", grid: true},
+  marks: [
+    Plot.lineY(sensCoefG.filter(d => d.coefficient === coefPick), {x: "DAP", y: "GWAD", z: "value", stroke: "#ccc"}),
+    Plot.lineY(sensCoefG.filter(d => d.coefficient === coefPick && d.value === coefVal), {x: "DAP", y: "GWAD", stroke: "#2a7f62", strokeWidth: 3, tip: true})
+  ]
+}), `module1-${coefPick}-${coefVal}-grain`)
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(W, 640), height: 300, marginLeft: 60,
+  x: {label: `${coefPick}, °C-day`, grid: true},
+  y: {label: "Potential grain yield, kg/ha", grid: true},
+  marks: [
+    Plot.lineY(sensCoef.filter(d => d.coefficient === coefPick), {x: "value", y: "HWAM", stroke: "#2a7f62", marker: "dot", tip: true}),
+    Plot.dot([coefSel], {x: "value", y: "HWAM", r: 8, stroke: "#d9822b", strokeWidth: 2, tip: true})
+  ]
+}), `module1-${coefPick}-response`)
+```
+
+With ${coefPick} = ${coefVal}: anthesis ${coefSel?.anthesis_dap} days after planting, maturity ${coefSel?.maturity_dap}, potential yield ${fmt.int(coefSel?.HWAM)} kg/ha. `P5` lengthens grain
+filling without moving anthesis, and yield rises with it. `P1` moves both dates, and yield is highest at
+P1 = ${p1Best.value} with ${fmt.int(p1Best.HWAM)} kg/ha, not at either end of the range; the notebook's daily
+weather is the place to look for why.
+
+```{ojs}
+p1Best = sensCoef.filter(d => d.coefficient === "P1").reduce((a, b) => b.HWAM > a.HWAM ? b : a)
+```
+
+## From one field to a grid: xdssat
+
+Every experiment above is one field. xdssat runs the same engine, unchanged, for every 0.1° weather cell of a
+region, one simulation per cell, season and water regime. In the [rice case study](../java/index.qmd) that is
+${fmt.int(gCells.length)} cells of Java over 30 years (current run: ${gSummary.current_run}). Phenology is where the
+grid shows its first pattern: the same cultivar, planted by the same rule, takes longer to mature where nights are
+cooler, because thermal time accumulates more slowly (section 3).
+
+```{ojs}
+import {cellFeatures, adminMarks} from "../assets/js/dl.js"
+gCells = FileAttachment("../java/data/grid_cells.csv").csv({typed: true})
+gOutline = FileAttachment("../java/data/java_outline.geojson").json()
+gProv = FileAttachment("../java/data/provinces.geojson").json()
+gDist = FileAttachment("../java/data/districts.geojson").json()
+gSummary = FileAttachment("../java/data/summary.json").json()
+gMapW = Math.min(width, 960)
+```
+
+```{ojs}
+viewof g1Var = Inputs.radio(new Map([["Days from planting to maturity", "len_wet_irrigated"], ["Mean season minimum temperature, °C", "tmina_wet_irrigated"]]), {value: "len_wet_irrigated", label: "Map"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: gMapW, height: Math.round(gMapW * 0.42),
+  projection: {type: "mercator", domain: gOutline},
+  color: {type: "linear", scheme: g1Var.startsWith("len") ? "YlOrBr" : "RdYlBu", reverse: g1Var.startsWith("tmin"), legend: true,
+          label: g1Var.startsWith("len") ? "Irrigated wet-season rice: days to maturity (1991-2020 mean)" : "Mean season Tmin, °C"},
+  marks: [
+    Plot.geo(gProv, {fill: "#f1f1f1", clip: true}),
+    Plot.geo(cellFeatures(gCells.filter(d => d[g1Var] != null)).features, Plot.centroid({fill: d => d.properties[g1Var], tip: true,
+      title: d => `${d.properties.lat.toFixed(1)}, ${d.properties.lon.toFixed(1)}: ${fmt.d1(d.properties.len_wet_irrigated)} days, Tmin ${fmt.d1(d.properties.tmina_wet_irrigated)} °C`})),
+    ...adminMarks(Plot, gProv, gDist)
+  ]
+}), `module1-grid-${g1Var}`)
+```
+
+```{ojs}
+g1 = gCells.filter(d => d.len_wet_irrigated != null && d.tmina_wet_irrigated != null)
+g1r = (() => { const x = g1.map(d => d.tmina_wet_irrigated), y = g1.map(d => d.len_wet_irrigated); const mx = d3.mean(x), my = d3.mean(y);
+  return d3.sum(x, (v, i) => (v - mx) * (y[i] - my)) / Math.sqrt(d3.sum(x, v => (v - mx) ** 2) * d3.sum(y, v => (v - my) ** 2)); })()
+withDownload(Plot.plot({
+  width: Math.min(W, 560), height: 300, marginLeft: 55,
+  x: {label: "Mean season minimum temperature, °C", grid: true},
+  y: {label: "Days from planting to maturity", grid: true},
+  marks: [Plot.dot(g1, {x: "tmina_wet_irrigated", y: "len_wet_irrigated", r: 2, fill: "#3f7a34", fillOpacity: 0.5, tip: true})]
+}), "module1-grid-length-vs-tmin")
+```
+
+Across the ${fmt.int(g1.length)} cells with irrigated wet-season rice, season length and night temperature correlate at r = ${g1r.toFixed(2)}, from ${fmt.int(d3.min(g1, d => d.len_wet_irrigated))} to ${fmt.int(d3.max(g1, d => d.len_wet_irrigated))} days. The [case study's Science page](../java/science.qmd) shows what that does to the simulated yield.
+
+## Self-test
+
+1. Which treatment of UFGA8201 is closest to potential production, and why is it not exactly equal?
+2. The model gives the same grain yield to both rainfed treatments. What does that tell you about which
+   factor limited them?
+3. In the cultivar comparison, why does the cultivar with the most leaf area not give the most grain?
+4. Change the CO2 option in the notebook to `W` (CO2 from the weather file). What happens, and why?
+5. Add a planting date in July in the notebook. Predict anthesis and maturity first, then run it.
+
+## Where this goes next
+
+Module 2 adds growth processes, weather files and cultivar coefficients; module 3 turns the water balance
+on. The plan for all six modules is on the [training overview](index.qmd).
+
+## References {.unnumbered}
+
+::: {#refs}
+:::

@@ -1,0 +1,110 @@
+[
+ {
+  "page": "java/index",
+  "file": "index/xdssat-java-mean-yield-wet_irrigated"
+ },
+ {
+  "page": "java/index",
+  "file": "index/xdssat-java-yield-java_per_cell_1991-2020_slpf_temp_v1_tcldf19"
+ },
+ {
+  "page": "java/index",
+  "file": "index/xdssat-district-ratio-java_per_cell_1991-2020_slpf_temp_v1_tcldf19"
+ },
+ {
+  "page": "java/index",
+  "file": "index/xdssat-district-obs-vs-sim-java_per_cell_1991-2020_slpf0.73"
+ },
+ {
+  "page": "java/data",
+  "file": "data/xdssat-java-rice-area-ha"
+ },
+ {
+  "page": "java/data",
+  "file": "data/xdssat-java-irrigation-classes"
+ },
+ {
+  "page": "java/data",
+  "file": "data/xdssat-java-aez"
+ },
+ {
+  "page": "java/data",
+  "file": "data/xdssat-java-tmina_wet_irrigated"
+ },
+ {
+  "page": "java/data",
+  "file": "data/xdssat-java-soil-sloc_top"
+ },
+ {
+  "page": "java/data",
+  "file": "data/xdssat-java-soil-texture"
+ },
+ {
+  "page": "java/data",
+  "file": "data/xdssat-bdsp-coverage"
+ },
+ {
+  "page": "java/data",
+  "file": "data/xdssat-bdsp-province-yield"
+ },
+ {
+  "page": "java/data",
+  "file": "data/xdssat-bdsp-flags-java"
+ },
+ {
+  "page": "java/data",
+  "file": "data/xdssat-n-cultivar-soc1"
+ },
+ {
+  "page": "java/science",
+  "file": "science/xdssat-soil-water-limits-by-depth"
+ },
+ {
+  "page": "java/science",
+  "file": "science/xdssat-srgf-rule"
+ },
+ {
+  "page": "java/science",
+  "file": "science/xdssat-onset-map"
+ },
+ {
+  "page": "java/science",
+  "file": "science/xdssat-onset-histogram"
+ },
+ {
+  "page": "java/science",
+  "file": "science/xdssat-slpf-sweep"
+ },
+ {
+  "page": "java/science",
+  "file": "science/xdssat-tcldf-sample"
+ },
+ {
+  "page": "java/science",
+  "file": "science/xdssat-ratio-vs-season-java_uniform_1991-2020_slpf_temp_v1_tcldf19"
+ },
+ {
+  "page": "java/science",
+  "file": "science/xdssat-fit-slpf-surface"
+ },
+ {
+  "page": "java/science",
+  "file": "science/xdssat-fit-slpf-cv"
+ },
+ {
+  "page": "java/science",
+  "file": "science/xdssat-slpf-table-map-irrigated"
+ },
+ {
+  "page": "java/science",
+  "file": "science/xdssat-slpf-vs-tmin"
+ },
+ {
+  "page": "java/science",
+  "file": "science/xdssat-district-3215-java_per_cell_1991-2020_slpf_temp_v1_tcldf19"
+ },
+ {
+  "page": "java/science",
+  "file": "science/xdssat-gkg-moisture"
+ }
+]

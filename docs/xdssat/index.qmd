@@ -1,0 +1,53 @@
+---
+title: "xdssat: DSSAT on a grid"
+subtitle: "The unmodified DSSAT engine, driven from Python over every weather cell of a region"
+---
+
+```{ojs}
+import {withDownload, fmt} from "../assets/js/dl.js"
+runs = FileAttachment("../java/data/runs.json").json()
+summary = FileAttachment("../java/data/summary.json").json()
+cur = summary.current
+```
+
+xdssat does not reimplement DSSAT. It writes the engine's own input files for each grid cell and season,
+runs the stock `dscsm048` executable in parallel chunks, and collects the results into a CF netCDF file.
+The [DSSAT training](../learn/index.qmd) modules use the same building blocks on single experiments.
+
+| Module (`src/`) | Role |
+|---|---|
+| `config.py` | All locations: engine, work root, source data, cache (`XDSSAT_*` variables) |
+| `wth.py` | Read and write daily weather files (`.WTH`) |
+| `sol.py` | Read and write soil profiles (`.SOL`) |
+| `filex.py` | Build one FileX per chunk from a template experiment: one treatment per cell-season, all dates shifted with planting |
+| `genotype.py` | Cultivar files written into each run folder, with coefficient overrides |
+| `runner.py` | Run chunks in parallel, isolate cells that crash the engine, read outputs |
+| `outputs.py` | Gridded CF netCDF of a run's seasonal results |
+| `agera5.py`, `rasters.py`, `soils.py`, `management.py` | Weather cache, 100 m rasters, soil profiles from SoilGrids, strata and planting calendars |
+
+::: {.source-note}
+From the repository README; the module docstrings hold the details and the measured facts.
+:::
+
+## Runs so far
+
+Every run folder in the cache, with its size and wall time (the case study's runs):
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(width, 760), height: 50 + runs.length * 26, marginLeft: 300,
+  x: {label: "Seasons simulated (thousands)", grid: true},
+  y: {label: null},
+  color: {legend: true, domain: ["current", "other"], range: ["#2a7f62", "#9bb8ad"]},
+  marks: [Plot.barX(runs, {y: "run", x: d => d.seasons / 1000, fill: d => d.current ? "current" : "other", tip: true,
+    channels: {minutes: "minutes", failed: "failed"}, sort: {y: "-x"}})]
+}), "xdssat-runs-overview")
+```
+
+The current run simulated ${fmt.int(cur.seasons)} seasons with ${fmt.int(cur.failed)} rejected by the engine in ${fmt.d1(cur.minutes)} minutes on ${cur.workers} engine processes.
+
+## Read on
+
+- [How xdssat differs from common DSSAT use](gridding.qmd): gridding, data preparation, chunked runs, netCDF.
+- [Implementation](implementation.qmd): each script, the settings that change its result, and its outputs.
+- [Getting started](../getting-started.md): setup from an empty machine.

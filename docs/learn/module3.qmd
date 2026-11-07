@@ -1,0 +1,911 @@
+---
+title: "Module 3: estimating cultivar coefficients (GLUE), soil data and water-limited production"
+subtitle: "DSSAT training, module 3 of 6. Follows day 3 of the course, with code instead of the DSSAT shell"
+---
+
+```{ojs}
+import {withDownload, fmt} from "../assets/js/dl.js"
+gObs = FileAttachment("data/module3/glue_obs.csv").csv({typed: true})
+gRanges = FileAttachment("data/module3/glue_ranges.csv").csv({typed: true})
+gR1 = FileAttachment("data/module3/glue_round1.csv").csv({typed: true})
+gR2 = FileAttachment("data/module3/glue_round2.csv").csv({typed: true})
+gR2w = FileAttachment("data/module3/glue_round2_wide.csv").csv({typed: true})
+gPost = FileAttachment("data/module3/glue_posterior.csv").csv({typed: true})
+gWide = FileAttachment("data/module3/glue_widened.csv").csv({typed: true})
+gEval = FileAttachment("data/module3/glue_eval.csv").csv({typed: true})
+gStats = FileAttachment("data/module3/glue_stats.csv").csv({typed: true})
+gInfo = FileAttachment("data/module3/glue_info.csv").csv({typed: true})
+soilLayers = FileAttachment("data/module3/soil_layers.csv").csv({typed: true})
+soilPaw = FileAttachment("data/module3/soil_paw.csv").csv({typed: true})
+soilSR = FileAttachment("data/module3/soil_saxton_rawls.csv").csv({typed: true})
+wlLevels = FileAttachment("data/module3/wl_levels.csv").csv({typed: true})
+wlSW = FileAttachment("data/module3/wl_soilwater.csv").csv({typed: true})
+wlBal = FileAttachment("data/module3/wl_balance.csv").csv({typed: true})
+wlLayers = FileAttachment("data/module3/wl_layers.csv").csv({typed: true})
+wlSoils = FileAttachment("data/module3/wl_soils.csv").csv({typed: true})
+wlAuto = FileAttachment("data/module3/wl_auto.csv").csv({typed: true})
+wlYears = FileAttachment("data/module3/wl_years.csv").csv({typed: true})
+coObs = FileAttachment("data/module3/co_obs.csv").csv({typed: true})
+coPost = FileAttachment("data/module3/co_posterior.csv").csv({typed: true})
+coEval = FileAttachment("data/module3/co_eval.csv").csv({typed: true})
+pnGrid = FileAttachment("data/module3/pn_grid.csv").csv({typed: true})
+pnDaily = FileAttachment("data/module3/pn_daily.csv").csv({typed: true})
+pnStats = FileAttachment("data/module3/pn_stats.csv").csv({typed: true})
+pnObs = FileAttachment("data/module3/pn_obs.csv").csv({typed: true})
+pnInfo = FileAttachment("data/module3/pn_info.csv").csv({typed: true})
+soilOg = FileAttachment("data/module3/soil_orangeburg.csv").csv({typed: true})
+soilUmAlt = FileAttachment("data/module3/soil_umariya_alt.csv").csv({typed: true})
+sheetUm = FileAttachment("data/module3/soil_sheet_umariya.csv").csv({typed: true})
+runInfo = FileAttachment("data/module3/run_info.csv").csv()
+dlLinks = html`<a href="${"../notebooks/module3" + ".ipynb"}" download>download .ipynb</a>, helpers <a href="../notebooks/learnlib.py" download>learnlib.py</a> and <a href="../notebooks/glue.py" download>glue.py</a>`
+W = Math.min(width, 860)
+versions = ["default", "GLUE", "GLUE, wider ranges"]
+vColors = ["#999999", "#2a7f62", "#d9822b"]
+```
+
+::: {.callout-note appearance="simple"}
+**How to use this module.** Read this page for the ideas; every chart comes from the
+[module 3 notebook](../notebooks/module3.ipynb) (${dlLinks}), which runs the DSSAT engine and writes the small
+data files the charts read. The runs on this build were made on ${runInfo[0].run_on}.
+:::
+
+## What you will learn
+
+- How cultivar coefficients are estimated from field data, and why the answer is a distribution, not one
+  number: the GLUE method of DSSAT, here as a Python port (`glue.py`), for soybean and for a new maize hybrid.
+- How to calibrate by hand against growth measured during the season, with the statistics the course uses.
+- What a soil profile in DSSAT holds, how much water a soil can store for a crop, and how to build a profile
+  from a soil survey sheet.
+- How the water balance limits production: soil water layer by layer, the effect of the soil's storage,
+  and automatic irrigation.
+
+## 1. Estimating cultivar coefficients with GLUE
+
+A cultivar's coefficients cannot be measured directly; they are estimated by running the model with many
+candidate values and keeping those that reproduce field observations. DSSAT's tool for this is GLUE
+(Generalized Likelihood Uncertainty Estimation), written in R ([DSSAT/glue](https://github.com/DSSAT/glue)).
+The notebook uses a Python port of its method, `docs/notebooks/glue.py`, which follows the R files step by
+step (the module docstring lists them).
+
+### Estimating coefficients: the ideas
+
+A model coefficient is estimated by changing it until the simulation matches measurements, which is only as good
+as the measurements, the order and the error model. Three ideas from the course carry through this module:
+
+- **Least squares and likelihood.** Fitting by hand usually minimizes an error measure such as the RMSE; GLUE
+  instead asks how likely the measurements are under each candidate set, given an assumed measurement error, and
+  keeps a weight for every candidate.
+- **Order.** Coefficients that set dates (phenology) are fitted first, against flowering and maturity dates; those
+  that set weights (growth) after, against biomass and yield. Module 2's coefficient sweep shows why: the date
+  coefficients move everything else, the growth ones do not move the dates.
+- **Diverse data.** Experiments at several sites and sowing dates separate coefficients that would compensate for
+  each other in one experiment: the day-length coefficients, for example, only show their effect across day
+  lengths.
+
+
+GLUE is one way to estimate cultivar coefficients. The course's lecture on estimating coefficients set it among
+the others:
+
+- **Measure the trait directly.** Controlled-environment experiments that control one or more factors (for
+  example temperature or day length) and measure the crop's response.
+- **Fit to field data**, the usual way: experiments with known weather, soil and management, and observed
+  phenology, growth and yield. Within that:
+  - **trial and error**: start from the closest cultivar in the DSSAT list, change one coefficient at a time,
+    phenology first, and watch the error (module 4 gives the order);
+  - **software-assisted search**: GenCalc, distributed with DSSAT, searches coefficients to minimize the error
+    for chosen variables;
+  - **Bayesian estimation**: GLUE, below, which also says how uncertain each value is.
+- **Gene-based estimation**: coefficients expressed as functions of the alleles a cultivar carries, so they can be
+  predicted from molecular markers. The course called this "in its infancy" in 2018.
+
+Whatever the method, several sites and years estimate coefficients better than one: with one experiment, errors in
+the weather, soil or measurements are absorbed into the coefficients.
+
+### The observations
+
+The course's GLUE exercise calibrates Williams-82, a soybean cultivar of maturity group 3, on the five treatments
+it selects: the first treatment of four experiments from Ames, Iowa (IUAM) and Wooster, Ohio (OHWO), and the fully
+irrigated treatment 4 of UFGA7902 from Gainesville, all shipped with DSSAT [@csmdata]. Dates are days after
+planting.
+
+```{ojs}
+Inputs.table(gObs, {columns: ["exp", "ADAP", "MDAP", "HWAM", "CWAM", "PWAM", "LAIX", "HWUM"],
+  header: {exp: "Experiment", ADAP: "Anthesis, DAP", MDAP: "Maturity, DAP", HWAM: "Seed yield, kg/ha", CWAM: "Tops, kg/ha", PWAM: "Pods, kg/ha", LAIX: "Max LAI", HWUM: "Seed size, g"},
+  format: {HWUM: d => d?.toFixed(3)}, layout: "auto"})
+```
+
+Two more experiments, IUAM9701 and IUAM9702, are kept back to test the result; only their yield was
+measured.
+
+### Step 1: a range for every coefficient
+
+GLUE draws candidate values uniformly within a range for each coefficient
+([`Uniform.r`](https://github.com/DSSAT/glue/blob/e86093e400fbbdfc8e2c751c98acc2136835c3af/Uniform.r)).
+DSSAT keeps the ranges in the cultivar file itself, in a `MINIMA` and a `MAXIMA` row, with a `!Calibration`
+row that marks each coefficient as **P** (phenology), **G** (growth) or **N** (not calibrated).
+
+```{ojs}
+Inputs.table(gRanges, {columns: ["coef", "flag", "min", "max", "default", "outside_range"],
+  header: {coef: "Coefficient", flag: "Flag", min: "MINIMA", max: "MAXIMA", default: "Williams-82 in the engine", outside_range: "Outside the range?"},
+  format: {outside_range: v => v ? "yes" : ""}, layout: "auto", rows: 20})
+```
+
+```{ojs}
+outside = gRanges.filter(d => d.outside_range === true && d.flag !== "N").map(d => d.coef)
+// string literals stay in cells: Pandoc rewrites quotes and spaces inside inline expressions
+outsideText = outside.join(" and ")
+```
+
+Note the last column: Williams-82's own values of ${outsideText} lie outside the ranges that GLUE samples from.
+
+### Step 2: how likely is each candidate?
+
+For every measurement, GLUE asks how likely the simulated value would be if the measurement had a normal
+error with a fixed variance
+([`Calculation.r`](https://github.com/DSSAT/glue/blob/e86093e400fbbdfc8e2c751c98acc2136835c3af/Calculation.r),
+variances in
+[`MeasurementVariance_All.csv`](https://github.com/DSSAT/glue/blob/e86093e400fbbdfc8e2c751c98acc2136835c3af/MeasurementVariance_All.csv)):
+a standard deviation of 3 days for anthesis and 7 days for maturity, and 30% for yields and weights. The
+likelihoods are multiplied over the measurements and the experiments and normalised, so the probabilities
+of all candidates add up to 1. For candidate \(i\), measurement \(j\) with value \(O_j\), simulation \(S_{ij}\) and
+variance \(\sigma_j^2\), in experiment \(e\):
+
+\[
+\begin{gathered}
+L_{ij} = \frac{1}{\sqrt{2\pi\sigma_j^2}}\,\exp\!\left(-\frac{(O_j - S_{ij})^2}{2\sigma_j^2}\right),
+\qquad L_{ie} = \prod_{j \in e} L_{ij} \\[6pt]
+p_i = \frac{\prod_e \left( L_{ie} \big/ \sum_k L_{ke} \right)}{\sum_m \prod_e \left( L_{me} \big/ \sum_k L_{ke} \right)}
+\end{gathered}
+\]
+
+GLUE works in two rounds: round 1 varies the phenology coefficients and is
+scored on the dates; round 2 keeps the best round-1 values and varies the growth coefficients, scored on
+the weights. The notebook draws ${fmt.int(gInfo[0].sets_per_round)} candidates per round, ${fmt.int(gInfo[0].seasons)} soybean seasons in all.
+
+Try the likelihood of one date: with a standard deviation of 3 days, how much less likely is a candidate that
+misses anthesis by your chosen number of days than one that hits it?
+
+```{ojs}
+viewof miss = Inputs.range([0, 15], {step: 1, value: 4, label: "Days off"})
+```
+
+${missText}
+
+```{ojs}
+missText = miss === 0 ? "A candidate that hits the date has the highest likelihood; move the slider."
+  : `${fmt.pct(Math.exp(-(miss ** 2) / 18))} as likely. Missing by ${2 * miss} days instead of ${miss} does not halve the likelihood: it divides it by ${fmt.int(Math.exp(-(miss ** 2) / 18) / Math.exp(-((2 * miss) ** 2) / 18))}.`
+```
+
+### Step 3: the posterior
+
+Each dot is one candidate; its height is its GLUE probability.
+
+```{ojs}
+roundMap = new Map([["Round 1: phenology", gR1], ["Round 2: growth", gR2], ["Round 2, wider ranges", gR2w]])
+viewof gRound = Inputs.radio([...roundMap.keys()], {value: "Round 1: phenology", label: "Round"})
+```
+
+```{ojs}
+gSets = roundMap.get(gRound)
+gCoefs = Object.keys(gSets[0]).filter(k => k !== "set" && k !== "prob")
+viewof gCoef = Inputs.select(gCoefs, {label: "Coefficient"})
+```
+
+```{ojs}
+postKey = gRound.startsWith("Round 1") ? "1" : gRound.includes("wider") ? "2, wider ranges" : "2"
+gp = gPost.find(d => String(d.round) === postKey && d.coef === gCoef)
+rg = gRanges.find(d => d.coef === gCoef)
+withDownload(Plot.plot({
+  width: W, height: 320, marginLeft: 60,
+  x: {label: gCoef, grid: true},
+  y: {label: "GLUE probability", grid: true},
+  marks: [
+    Plot.rectX([gp], {x1: "prior_min", x2: "prior_max", fill: "#c4a35a", fillOpacity: 0.12}),
+    Plot.dot(gSets, {x: gCoef, y: "prob", r: 1.6, fill: "#2a7f62", fillOpacity: 0.5, tip: true}),
+    Plot.ruleX([rg.default], {stroke: "#999", strokeDasharray: "4,3"}),
+    Plot.ruleX([gp.best], {stroke: "#d9822b", strokeWidth: 2}),
+    Plot.text([{x: rg.default, t: "Williams-82 in the engine"}, {x: gp.best, t: "best"}], {x: "x", text: "t", frameAnchor: "top", dy: 6, dx: 4, textAnchor: "start", fill: "#555"})
+  ]
+}), `module3-glue-${postKey}-${gCoef}`)
+```
+
+```{ojs}
+Inputs.table(gPost.filter(d => String(d.round) === postKey), {columns: ["coef", "best", "mean", "sd", "prior_min", "prior_max"],
+  header: {coef: "Coefficient", best: "Most probable set", mean: "Posterior mean", sd: "Posterior sd", prior_min: "Range from", prior_max: "to"},
+  format: {best: d => d.toPrecision(4), mean: d => d.toPrecision(4), sd: d => d.toPrecision(2)}, layout: "auto"})
+```
+
+```{ojs}
+nNear = (sets) => sets.filter(d => d.prob > d3.max(sets, s => s.prob) / 100).length
+```
+
+Many candidates are almost as good as the best. In round 1, ${nNear(gR1)} of the ${fmt.int(gR1.length)} candidates have
+at least 1% of the best candidate's probability; in round 2, ${nNear(gR2)}. Different combinations of
+coefficients reproduce the same observations (*equifinality*). That is why the posterior mean and spread
+matter as much as the single best set.
+
+### When the best value sits on the edge
+
+If the best value of a coefficient lies at the edge of its range, the data want a value the range does not
+allow. That happens in round 2. The notebook reruns round 2 with those ranges widened by half their width
+on the side that was hit:
+
+```{ojs}
+Inputs.table(gWide, {header: {coef: "Coefficient", best: "Best in round 2", side: "Edge", old_min: "Range from", old_max: "to", new_min: "Wider from", new_max: "to"},
+  format: {best: d => d.toPrecision(4)}, layout: "auto"})
+```
+
+### Result: better dates; the weights depend on the ranges
+
+```{ojs}
+viewof eVar = Inputs.select(new Map([["Anthesis, DAP", "ADAP"], ["Maturity, DAP", "MDAP"], ["Seed yield, kg/ha", "HWAM"], ["Tops, kg/ha", "CWAM"], ["Pods, kg/ha", "PWAM"], ["Max LAI", "LAIX"], ["Seed size, g", "HWUM"]]), {value: "MDAP", label: "Variable"})
+```
+
+```{ojs}
+{
+  const rows = gEval.filter(d => d.variable === eVar);
+  const ext = d3.extent(rows.flatMap(d => [d.simulated, d.observed]));
+  const pad = (ext[1] - ext[0]) * 0.1 || 1, lo = ext[0] - pad, hi = ext[1] + pad;
+  return withDownload(Plot.plot({
+    width: Math.min(W, 520), height: 420, marginLeft: 60,
+    x: {label: `Observed`, domain: [lo, hi], grid: true},
+    y: {label: `Simulated`, domain: [lo, hi], grid: true},
+    color: {legend: true, domain: versions, range: vColors},
+    symbol: {legend: true, domain: ["calibration", "independent check"]},
+    marks: [
+      Plot.line([[lo, lo], [hi, hi]], {stroke: "#bbb", strokeDasharray: "4,3"}),
+      Plot.dot(rows, {x: "observed", y: "simulated", stroke: "version", symbol: "use", r: 6, strokeWidth: 2, tip: true, channels: {experiment: "exp"}})
+    ]
+  }), `module3-glue-eval-${eVar}`);
+}
+```
+
+```{ojs}
+statTab = [...new Set(gStats.map(d => d.variable))].map(v => {
+  const o = {variable: v};
+  for (const ver of versions) { const r = gStats.find(d => d.variable === v && d.version === ver); o[ver] = r?.rmse; o[`d ${ver}`] = r?.d; }
+  return o;
+})
+Inputs.table(statTab, {columns: ["variable", ...versions], header: {variable: "Variable (calibration experiments)", default: "RMSE, default", GLUE: "RMSE, GLUE", "GLUE, wider ranges": "RMSE, GLUE wider"},
+  format: Object.fromEntries(versions.map(v => [v, d => d < 1 ? d.toFixed(3) : d < 20 ? d.toFixed(1) : fmt.int(d)])), layout: "auto"})
+```
+
+```{ojs}
+st = (v, ver) => gStats.find(d => d.variable === v && d.version === ver).rmse
+calE = gEval.filter(d => d.use === "calibration")
+cmpE = (v) => [...new Set(calE.map(d => d.exp))].map(e => ({e, g: calE.find(d => d.exp === e && d.variable === v && d.version === "GLUE")?.simulated,
+  d0: calE.find(d => d.exp === e && d.variable === v && d.version === "default")?.simulated})).filter(d => d.g != null && d.d0 != null)
+calN = cmpE("MDAP").length
+laterN = cmpE("MDAP").filter(d => d.g > d.d0).length
+moreTopsN = cmpE("CWAM").filter(d => d.g > d.d0).length
+```
+
+GLUE improves the dates: the error in anthesis falls from ${fmt.d1(st("ADAP", "default"))} to ${fmt.d1(st("ADAP", "GLUE"))} days and in maturity from ${fmt.d1(st("MDAP", "default"))} to ${fmt.d1(st("MDAP", "GLUE"))} days. It does not improve the weights. The default Williams-82 reproduces tops weight with an error of ${fmt.int(st("CWAM", "default"))} kg/ha, the GLUE cultivar with ${fmt.int(st("CWAM", "GLUE"))},
+and with the wider ranges ${fmt.int(st("CWAM", "GLUE, wider ranges"))}. Two things on this page point to why. The new
+phenology lengthens the season (later maturity in ${laterN} of ${calN} experiments), and the GLUE cultivar grows more
+tops in ${moreTopsN} of them. And the growth coefficients that could offset that, the leaf photosynthesis rate `LFMAX`
+among them, were sampled inside ranges that exclude the engine's own Williams-82 values. A calibration is only as good as its observations, its ranges
+and its error model; GLUE makes all three explicit, which is its main use.
+
+
+### GLUE self test 4: a new maize hybrid from Colorado
+
+The course's last GLUE exercise calibrates a cultivar DSSAT does not have yet: the maize hybrid DEKALB 52-59 AF,
+grown at Greeley, Colorado, in 2008 and 2010 under full irrigation and with 40% of it [@anothai2013]. The
+experiment files, weather and soils came with the course. The exercise asks for a new cultivar entry, `CO0801`,
+built from an existing variety; the notebook starts from DEKALB 485 (`IB1072`) of the engine's cultivar file and
+runs both GLUE rounds on all four treatments.
+
+```{ojs}
+Inputs.table(coPost, {columns: ["round", "coef", "DEKALB 485", "best", "mean", "sd", "prior_min", "prior_max"],
+  header: {round: "Round", coef: "Coefficient", best: "CO0801 (most probable)", mean: "Posterior mean", sd: "Posterior sd", prior_min: "Range from", prior_max: "to"},
+  format: {best: d => d.toPrecision(4), mean: d => d.toPrecision(4), sd: d => d.toPrecision(2), prior_min: d => d.toPrecision(3), prior_max: d => d.toPrecision(3)}, layout: "auto"})
+```
+
+```{ojs}
+viewof coVar = Inputs.radio(new Map([["Anthesis, DAP", "ADAP"], ["Maturity, DAP", "MDAP"], ["Grain yield, kg/ha", "HWAM"], ["Tops, kg/ha", "CWAM"]]), {value: "ADAP", label: "Variable"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 300, marginLeft: 110, marginRight: 20,
+  x: {label: coVar, grid: true},
+  y: {label: null},
+  color: {legend: true, domain: ["DEKALB 485 as it is", "GLUE: CO0801", "observed"], range: ["#999999", "#3f7a34", "#f2a33a"]},
+  marks: [
+    Plot.dot(coEval.filter(d => d.variable === coVar), {y: "exp", x: "simulated", fill: "version", r: 6, tip: true}),
+    Plot.dot(coEval.filter(d => d.variable === coVar && d.version === "GLUE: CO0801"), {y: "exp", x: "observed", fill: () => "observed", symbol: "diamond", r: 7, tip: true})
+  ]
+}), `module3-colorado-${coVar}`)
+```
+
+```{ojs}
+coRmse = (v, ver) => Math.sqrt(d3.mean(coEval.filter(d => d.variable === v && d.version === ver), d => (d.simulated - d.observed) ** 2))
+```
+
+The phenology moves most: the anthesis error falls from ${fmt.d1(coRmse("ADAP", "DEKALB 485 as it is"))} to ${fmt.d1(coRmse("ADAP", "GLUE: CO0801"))} days. Grain yield goes from an error of ${fmt.int(coRmse("HWAM", "DEKALB 485 as it is"))} to ${fmt.int(coRmse("HWAM", "GLUE: CO0801"))} kg/ha over the four treatments. With two years and two irrigation levels, four observations of each
+variable carry the whole calibration; the posterior spread above shows how loosely that pins the growth
+coefficients down.
+
+### Calibration with in-season data: peanut UFGA8401
+
+The second calibration exercise of the course works by hand, against growth analysis data taken during the season:
+the irrigated treatment of the 1984 Florunner peanut experiment UFGA8401. It asks for four statistics of four
+variables, tops weight, seed weight, seed number and pod harvest index: the RMSE, the intercept `a` and slope `b`
+of the regression of simulated on observed values (a good fit has `a` near 0 and `b` near 1), and Willmott's `d`.
+It suggests four coefficients: `LFMAX` for the size of tops and seed weight, `FL-SH` and `FL-SD` moved together
+for the timing of seed growth, `PODUR` for the first rise of seed number and pod harvest index, and `XFRT` for the
+share of growth that goes to pods and seeds.
+
+The notebook runs every combination of five values of `LFMAX`, five shifts of `FL-SH` and `FL-SD`, five values
+of `PODUR` and the values of `XFRT`, so you can move them here freely.
+
+```{ojs}
+pi0 = pnInfo[0]
+lfV = [...new Set(pnGrid.map(d => d.LFMAX))].sort(d3.ascending)
+shV = [...new Set(pnGrid.map(d => d.shift))].sort(d3.ascending)
+poV = [...new Set(pnGrid.map(d => d.PODUR))].sort(d3.ascending)
+xfV = [...new Set(pnGrid.map(d => d.XFRT))].sort(d3.ascending)
+viewof pLf = Inputs.range([0, lfV.length - 1], {step: 1, value: lfV.indexOf(pi0.LFMAX), label: "LFMAX", format: i => lfV[i]})
+viewof pSh = Inputs.range([0, shV.length - 1], {step: 1, value: shV.indexOf(0), label: "FL-SH, FL-SD shift, days", format: i => shV[i]})
+viewof pPo = Inputs.range([0, poV.length - 1], {step: 1, value: poV.indexOf(pi0.PODUR), label: "PODUR", format: i => poV[i]})
+viewof pXf = Inputs.range([0, xfV.length - 1], {step: 1, value: xfV.indexOf(pi0.XFRT), label: "XFRT", format: i => xfV[i]})
+viewof pVar = Inputs.radio(new Map([["Tops weight", "CWAD"], ["Seed weight", "GWAD"], ["Seed number", "G#AD"], ["Pod harvest index", "HIPD"]]), {value: "GWAD", label: "Variable"})
+```
+
+```{ojs}
+pSet = pnGrid.find(d => d.LFMAX === lfV[pLf] && d.shift === shV[pSh] && d.PODUR === poV[pPo] && d.XFRT === xfV[pXf]).set
+withDownload(Plot.plot({
+  width: W, height: 330, marginLeft: 60,
+  x: {label: "Days after planting", grid: true},
+  y: {label: pVar, grid: true},
+  color: {legend: true, domain: ["Florunner as it is", "your coefficients", "observed"], range: ["#999999", "#3f7a34", "#f2a33a"]},
+  marks: [
+    Plot.lineY(pnDaily.filter(d => d.set === pi0.base_set), {x: "DAP", y: pVar, stroke: () => "Florunner as it is", strokeDasharray: "4,3"}),
+    Plot.lineY(pnDaily.filter(d => d.set === pSet), {x: "DAP", y: pVar, stroke: () => "your coefficients", strokeWidth: 2.5, tip: true}),
+    Plot.dot(pnObs.filter(d => d[pVar] != null), {x: "DAP", y: pVar, fill: () => "observed", r: 4, tip: true})
+  ]
+}), `module3-peanut-${pVar.replace(/[^A-Z]/gi, "")}`)
+```
+
+```{ojs}
+pTab = ["CWAD", "GWAD", "G#AD", "HIPD"].map(v => {
+  const a = pnStats.find(d => d.set === pi0.base_set && d.variable === v), b = pnStats.find(d => d.set === pSet && d.variable === v);
+  return {variable: ({CWAD: "Tops weight", GWAD: "Seed weight", "G#AD": "Seed number", HIPD: "Pod harvest index"})[v],
+          rmse0: a.rmse, rmse: b.rmse, a: b.a, b: b.b, d0: a.d, d: b.d};
+})
+Inputs.table(pTab, {header: {variable: "Variable", rmse0: "RMSE, Florunner", rmse: "RMSE, yours", a: "a, yours", b: "b, yours", d0: "d, Florunner", d: "d, yours"},
+  format: {rmse0: d => d < 1 ? d.toFixed(3) : fmt.int(d), rmse: d => d < 1 ? d.toFixed(3) : fmt.int(d), a: d => Math.abs(d) < 1 ? d.toFixed(3) : fmt.int(d),
+           b: d => d.toFixed(2), d0: d => d.toFixed(3), d: d => d.toFixed(3)}, layout: "auto"})
+```
+
+```{ojs}
+pBest = pnGrid.find(d => d.set === pi0.best_set)
+meanD = (set) => d3.mean(pnStats.filter(d => d.set === set), d => d.d)
+```
+
+Of all ${pnGrid.length} combinations, the one with the highest mean `d` over the four variables has `LFMAX` ${pBest.LFMAX}, a shift of ${pBest.shift} days, `PODUR` ${pBest.PODUR} and `XFRT` ${pBest.XFRT} (mean d ${meanD(pi0.best_set).toFixed(3)}, against ${meanD(pi0.base_set).toFixed(3)} for Florunner as it is). The course's self test asks for a second pass
+through the coefficients starting from the improved cultivar; the sliders let you do that pass here.
+
+## 2. Soil data
+
+A DSSAT soil profile lists layers with their lower limit of plant-extractable water (`SLLL`, close to the
+wilting point), drained upper limit (`SDUL`, close to field capacity), saturation (`SSAT`), a root growth
+factor (`SRGF`), texture and organic carbon. The water a soil can store for a crop is the sum over the
+layers,
+
+\[
+PAW = \sum_{l} \left(DUL_l - LL_l\right)\,\Delta z_l ,
+\]
+
+with \(\Delta z_l\) the thickness of layer \(l\) (in mm for PAW in mm).
+
+```{ojs}
+viewof soilId = Inputs.select(soilPaw.map(d => d.id), {value: "IBMZ910014", label: "Profile", format: id => soilPaw.find(d => d.id === id).name})
+```
+
+```{ojs}
+{
+  const lay = soilLayers.filter(d => d.id === soilId);
+  const long = lay.flatMap(d => [["LL", "lower limit (SLLL)"], ["DUL", "drained upper limit (SDUL)"], ["SAT", "saturation (SSAT)"]]
+    .flatMap(([k, n]) => [{depth: d.top, v: d[k], what: n}, {depth: d.bottom, v: d[k], what: n}]));
+  return withDownload(Plot.plot({
+    width: Math.min(W, 520), height: 380, marginLeft: 55,
+    x: {label: "Volumetric water content, cm³/cm³", domain: [0, 0.6], grid: true},
+    y: {label: "Depth, cm", reverse: true, grid: true},
+    color: {legend: true, domain: ["lower limit (SLLL)", "drained upper limit (SDUL)", "saturation (SSAT)"], range: ["#d9822b", "#2a7f62", "#4a6fa5"]},
+    marks: [
+      Plot.areaX(lay.flatMap(d => [{depth: d.top, a: d.LL, b: d.DUL}, {depth: d.bottom, a: d.LL, b: d.DUL}]), {y: "depth", x1: "a", x2: "b", fill: "#2a7f62", fillOpacity: 0.15}),
+      Plot.line(long, {x: "v", y: "depth", stroke: "what", strokeWidth: 2, tip: true})
+    ]
+  }), `module3-soil-${soilId}`);
+}
+```
+
+The shaded band is the plant-available water. Across the thirteen profiles:
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 380, marginLeft: 200,
+  x: {label: "Plant-available water in the profile, mm", grid: true},
+  y: {label: null},
+  color: {legend: true, domain: [...new Set(soilPaw.map(d => String(d.texture)))], scheme: "tableau10",
+          tickFormat: t => ({SIC: "silty clay", SIL: "silty loam", SL: "sandy loam", S: "sand", SCL: "sandy clay loam", LS: "loamy sand", "-99": "measured, texture not coded"})[t] ?? t},
+  marks: [Plot.barX(soilPaw, {y: "name", x: "paw_mm", fill: d => String(d.texture), sort: {y: "x"}, tip: true, channels: {"depth, cm": "depth_cm"}})]
+}), "module3-soil-paw")
+```
+
+### Estimating water limits from texture
+
+When only texture and organic matter are known, a pedotransfer function estimates the limits. xdssat uses
+the equations of Saxton and Rawls [-@saxton2006] (`src/soils.py`), ported below; for the lower limit, with
+sand \(S\), clay \(C\) as fractions and organic matter \(OM\) in %:
+
+\[
+\begin{aligned}
+\theta_{1500t} &= -0.024S + 0.487C + 0.006\,OM \\
+&\quad + 0.005\,S\,OM - 0.013\,C\,OM + 0.068\,S\,C + 0.031 \\
+LL &= \theta_{1500t} + (0.14\,\theta_{1500t} - 0.02)
+\end{aligned}
+\]
+
+and similar equations for the drained upper limit and saturation; DSSAT's SBuild tool has its
+own. Move the sliders:
+
+```{ojs}
+viewof srSand = Inputs.range([0, 95], {step: 1, value: 60, label: "Sand, %"})
+viewof srClay = Inputs.range([0, 60], {step: 1, value: 15, label: "Clay, %"})
+viewof srOM = Inputs.range([0, 8], {step: 0.1, value: 1.5, label: "Organic matter, %"})
+```
+
+```{ojs}
+function saxtonRawls(sand, clay, om) {
+  const S = sand, C = clay, OM = om;
+  const t1500 = -0.024 * S + 0.487 * C + 0.006 * OM + 0.005 * S * OM - 0.013 * C * OM + 0.068 * S * C + 0.031;
+  const ll = t1500 + (0.14 * t1500 - 0.02);
+  const t33 = -0.251 * S + 0.195 * C + 0.011 * OM + 0.006 * S * OM - 0.027 * C * OM + 0.452 * S * C + 0.299;
+  const dul = t33 + (1.283 * t33 ** 2 - 0.374 * t33 - 0.015);
+  const ts33 = 0.278 * S + 0.034 * C + 0.022 * OM - 0.018 * S * OM - 0.027 * C * OM - 0.584 * S * C + 0.078;
+  const s33 = ts33 + (0.636 * ts33 - 0.107);
+  return {ll, dul, sat: dul + s33 - 0.097 * S + 0.043};
+}
+srOut = srSand + srClay > 100 ? null : saxtonRawls(srSand / 100, srClay / 100, srOM)
+```
+
+${srText}
+
+```{ojs}
+srText = srOut ? `LL ${srOut.ll.toFixed(3)}, DUL ${srOut.dul.toFixed(3)}, SAT ${srOut.sat.toFixed(3)} cm³/cm³: ${fmt.int((srOut.dul - srOut.ll) * 1000)} mm of available water per metre of such soil.` : "Sand and clay add up to more than 100%."
+```
+
+Applied to the layers of the soil file, the estimates miss the file's values by a root mean square of ${srRmse.LL} (LL), ${srRmse.DUL} (DUL) and ${srRmse.SAT} (SAT) cm³/cm³. The file's generic profiles were not made with this
+function, so the comparison shows how much two reasonable estimates can differ, not which one is right.
+
+```{ojs}
+srRmse = Object.fromEntries(["LL", "DUL", "SAT"].map(k => [k, Math.sqrt(d3.mean(soilSR, d => (d[k] - d[k + "_sr"]) ** 2)).toFixed(3)]))
+withDownload(Plot.plot({
+  width: Math.min(W, 520), height: 380, marginLeft: 55,
+  x: {label: "In the soil file, cm³/cm³", domain: [0, 0.6], grid: true},
+  y: {label: "Saxton and Rawls, cm³/cm³", domain: [0, 0.6], grid: true},
+  color: {legend: true, domain: ["LL", "DUL", "SAT"], range: ["#d9822b", "#2a7f62", "#4a6fa5"]},
+  marks: [
+    Plot.line([[0, 0], [0.6, 0.6]], {stroke: "#bbb", strokeDasharray: "4,3"}),
+    ...["LL", "DUL", "SAT"].map(k => Plot.dot(soilSR, {x: k, y: k + "_sr", stroke: () => k, r: 3, tip: true, channels: {profile: "name", "bottom, cm": "bottom"}}))
+  ]
+}), "module3-saxton-rawls")
+```
+
+
+### The course's soil exercise: Umariya and Orangeburg
+
+The soil exercise gives the laboratory sheets of two soil series and asks for a DSSAT profile of each, with the
+water limits filled in from texture (SBuild's "calculate missing values"): the Umariya series of Shahdol district,
+India, and pedon 2 of the Orangeburg series, Peach County, Georgia [@perkins1987, pp. 364-365, as handed out with the course]. The notebook builds both with `sol.SoilProfile` and Saxton and Rawls; both now appear
+in the profile selector and the bar chart above, and in the water-limited runs below.
+
+A sheet can be wrong. In the Umariya sheet the 11-31 cm layer has 55.2% sand, 18.4% silt and 36.4% clay, which
+adds up to 110%:
+
+```{ojs}
+Inputs.table(sheetUm.map(d => ({...d, total: d.sand + d.silt + d.clay})), {columns: ["horizon", "top", "bottom", "sand", "silt", "clay", "total", "oc"],
+  header: {horizon: "Horizon", top: "From, cm", bottom: "To, cm", sand: "Sand, %", silt: "Silt, %", clay: "Clay, %", total: "Sum, %", oc: "Organic C, %"}, layout: "auto"})
+```
+
+```{ojs}
+ua = soilUmAlt[0]
+```
+
+Saxton and Rawls use sand and clay only, so the notebook keeps both as printed. Had the sand been 45.2% (the value
+that makes the sum 100%), the drained upper limit of that layer would be ${ua.DUL_sand45.toFixed(3)} instead of ${ua.DUL_printed.toFixed(3)} cm³/cm³: a small difference here, but the kind of error to check for before trusting a profile.
+
+**Self test 3** compares Orangeburg's estimated limits with the water contents the sheet measured at 1/3 bar
+(33 kPa) and 15 bar (1500 kPa). The sheet gives them in % by weight; times bulk density they are volumetric. Its
+own "available water" column is the check that the conversion is right:
+
+```{ojs}
+Inputs.table(soilOg, {columns: ["horizon", "top", "bottom", "clay", "DUL_measured", "DUL_sr", "LL_measured", "LL_sr", "available_check", "available_water_fc"],
+  header: {horizon: "Horizon", top: "From", bottom: "To", clay: "Clay, %", DUL_measured: "DUL, measured", DUL_sr: "DUL, Saxton-Rawls", LL_measured: "LL, measured", LL_sr: "LL, Saxton-Rawls",
+           available_check: "DUL - LL, measured", available_water_fc: "Available water on the sheet"},
+  format: Object.fromEntries(["DUL_measured", "DUL_sr", "LL_measured", "LL_sr", "available_check"].map(k => [k, d => d.toFixed(3)])), layout: "auto"})
+```
+
+```{ojs}
+ogBias = d3.mean(soilOg, d => d.DUL_sr - d.DUL_measured)
+ogBiasLL = d3.mean(soilOg, d => d.LL_sr - d.LL_measured)
+```
+
+The pedotransfer function puts the drained upper limit ${ogBias > 0 ? "above" : "below"} the measured 1/3 bar water by ${Math.abs(ogBias).toFixed(3)} cm³/cm³ on average, and the lower limit ${ogBiasLL > 0 ? "above" : "below"} the 15 bar water by ${Math.abs(ogBiasLL).toFixed(3)}. Where a soil was measured, measured limits beat estimated ones; the soil file
+already holds an Orangeburg sandy loam (`IBSB910017`), shown in the selector above for comparison (self test 2).
+
+## 3. Water-limited production
+
+The course's water-limited exercise builds `UFGA8212.MZX` from the potential production experiment of module 1:
+McCurdy 84aa maize planted on 26 February 1982 (7.2 plants/m², 61 cm rows, 7 cm deep), the Millhopper fine
+sand, simulation from 25 February with the initial soil water the exercise lists, the water balance on and
+nitrogen off. Treatment 1 is **rainfed** (no irrigation at all); treatment 2 irrigates **automatically** when the
+available water in the top 30 cm falls below 50%. Rain and irrigation enter the soil; water runs off, drains below
+the profile, evaporates from the soil surface and is taken up by roots from each layer
+([`WATBAL.for`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Soil/SoilWater/WATBAL.for)).
+Self test 1 adds potential production for comparison.
+
+
+**Creating the FileX: the water balance on.** Two parts of the experiment file change from module 1. The
+treatment table gives the rainfed treatment irrigation level 0 (`MI`), and the simulation controls switch the
+water balance on (`WATER` = `Y`) and, for the irrigated treatment, irrigation to automatic (`IRRIG` = `A`, with
+the depth `IMDEP` and threshold `ITHRL` in the automatic management rows). The rainfed file:
+
+```{ojs}
+wlFiles = FileAttachment("data/module3/wl_files.csv").csv()
+pre3 = (t) => html`<pre class="filex">${t}</pre>`
+viewof wlSec = Inputs.radio(wlFiles.map(d => d.section), {value: wlFiles[0].section, label: "Section"})
+```
+
+```{ojs}
+pre3(wlFiles.find(d => d.section === wlSec).text)
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(W, 640), height: 200, marginLeft: 150,
+  x: {label: "Grain yield, kg/ha", grid: true},
+  y: {label: null, domain: ["potential", "automatic irrigation", "rainfed"]},
+  marks: [Plot.barX(wlLevels, {y: "level", x: "HWAM", fill: d => d.level === "rainfed" ? "#f2a33a" : "#3f7a34", tip: true})]
+}), "module3-production-levels")
+```
+
+```{ojs}
+Inputs.table(wlLevels.filter(d => d.level !== "potential"), {columns: ["level", "HWAM", "PRCM", "IRCM", "IR#M", "ETCM", "EPCM", "ESCM", "ROCM", "DRCM"],
+  header: {level: "Treatment", HWAM: "Yield, kg/ha", PRCM: "Rain, mm", IRCM: "Irrigation, mm", "IR#M": "Irrigations", ETCM: "Evapo-transpiration", EPCM: "Transpiration", ESCM: "Soil evaporation", ROCM: "Runoff", DRCM: "Drainage"}, layout: "auto"})
+```
+
+```{ojs}
+wlR = wlLevels.find(d => d.level === "rainfed")
+wlI = wlLevels.find(d => d.level === "automatic irrigation")
+wlP = wlLevels.find(d => d.level === "potential")
+```
+
+Rainfed, the crop reaches ${fmt.pct(wlR.HWAM / wlP.HWAM)} of the potential yield; with ${fmt.int(wlI.IRCM)} mm of automatic irrigation in ${wlI["IR#M"]} applications it reaches ${fmt.pct(wlI.HWAM / wlP.HWAM)}. Of ${fmt.int(wlR.PRCM)} mm of rain over the simulation, ${fmt.int(wlR.DRCM)} mm drained below the profile of this sandy soil and only ${fmt.int(wlR.EPCM)} mm passed through the rainfed crop as transpiration.
+
+### Runoff and water stress, as the engine computes them
+
+The soil water of the profile changes each day by what comes in and what goes out:
+
+\[
+\Delta SW = P + I - R - D - E_s - E_p
+\]
+
+(rain, irrigation, runoff, drainage, soil evaporation, transpiration). Two of the terms in a few lines each.
+**Runoff** uses the curve number method of the US Soil Conservation Service: with the soil's curve number \(CN\)
+and the day's water \(P\) (mm),
+
+\[
+\begin{gathered}
+S = 254\left(\frac{100}{CN} - 1\right) \\[4pt]
+R = \begin{cases} \dfrac{(P - I_a S)^2}{P + (1 - I_a)\,S} & P > I_a S \\ 0 & \text{otherwise} \end{cases}
+\end{gathered}
+\]
+
+with \(I_a\) the initial abstraction
+([`RNOFF.for:78-105`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Soil/SoilWater/RNOFF.for#L78)). The engine sets `Ia` from how wet the top two layers are
+(lines 84-86): about 0.3 when they are dry, near 0 when they are saturated.
+
+```{ojs}
+viewof cn = Inputs.range([50, 95], {step: 1, value: 60, label: "Curve number CN"})
+viewof ia = Inputs.range([0, 0.3], {step: 0.01, value: 0.15, label: "Initial abstraction Ia"})
+```
+
+```{ojs}
+runoff = (p, cn, ia) => { const S = 254 * (100 / cn - 1); const pb = p - ia * S; return pb > 0 ? pb ** 2 / (p + (1 - ia) * S) : 0; }
+withDownload(Plot.plot({
+  width: Math.min(W, 600), height: 280, marginLeft: 55,
+  x: {label: "Rain on the day, mm", grid: true},
+  y: {label: "Runoff, mm", grid: true},
+  marks: [Plot.ruleY([0]), Plot.lineY(d3.range(0, 151, 1).map(p => ({p, r: runoff(p, cn, ia)})), {x: "p", y: "r", stroke: "#4a6fa5", strokeWidth: 2.5, tip: true})]
+}), `module3-runoff-cn${cn}`)
+```
+
+With CN ${cn}, a 60 mm storm runs off ${fmt.d1(runoff(60, cn, ia))} mm. A soil profile carries its curve number as `SLRO`: 60 for the Millhopper fine sand, which is where the slider starts.
+
+**Water stress.** Each day the engine compares what the roots can take up (`TRWUP`) with what the crop could
+transpire (`EP1`). CERES-Maize turns the ratio into two factors
+([`MZ_GROSUB.for:1065-1076`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Plant/CERES-Maize/MZ_GROSUB.for#L1065)):
+
+\[
+\begin{aligned}
+SWFAC &= \min\!\left(1, \frac{TRWUP}{EP_1}\right) && \text{(photosynthesis)} \\[4pt]
+TURFAC &= \min\!\left(1, \frac{TRWUP}{RWUEP1 \cdot EP_1}\right) && \text{(leaf expansion)}
+\end{aligned}
+\]
+
+with `RWUEP1` = 1.5 in the maize species file. Expansion is hit first, while the supply
+still covers the demand:
+
+```{ojs}
+viewof supply = Inputs.range([0, 2.5], {step: 0.05, value: 1.2, label: "Root supply / transpiration demand"})
+```
+
+```{ojs}
+sw = (r) => Math.min(1, r)
+tu = (r) => Math.min(1, r / 1.5)
+withDownload(Plot.plot({
+  width: Math.min(W, 600), height: 260, marginLeft: 55,
+  x: {label: "Root supply / transpiration demand", grid: true},
+  y: {label: "Factor (1 = no stress)", domain: [0, 1.05], grid: true},
+  color: {legend: true, domain: ["SWFAC (photosynthesis)", "TURFAC (expansion)"], range: ["#f2a33a", "#3f7a34"]},
+  marks: [
+    Plot.lineY(d3.range(0, 2.51, 0.01).map(r => ({r, v: sw(r), k: "SWFAC (photosynthesis)"})), {x: "r", y: "v", stroke: "k", strokeWidth: 2}),
+    Plot.lineY(d3.range(0, 2.51, 0.01).map(r => ({r, v: tu(r), k: "TURFAC (expansion)"})), {x: "r", y: "v", stroke: "k", strokeWidth: 2}),
+    Plot.ruleX([supply], {stroke: "#999", strokeDasharray: "4,3"})
+  ]
+}), "module3-water-stress-factors")
+```
+
+At a ratio of ${supply}: SWFAC ${sw(supply).toFixed(2)}, TURFAC ${tu(supply).toFixed(2)}.
+
+### Soil water, layer by layer
+
+The fill is the plant-available water of each layer: 0 at the lower limit, 1 at the drained upper limit (above 1
+the layer holds more than it can keep against drainage). Depths are those the engine simulates, which differ from
+the layers of the soil file: the engine keeps 5 and 15 cm at the top and splits thick layers
+([`LYRSET2`, `LMATCH.for:263`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Soil/SoilUtilities/LMATCH.for#L263),
+ported as `learnlib.engine_layers`).
+
+```{ojs}
+viewof swLev = Inputs.radio(["rainfed", "automatic irrigation"], {value: "rainfed", label: "Treatment"})
+```
+
+```{ojs}
+{
+  const lay = new Map(wlLayers.map(d => [d.layer, d]));
+  const rows = wlSW.filter(d => d.level === swLev && lay.has(d.layer)).map(d => {
+    const L = lay.get(d.layer); return {...d, top: L.top, bottom: L.bottom, rel: (d.SW - L.LL) / (L.DUL - L.LL)};
+  });
+  return withDownload(Plot.plot({
+    width: W, height: 330, marginLeft: 55,
+    x: {label: "Days after the start of the simulation"},
+    y: {label: "Depth, cm", reverse: true},
+    color: {type: "linear", domain: [0, 1.2], range: ["#b5651d", "#f3e9c6", "#3f7a34"], interpolate: "rgb", legend: true, label: "Relative available water"},
+    marks: [Plot.rect(rows, {x1: "DAS", x2: d => d.DAS + 1, y1: "top", y2: "bottom", fill: "rel", tip: true, channels: {"SW, cm³/cm³": "SW"}})]
+  }), `module3-soil-water-${swLev.replace(" ", "-")}`);
+}
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 280, marginLeft: 55,
+  x: {label: "Days after planting", grid: true},
+  y: {label: "Water stress index (0 = none)", domain: [0, 1], grid: true},
+  color: {legend: true, domain: ["rainfed", "automatic irrigation"], range: ["#f2a33a", "#3f7a34"]},
+  marks: [Plot.lineY(wlBal.filter(d => d.DAP >= 0), {x: "DAP", y: "WSGD", stroke: "level", tip: true})]
+}), "module3-water-stress")
+```
+
+::: {.source-note}
+Water stress index: `WSGD` of PlantGro, the expansion and partitioning stress written as 1 minus the factor
+([`MZ_OPGROW.for:175`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Plant/CERES-Maize/MZ_OPGROW.for#L175)).
+:::
+
+### Self test 2: which soil holds the most water for the crop?
+
+The rainfed treatment on the twelve generic profiles, the Millhopper fine sand, and the two profiles built from
+the course's soil sheets, each starting at 100% of its plant-available water:
+
+```{ojs}
+srcColor = new Map([["SOIL.SOL", "#3f7a34"], ["course exercise", "#f2a33a"]])
+withDownload(Plot.plot({
+  width: Math.min(W, 660), height: 380, marginLeft: 60,
+  x: {label: "Plant-available water of the profile, mm", grid: true},
+  y: {label: "Rainfed grain yield, kg/ha", grid: true},
+  color: {legend: true, domain: ["SOIL.SOL", "course exercise"], range: ["#3f7a34", "#f2a33a"]},
+  symbol: {legend: true, domain: [60, 150, 180, 210], tickFormat: d => `${d} cm deep`},
+  marks: [Plot.dot(wlSoils, {x: "paw_mm", y: "HWAM", stroke: "source", symbol: d => d.depth_cm, r: 6, strokeWidth: 2, tip: true,
+    channels: {soil: "name", "drainage, mm": "DRCM", "runoff, mm": "ROCM"}})]
+}), "module3-yield-vs-paw")
+```
+
+```{ojs}
+rPaw = (() => { const x = wlSoils.map(d => d.paw_mm), y = wlSoils.map(d => d.HWAM); const mx = d3.mean(x), my = d3.mean(y);
+  return d3.sum(x, (v, i) => (v - mx) * (y[i] - my)) / Math.sqrt(d3.sum(x, v => (v - mx) ** 2) * d3.sum(y, v => (v - my) ** 2)); })()
+mill = wlSoils.find(d => d.id === "IBMZ910014")
+lessStore = wlSoils.filter(d => d.paw_mm < mill.paw_mm && d.HWAM > mill.HWAM).length
+bestSoil = wlSoils.reduce((a, b) => b.HWAM > a.HWAM ? b : a)
+```
+
+Yield rises with the soil's storage (r = ${rPaw.toFixed(2)} over the ${wlSoils.length} soils). Closest to potential production comes the ${bestSoil.name.toLowerCase()}, with ${fmt.int(bestSoil.HWAM)} kg/ha. Storage is not the only property that counts: the Millhopper fine sand stores ${fmt.int(mill.paw_mm)} mm and yields ${fmt.int(mill.HWAM)} kg/ha, less than ${lessStore} soils that store less water, and it loses ${fmt.int(mill.DRCM)} mm to drainage against a median of ${fmt.int(d3.median(wlSoils, d => d.DRCM))} mm.
+
+### Self test 3: when to irrigate
+
+With `IRRIG` = `A` the engine irrigates when the available water in the top `IMDEP` cm falls to `ITHRL` percent of
+its capacity, and refills it to `ITHRU`
+([`IRRIG.for:827`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Management/IRRIG.for#L827)).
+The exercise's grid of management depths and thresholds:
+
+```{ojs}
+viewof aVar = Inputs.radio(new Map([["Grain yield, kg/ha", "HWAM"], ["Irrigation, mm", "IRCM"], ["Number of irrigations", "irrigations"], ["Extra grain per mm of irrigation", "kg_grain_per_mm_irrigation"]]), {value: "HWAM", label: "Show"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(W, 560), height: 300, marginLeft: 70, marginBottom: 40,
+  x: {label: "Threshold ITHRL, % of available water", type: "band"},
+  y: {label: "Management depth IMDEP, cm", type: "band"},
+  color: {scheme: "YlGn", legend: true, label: aVar},
+  marks: [
+    Plot.cell(wlAuto, {x: "threshold", y: "depth_cm", fill: aVar, inset: 1, tip: true, channels: {"yield, kg/ha": "HWAM", "irrigation, mm": "IRCM", irrigations: "irrigations"}}),
+    Plot.text(wlAuto, {x: "threshold", y: "depth_cm", text: d => d[aVar] == null ? "" : d[aVar] < 100 ? d[aVar].toFixed(aVar === "irrigations" ? 0 : 1) : fmt.int(d[aVar]), fill: "#222", fontSize: 10})
+  ]
+}), `module3-auto-irrigation-${aVar}`)
+```
+
+```{ojs}
+fullY = d3.max(wlAuto, d => d.HWAM)
+cheapest = wlAuto.filter(d => d.HWAM >= fullY - 0.5).reduce((a, b) => b.IRCM < a.IRCM ? b : a)
+aEff = wlAuto.reduce((a, b) => (b.kg_grain_per_mm_irrigation ?? -1) > (a.kg_grain_per_mm_irrigation ?? -1) ? b : a)
+```
+
+The full yield of ${fmt.int(fullY)} kg/ha needs least water at ${cheapest.depth_cm} cm and ${cheapest.threshold}%: ${fmt.int(cheapest.IRCM)} mm in ${cheapest.irrigations} applications. The most grain per mm of irrigation comes at ${aEff.depth_cm} cm and ${aEff.threshold}%, a lower yield (${fmt.int(aEff.HWAM)} kg/ha): the best setting depends on whether water or land is the scarcer resource.
+
+### Self test 4: other years at Gainesville
+
+The rainfed and automatically irrigated maize planted on 26 February of every year with a full Gainesville
+weather file in dssat-csm-data:
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 320, marginLeft: 60,
+  x: {label: "Year", tickFormat: "d", grid: true},
+  y: {label: "Grain yield, kg/ha", grid: true},
+  color: {legend: true, domain: ["rainfed", "automatic irrigation"], range: ["#f2a33a", "#3f7a34"]},
+  marks: [
+    Plot.ruleX(wlYears.filter(d => d.level === "rainfed"), {x: "year", y1: d => d.HWAM, y2: d => wlYears.find(e => e.year === d.year && e.level !== "rainfed").HWAM, stroke: "#ddd"}),
+    Plot.dot(wlYears, {x: "year", y: "HWAM", fill: "level", r: 5, tip: true, channels: {"rain, mm": "PRCM", "irrigation, mm": "IRCM"}})
+  ]
+}), "module3-gainesville-years")
+```
+
+```{ojs}
+yrR = wlYears.filter(d => d.level === "rainfed")
+yrI = wlYears.filter(d => d.level !== "rainfed")
+```
+
+Over ${yrR.length} years the rainfed yield ranges from ${fmt.int(d3.min(yrR, d => d.HWAM))} to ${fmt.int(d3.max(yrR, d => d.HWAM))} kg/ha, the irrigated one only from ${fmt.int(d3.min(yrI, d => d.HWAM))} to ${fmt.int(d3.max(yrI, d => d.HWAM))}: irrigation removes most of the year-to-year variation, and what remains comes from the rest of the weather.
+
+### Paddy rice: the flood water balance
+
+In bunded, puddled rice fields the water balance has one more store: the flood above the soil. Bunds hold rain and irrigation as standing water up to their height. The flood loses water by evaporation,
+by infiltration into the puddled soil at a percolation rate, and by spilling over the bund when it rises above
+it. The engine keeps this balance every day when the irrigation section of the experiment file sets the paddy
+operations, and writes it to `FloodW.OUT`
+([`Management/OpFlood.for`](https://github.com/DSSAT/dssat-csm-os/blob/25c93b9a2f73f8ec45bf441b198dac5fb7b22849/Management/OpFlood.for)). The operations are codes of the engine's
+`DETAIL.CDE`: `IR010` puddling, `IR008` percolation rate (mm/day), `IR009` bund height (mm), `IR011` constant
+flood depth (mm) and `IR006` flood depth (mm).
+
+The runs use xdssat's own rice template, `templates/XDRI8601.RIX`: IRRI's IR 58 experiment at Munoz,
+Philippines (IRMZ8601), with an added rainfed bunded water level. Its three water regimes, in the irrigation
+section below, are run in the dry season as in the experiment (transplanted early February 1986) and in the wet
+season (1 July 1986), with nitrogen off so that only water differs.
+
+```{ojs}
+flSum = FileAttachment("data/module3/flood_summary.csv").csv({typed: true})
+flDaily = FileAttachment("data/module3/flood_daily.csv").csv({typed: true})
+flFiles = FileAttachment("data/module3/flood_files.csv").csv()
+html`<pre class="filex">${flFiles[0].text}</pre>`
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: W, height: 380, marginLeft: 55, marginRight: 90,
+  x: {label: "Days after the start of the simulation", grid: true},
+  y: {label: "Flood depth, mm", grid: true},
+  fy: {label: null},
+  color: {legend: true, domain: ["flooded, 50 mm kept", "flooded, drained twice", "rainfed, bunded"], range: ["#2a6f97", "#7fb3d5", "#f2a33a"]},
+  marks: [
+    Plot.lineY(flDaily, {x: "DAS", y: "ABUND", fy: "season", stroke: "#bbb", strokeDasharray: "3,3", z: "regime"}),
+    Plot.lineY(flDaily, {x: "DAS", y: "FLOD", fy: "season", stroke: "regime", tip: true, channels: {"rain, mm": "PRED", "irrigation, mm": "IRRD", "over the bund, mm": "FROD"}})
+  ]
+}), "module3-paddy-flood-depth")
+```
+
+Lines: flood depth; dashed grey: bund height.
+
+```{ojs}
+Inputs.table(flSum, {columns: ["season", "regime", "HWAM", "days_to_maturity", "PRCM", "IRCM", "flood_days", "flood_evap", "infiltration", "over_bund", "WSPD"],
+  header: {season: "Season", regime: "Water regime", HWAM: "Grain, kg/ha", days_to_maturity: "Days to maturity", PRCM: "Rain, mm", IRCM: "Irrigation, mm",
+           flood_days: "Days with flood", flood_evap: "Evaporation from flood, mm", infiltration: "Infiltration, mm", over_bund: "Over the bund, mm", WSPD: "Mean water stress (photosynthesis)"},
+  format: {WSPD: d => d.toFixed(2), flood_evap: d => d.toFixed(0), infiltration: d => d.toFixed(0), over_bund: d => d.toFixed(0)}, layout: "auto"})
+```
+
+```{ojs}
+flPick = (season, regime) => flSum.find(d => d.season === season && d.regime === regime)
+flWet = flSum.filter(d => d.season === "wet season")
+flDryF = flPick("dry season", "flooded, 50 mm kept")
+flDryR = flPick("dry season", "rainfed, bunded")
+flWetR = flPick("wet season", "rainfed, bunded")
+flWetSpread = d3.max(flWet, d => d.HWAM) - d3.min(flWet, d => d.HWAM)
+flWetYield = flWetSpread === 0 ? "the same grain yield, " + fmt.int(flWet[0].HWAM) + " kg/ha" : "grain yields within " + fmt.int(flWetSpread) + " kg/ha of each other"
+flDryLoss = flDryF.HWAM - flDryR.HWAM
+```
+
+In the wet season the bunds alone keep the field flooded: the rainfed field has standing water on ${flWetR.flood_days} days without any irrigation, ${fmt.int(flWetR.over_bund)} mm of rain spills over its bund, and the three regimes give ${flWetYield}. In the dry season the rainfed field has a flood on ${flDryR.flood_days} day and its crop is water-stressed (mean stress factor ${flDryR.WSPD.toFixed(2)}, against ${flDryF.WSPD.toFixed(2)} when flooded). In these runs the stressed crop takes ${flDryR.days_to_maturity} days from planting to maturity against ${flDryF.days_to_maturity}; over that longer season it receives ${fmt.int(flDryR.PRCM)} mm of rain against ${fmt.int(flDryF.PRCM)} mm, because the 1986 rains at Munoz start in May, and its simulated yield is ${fmt.int(flDryLoss)} kg/ha below the flooded crop's. Kept flooded, the dry-season crop receives ${fmt.int(flDryF.IRCM)} mm of irrigation, and ${fmt.int(flDryF.infiltration)} mm of water infiltrates from the flood into the puddled soil. These runs change only the water regime: to see how much the bund height (`IR009`) and the percolation rate (`IR008`) matter, change them in the notebook and rerun.
+
+## From one field to a grid: xdssat
+
+Section 2 built two soil profiles by hand. For a region, xdssat builds one per cell: texture and organic carbon
+from SoilGrids [@poggio2021] at six depths, water limits from `soils.saxton_rawls`, the same function used above,
+and the root growth factor from `soils.root_growth_factor`. The plant-available water of the profiles of the
+[rice case study](../java/index.qmd):
+
+```{ojs}
+import {cellFeatures, adminMarks} from "../assets/js/dl.js"
+gCells = FileAttachment("../java/data/grid_cells.csv").csv({typed: true})
+gOutline = FileAttachment("../java/data/java_outline.geojson").json()
+gProv = FileAttachment("../java/data/provinces.geojson").json()
+gDist = FileAttachment("../java/data/districts.geojson").json()
+gSummary = FileAttachment("../java/data/summary.json").json()
+gMapW = Math.min(width, 960)
+```
+
+```{ojs}
+viewof g3Var = Inputs.radio(new Map([["Plant-available water of the profile, mm", "paw_mm"], ["Clay in the top layer, %", "slcl_top"], ["Organic carbon in the top layer, %", "sloc_top"]]), {value: "paw_mm", label: "Map"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  width: gMapW, height: Math.round(gMapW * 0.42),
+  projection: {type: "mercator", domain: gOutline},
+  color: {type: "linear", scheme: g3Var === "paw_mm" ? "YlGnBu" : g3Var === "slcl_top" ? "Oranges" : "Greens", legend: true, label: g3Var},
+  marks: [
+    Plot.geo(gProv, {fill: "#f1f1f1", clip: true}),
+    Plot.geo(cellFeatures(gCells.filter(d => d[g3Var] != null)).features, Plot.centroid({fill: d => d.properties[g3Var], tip: true,
+      title: d => `${d.properties.lat.toFixed(1)}, ${d.properties.lon.toFixed(1)}: texture ${d.properties.texture}, PAW ${fmt.int(d.properties.paw_mm)} mm, clay ${fmt.d1(d.properties.slcl_top)}%`})),
+    ...adminMarks(Plot, gProv, gDist)
+  ]
+}), `module3-grid-${g3Var}`)
+```
+
+```{ojs}
+g3 = gCells.filter(d => d.paw_mm != null)
+```
+
+The profiles hold between ${fmt.int(d3.min(g3, d => d.paw_mm))} and ${fmt.int(d3.max(g3, d => d.paw_mm))} mm of plant-available water, a median of ${fmt.int(d3.median(g3, d => d.paw_mm))} mm, against ${fmt.int(wlSoils.find(d => d.id === "IBMZ910014").paw_mm)} mm for the Millhopper fine sand of the maize experiments. Estimated, not measured: what section 2 showed about the pedotransfer function holds for every cell.
+
+## Self-test
+
+1. GLUE improved the dates of Williams-82 more than its weights. Name two things you would change before
+   calibrating again.
+2. Why is a GLUE posterior with a wide spread not a failure?
+3. Two soils store the same plant-available water, one 60 cm deep and one 150 cm deep. Which would you
+   expect to yield more under rainfed conditions, and what in the model decides it?
+4. In the rainfed run, where did most of the rain go?
+5. What does `ITHRL` = 90% cost compared with 50%, and what does it buy?
+6. In the peanut grid, which coefficient moves the seed number curve most, and which the tops weight?
+
+## Where this goes next
+
+Module 4 turns to the observed data files and to nitrogen. The plan for all six modules is on the
+[training overview](index.qmd).
+
+## References {.unnumbered}
+
+::: {#refs}
+:::

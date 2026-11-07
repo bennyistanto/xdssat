@@ -1,0 +1,75 @@
+usage: run_aoi.py [-h] [--aoi {java}] [--mode {uniform,by_zone,per_cell}]
+                  [--years FIRST LAST] [--zone-table ZONE_TABLE]
+                  [--onset-years FIRST LAST] [--sample SAMPLE] [--seed SEED]
+                  [--block BLOCK] [--chunk-size CHUNK_SIZE]
+                  [--workers WORKERS] [--cultivar {IR 58,IR 64}]
+                  [--n {0,35,70,105,140}] [--out OUT] [--tcldf TCLDF]
+                  [--slpf SLPF] [--slpf-rainfed SLPF_RAINFED]
+                  [--slpf-table SLPF_TABLE]
+
+Run rice seasons for every rice stratum of an area of interest.
+
+    python scripts/run_aoi.py --aoi java --mode uniform  --years 1991 2020
+    python scripts/run_aoi.py --aoi java --mode per_cell --years 1991 2020
+    python scripts/run_aoi.py --aoi java --mode by_zone  --years 1991 2020 --zone-table zones.csv
+    python scripts/run_aoi.py --aoi java --mode uniform  --years 2015 2016 --sample 30   # quick test
+    python scripts/run_aoi.py --aoi java --mode per_cell --cultivar "IR 64" --n 105
+
+Needs the AgERA5 cache, the rasters (with the filled irrigation layer) and the
+soil profiles of the AOI (docs/getting-started.md). Strata, modes and calendars
+are described in src/management.py.
+
+Modes:
+    uniform   wet season 15 Nov (all rice), dry season 1 Apr (irrigated only)
+    by_zone   --zone-table CSV with columns zone, season, month_day (MM-DD),
+              zone = agro-ecological zone code (rasters/idn_aez_classes.csv).
+              Without --zone-table: each zone gets the median onset of its
+              cells (as per_cell), written to zone_table.csv
+    per_cell  wet-season onset per cell from AgERA5 rain (BMKG dasarian rule),
+              median over --onset-years; transplant 20 days after onset, dry
+              season 120 days after the wet season
+
+Writes to --out (default <XDSSAT_CACHE>/runs/<aoi>_<mode>_<y0>-<y1>):
+    strata.csv     one row per weather cell and water regime, with rice ha
+    units.csv      one row per simulated season
+    summary.csv    DSSAT seasonal summary joined to the units (HWAH, MDAT ...)
+    failed.csv     seasons the engine rejected, with its error message
+    onset.csv      per_cell only: onset per cell (days after 1 Aug, date)
+    run_info.json  arguments, counts, timings, engine build
+    <out name>.nc  gridded CF netCDF of the seasonal results (src/outputs.py)
+
+options:
+  -h, --help            show this help message and exit
+  --aoi {java}
+  --mode {uniform,by_zone,per_cell}
+  --years FIRST LAST    agricultural years (1 Aug to 31 Jul), inclusive
+  --zone-table ZONE_TABLE
+                        by_zone: CSV zone,season,month_day
+  --onset-years FIRST LAST
+                        per_cell: years for the onset climatology (default
+                        --years)
+  --sample SAMPLE       run only this many cells (sampled by rice area)
+  --seed SEED
+  --block BLOCK         agricultural years per batch
+  --chunk-size CHUNK_SIZE
+  --workers WORKERS
+  --cultivar {IR 58,IR 64}
+  --n {0,35,70,105,140}
+                        kg N/ha as urea, 2/3 at 18 and 1/3 at 41 days after
+                        transplanting
+  --out OUT
+  --tcldf TCLDF         cold sterility threshold (C) of the cultivar: canopy
+                        temperature below it during heading reduces spikelet
+                        fertility (RI_Phenol.for:600-648); default: the CUL
+                        value
+  --slpf SLPF           soil fertility factor (0-1], multiplies daily crop
+                        carbohydrate in CERES-Rice (RI_Grosub.for:648-649);
+                        the yield-gap calibration factor
+  --slpf-rainfed SLPF_RAINFED
+                        SLPF for rainfed strata (default: --slpf); rainfed
+                        strata then get their own copies of the cell profiles,
+                        ID XR<iy><ix>
+  --slpf-table SLPF_TABLE
+                        CSV iy, ix, water, slpf (scripts/fit_slpf.py
+                        slpf_table.csv): SLPF per stratum; replaces --slpf and
+                        --slpf-rainfed

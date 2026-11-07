@@ -1,0 +1,22 @@
+section,text
+TREATMENTS,"*TREATMENTS                        -------------FACTOR LEVELS------------
+@N R O C TNAME.................... CU FL SA IC MP MI MF MR MC MT ME MH SM
+ 1 1 0 0 CONTROL, NO SHADE          1  1  0  1  1  0  1  0  0  0  0  1  1
+ 2 1 0 0 SHADE 20%, 4-24 AUG        1  1  0  1  1  0  1  0  0  0  1  1  1"
+ENVIRONMENT MODIFICATIONS,"*ENVIRONMENT MODIFICATIONS
+@E ODATE EDAY  ERAD  EMAX  EMIN  ERAIN ECO2  EDEW  EWIND ENVNAME
+ 1 76217 A   0 M .20 A   0 A   0 A 0.0 A   0 A   0 A   0
+ 1 76238 A   0 M   1 A   0 A   0 A 0.0 A   0 A   0 A   0"
+FileA,"*EXP.DATA (A): UFGA7609PN Environmental Modification
+
+@TRNO   PWAM  H#AM  HWAM  CWAM  HWUM
+     1  6718   942  5283 14240 .5608
+     2  5037   658  3611 11431 .5488"
+FileT (first lines),"*EXP.DATA (T): UFGA7609PN Environmental Modification
+
+@TRNO   DATE  PWAD  G#AD  GWAD  P#AD  CWAD  GWGD
+     1 76161    10     0     0     0  1407     0
+     1 76168    28     0     0     0  2268     0
+     1 76175    99     0     0    11  3032     0
+     1 76182   362     0     0    69  4365     0
+     1 76189   727    85    99   192  6498 116.5"

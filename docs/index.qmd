@@ -1,0 +1,107 @@
+---
+title: "xdssat"
+subtitle: "A bridge between the DSSAT crop model and Python: from one field to a whole region"
+---
+
+```{ojs}
+import {withDownload, fmt} from "./assets/js/dl.js"
+summary = FileAttachment("java/data/summary.json").json()
+javaYears = FileAttachment("java/data/java_years.csv").csv({typed: true})
+cur = summary.current
+cal = summary.districts[summary.current_run]
+```
+
+::: {.grid}
+
+::: {.g-col-12 .g-col-md-8}
+DSSAT's Cropping System Model is a Fortran program that grows a crop one day at a time from text files:
+an experiment file, daily weather, soil profiles and crop coefficients [@jones2003]. It is usually driven by the
+DSSAT shell, a set of Windows tools for writing those files and reading the results.
+
+**xdssat** puts Python in the place of the shell. It writes the engine's own input files, runs the unmodified
+`dscsm048` executable and reads what it writes back into tables. Nothing in the model is reimplemented, so a
+result from xdssat is a result from DSSAT. What Python adds is what the shell does not do easily: thousands of
+simulations at once, inputs prepared from gridded data, and every step written down as code that can be rerun.
+:::
+
+::: {.g-col-12 .g-col-md-4}
+![](assets/logo/logo-light-256.png){fig-alt="xdssat logo" width="220px" .light-content}
+![](assets/logo/logo-dark-256.png){fig-alt="xdssat logo" width="220px" .dark-content}
+:::
+
+:::
+
+| What the DSSAT shell does | What xdssat does instead |
+|---|---|
+| XBuild writes an experiment file | `filex.build_filex` writes one with a treatment per field, grid cell or scenario |
+| WeatherMan imports and checks weather | `wth.write_wth` and `wth.read_wth`, with pandas for the checks |
+| SBuild builds soil profiles | `sol.SoilProfile` and `soils.saxton_rawls`, from soil maps as well as from soil sheets |
+| The cultivar file is edited by hand | `genotype.write_cultivar_files` writes per-run copies with changed coefficients |
+| One run at a time from the shell | `runner.run_engine` and `runner.run_units`, in parallel chunks |
+| Results in text output files | Tables, and CF netCDF maps for gridded runs (`outputs.py`) |
+
+## Three ways through this site
+
+::: {.grid}
+
+::: {.g-col-12 .g-col-md-4 .track-card}
+### 1. [What xdssat is](xdssat/index.qmd)
+
+How a field-scale model becomes a map: one simulation per weather cell and water regime, inputs prepared from
+netCDF and GeoTIFF, chunked parallel runs of the stock engine, and gridded output. With the
+[implementation](xdssat/implementation.qmd) of every script and a [setup guide](getting-started.md).
+:::
+
+::: {.g-col-12 .g-col-md-4 .track-card}
+### 2. [A real case: rice in Java](java/index.qmd)
+
+xdssat applied to an island: ${fmt.int(cur.seasons)} simulated rice seasons over Java for 1991-2020, checked
+against district statistics. What fits, what does not yet, and how it was calibrated.
+:::
+
+::: {.g-col-12 .g-col-md-4 .track-card}
+### 3. [DSSAT itself, through xdssat](learn/index.qmd)
+
+The case study uses a small part of DSSAT. Six training modules, adapted from the International Training
+Program on DSSAT, explore the rest: phenology, growth, weather and soils, calibration, water and nitrogen,
+seasonal risk and crop rotations. Each has a reading page and a [notebook](notebooks/index.qmd) that runs the
+real engine.
+:::
+
+:::
+
+## The case study in one chart
+
+Simulated and observed rice yield for Java, current calibrated run (${summary.current_run}), weighted by
+district rice area:
+
+```{ojs}
+withDownload(Plot.plot({
+  width: Math.min(width, 860), height: 300, marginLeft: 50,
+  y: {label: "Java rice yield, ku/ha GKG", grid: true, zero: false},
+  x: {label: "Harvest year", tickFormat: d => String(d)},
+  color: {legend: true, domain: ["Simulated", "Observed (BDSP/BPS)"], range: ["#3f7a34", "#f2a33a"]},
+  marks: [
+    Plot.lineY(javaYears.filter(d => d.run === summary.current_run).flatMap(d => [{year: d.year, s: "Simulated", v: d.sim}, {year: d.year, s: "Observed (BDSP/BPS)", v: d.obs}]),
+      {x: "year", y: "v", stroke: "s", strokeWidth: 2, marker: "dot", tip: true})
+  ]
+}), "xdssat-home-java-yield")
+```
+
+Level ${fmt.d2(cal.level_area_weighted)} (simulated over observed), spatial correlation of district means r = ${fmt.d2(cal.spatial_r)}. The [story](java/index.qmd) explains what that means.
+
+## Rebuilding
+
+Numbers on the pages are read from small data files, never typed in. The [rebuild notes](rebuild.qmd) say
+how to refresh them after a new run or a rerun notebook.
+
+## Author
+
+xdssat and this site are made by [Benny Istanto](https://benny.istan.to/about), as a casual-weekend project
+built on DSSAT ([acknowledgements and how to cite](acknowledgements.qmd)). Questions, corrections and ideas are
+welcome in the [issue tracker](https://github.com/bennyistanto/xdssat/issues).
+
+## References {.unnumbered}
+
+::: {#refs}
+:::

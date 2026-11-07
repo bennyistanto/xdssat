@@ -1,0 +1,9 @@
+check,count
+days in file,365
+"missing values (any of SRAD, TMAX, TMIN, RAIN)",0
+TMAX below TMIN,0
+negative rain,0
+SRAD below 0 or above 35 MJ/m2/day,0
+TMAX above 45 or TMIN below -20 °C,0
+day-to-day TMAX change above 15 °C,1
+gaps in the dates,0

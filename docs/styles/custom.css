@@ -1,0 +1,108 @@
+/* xdssat documentation site */
+
+.dl-wrap {
+  margin: 0.5rem 0 1.25rem 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.dl-bar {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.dl-bar button {
+  font-size: 0.78rem;
+  padding: 0.1rem 0.55rem;
+}
+
+.dl-note {
+  font-size: 0.8rem;
+  opacity: 0.75;
+  margin-left: 0.3rem;
+  align-self: center;
+}
+
+/* Plot draws text in currentColor; keep charts on a light card in dark mode too */
+.dl-chart {
+  background: #ffffff;
+  color: #222222;
+  border-radius: 6px;
+  padding: 6px;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0 1.5rem 0;
+}
+
+.kpi {
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+}
+
+.kpi .v {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.kpi .l {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.gap-box {
+  border-left: 4px solid #d9822b;
+  padding: 0.4rem 0.9rem;
+  margin: 0.8rem 0;
+  background: rgba(217, 130, 43, 0.07);
+}
+
+.source-note {
+  font-size: 0.82rem;
+  opacity: 0.8;
+}
+
+pre.cli-help {
+  font-size: 0.78rem;
+  max-height: 32rem;
+  overflow: auto;
+}
+
+table.small-table {
+  font-size: 0.85rem;
+}
+
+/* experiment-file text shown on the training pages */
+pre.filex {
+  font-size: 0.78rem;
+  line-height: 1.25;
+  background: rgba(127, 127, 127, 0.08);
+  border-left: 3px solid #f2a33a;
+  padding: 0.6rem 0.8rem;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+/* dark theme: swap the navbar logo for its dark variant (Quarto marks the body with .quarto-dark) */
+body.quarto-dark .navbar-brand img.navbar-logo { content: url("../assets/logo/logo-dark-64.png"); }
+
+/* light/dark images on the home page */
+body.quarto-dark .light-content, body:not(.quarto-dark) .dark-content { display: none; }
+
+/* Display equations: MathJax 3 does not wrap lines, so a formula wider than the column
+   (on a phone) scrolls sideways inside its own box instead of crossing the margin. */
+mjx-container[display="true"] {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 0;
+}

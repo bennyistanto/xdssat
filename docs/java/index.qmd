@@ -1,0 +1,346 @@
+---
+title: "Growing Java's rice in a computer, one weather cell at a time"
+subtitle: "What xdssat does, why it simulates rice on a grid, and what the first Java results show, gaps included"
+---
+
+```{ojs}
+import {withDownload, adminMarks, cellFeatures, fmt, pearson} from "../assets/js/dl.js"
+summary = FileAttachment("data/summary.json").json()
+cells = FileAttachment("data/grid_cells.csv").csv({typed: true})
+districtsGeo = FileAttachment("data/districts.geojson").json()
+outline = FileAttachment("data/java_outline.geojson").json()
+provinces = FileAttachment("data/provinces.geojson").json()
+districts = FileAttachment("data/districts.csv").csv({typed: true})
+javaYears = FileAttachment("data/java_years.csv").csv({typed: true})
+cur = summary.current
+calRun = summary.current_run
+uncalRun = Object.entries(summary.districts).find(([k, v]) => v.slpf == null && v.tcldf == null)?.[0] ?? calRun
+runOptions = new Map(Object.entries(summary.districts).map(([k, v]) => [v.label, k]))
+cal = summary.districts[calRun]
+uncal = summary.districts[uncalRun]
+runs = FileAttachment("data/runs.json").json()
+// earlier calibration: one SLPF for all rice, no TCLDF change
+oneRun = Object.entries(summary.districts).find(([k, v]) => v.slpf != null && v.tcldf == null && v.slpf_rainfed == null)?.[0] ?? calRun
+one = summary.districts[oneRun]
+oneInfo = runs.find(r => r.run === oneRun)
+fit = FileAttachment("data/fit_slpf.json").json()
+```
+
+```{ojs}
+kpis = html`<div class="kpi-row">
+  <div class="kpi"><div class="v">${fmt.int(cur.seasons)}</div><div class="l">rice seasons simulated for Java (season years ${JSON.parse(cur.years).join("-")})</div></div>
+  <div class="kpi"><div class="v">${fmt.int(cur.failed)}</div><div class="l">seasons the engine rejected</div></div>
+  <div class="kpi"><div class="v">${fmt.d1(cur.minutes)} min</div><div class="l">wall time, ${cur.workers} engine processes in parallel</div></div>
+  <div class="kpi"><div class="v">${fmt.int(cur.cells)}</div><div class="l">0.1° weather cells with rice (${fmt.int(cur.strata)} strata)</div></div>
+  <div class="kpi"><div class="v">${fmt.d2(cur.ha / 1e6)} M ha</div><div class="l">rice fields covered, from 100 m maps</div></div>
+</div>`
+```
+
+::: {.source-note}
+Every number on this page is read from `docs/java/data/` when the page loads; those files are exported from the
+current run, ${calRun}, exported ${summary.generated} by `docs/scripts/export_data.py`. When the
+calibration changes, the numbers change with it. See [Rebuild](../rebuild.qmd).
+:::
+
+## A crop model built for one field
+
+DSSAT, the Decision Support System for Agrotechnology Transfer, is one of the most used families of crop
+models in the world [@jones2003]. Its rice model, CERES-Rice, grows a crop day by day from the weather: how
+much sunlight the leaves catch, how warm the nights are, how much water and nitrogen the roots find. Feed it
+the weather, the soil and the farmer's calendar for one field, and it tells you when the crop flowers, when it
+matures, and how much grain it yields.
+
+That "one field" is both its strength and its limit. DSSAT was designed around field experiments: one plot,
+one weather station, one soil profile, a handful of treatments. Indonesia's rice is not one field. It is a
+mosaic of about 7.4 million hectares of paddies (7,392,188 ha in the national 100 m raster built from the
+ATR/BPN 2024 rice-field map, `temp/inputs-detail.md`), from irrigated lowlands on the north coast of Java to
+rain-fed terraces in the hills, with planting dates that follow the monsoon.
+
+## What xdssat does
+
+**xdssat runs the unmodified DSSAT engine over a grid.** It does not rewrite the model. For every 0.1 degree
+weather cell that holds rice, and for every season, it writes the ordinary DSSAT input files (a weather file, a
+soil profile and an experiment file), runs the stock `dscsm048` executable on hundreds of those cell-seasons at
+a time, in parallel, and gathers the results into one gridded netCDF file that GIS tools and climate tools can
+read.
+
+```{mermaid}
+%%{init: {"theme": "neutral"}}%%
+flowchart TB
+  A[AgERA5 daily weather<br/>0.1 degree netCDF] --> D
+  B[SoilGrids 2.0<br/>250 m GeoTIFF] --> D
+  C[Rice fields, irrigation,<br/>districts: 100 m rasters] --> D
+  D[Strata:<br/>weather cell x water regime] --> E[WTH + SOL + FileX<br/>per chunk]
+  E --> F[dscsm048 x 32<br/>in parallel]
+  F --> G[summary.csv]
+  G --> H[CF netCDF<br/>system x year x lat x lon]
+  H --> I[Compare with<br/>district statistics]
+```
+
+For Java that means ${fmt.int(cur.cells)} weather cells, ${fmt.int(cur.strata)} strata (a cell's
+irrigated rice and its rain-fed rice are simulated separately) and ${fmt.int(cur.seasons)} seasons over 30
+agricultural years, in ${fmt.d1(cur.minutes)} minutes.
+
+The map shows the simulated mean yield of each cell. Pick a season and water regime.
+
+```{ojs}
+viewof sysPick = Inputs.radio(
+  new Map([["Wet season, irrigated", "wet_irrigated"], ["Wet season, rain-fed", "wet_rainfed"], ["Dry season, irrigated", "dry_irrigated"]]),
+  {value: "wet_irrigated", label: "System"})
+```
+
+```{ojs}
+yieldMap = {
+  const col = `hwah_${sysPick}`;
+  const rows = cells.filter(d => d[col] != null && isFinite(d[col]));
+  const fc = cellFeatures(rows);
+  const w = Math.min(width, 960);
+  return withDownload(Plot.plot({
+    width: w, height: Math.round(w * 0.42),
+    projection: {type: "mercator", domain: outline},
+    color: {type: "linear", scheme: "YlGn", legend: true, label: "Mean simulated yield, kg/ha dry matter", domain: [2500, 7000], clamp: true},
+    marks: [
+      Plot.geo(provinces, {fill: "#f1f1f1", clip: true}),
+      Plot.geo(fc.features, Plot.centroid({fill: d => d.properties[col], stroke: null,
+        title: d => `cell ${d.properties.lat.toFixed(1)}, ${d.properties.lon.toFixed(1)}\n${fmt.int(d.properties[col])} kg/ha\nseason ${fmt.d1(d.properties["len_" + sysPick])} d`, tip: true})),
+      ...adminMarks(Plot, provinces, districtsGeo)
+    ]
+  }), `xdssat-java-mean-yield-${sysPick}`, "Hover a cell for its value.");
+}
+```
+
+::: {.source-note}
+Mean of the seasonal DSSAT yield (`HWAH`) over 1991-2020 season years, per cell and system, from
+`summary.csv` of the current run. Colour scale clamped at 2,500 and 7,000 kg/ha. District outlines: BPS admin2
+boundaries.
+:::
+
+## Why simulate rice on a grid at all?
+
+Because the questions people ask about rice in Indonesia are spatial. Where would a dry year hurt most? Which
+districts are already close to what their weather allows, and which have room to grow? How would a shift in the
+monsoon onset move the planting calendar, district by district? A single-field model answers none of these. A
+model run on every cell, with each cell's own weather, soil and calendar, can, as long as its results can be
+checked against what farmers actually harvest.
+
+That check is the point of the Java pilot. Indonesia publishes harvested area, production and yield for every
+district (*kabupaten* and *kota*) every year. xdssat adds the simulated seasons up the same way: by the
+calendar year of harvest, weighted by the rice area of each cell in each district, and converted from the
+model's dry matter to the dry milled-grain basis (*gabah kering giling*, GKG) of the statistics. Details are on
+the [Scientific method](science.qmd) page.
+
+## What the Java results show so far
+
+### The level: calibrated
+
+Out of the box, with full irrigation for irrigated fields and 140 kg of nitrogen per hectare, the model grew
+far more rice than Java harvests: ${fmt.d2(uncal.level_area_weighted)} times the district statistics on
+average (run ${uncalRun}). That is expected. A crop model simulates the yield that weather, water and
+nitrogen allow; real fields also lose yield to pests, diseases, weeds, uneven water and management that the
+model does not know about.
+
+xdssat closes that gap with the soil fertility factor `SLPF` of DSSAT, which scales the crop's daily
+carbohydrate production, fitted to the district statistics (`scripts/fit_slpf.py`). In the current run SLPF
+differs by water regime and with the cell's season night temperature: ${slpfText}. The run also raises the
+cold-sterility threshold TCLDF to ${cur.tcldf} °C (both explained on the
+[Scientific method](science.qmd#slpf) page). Simulated and observed Java means agree: ${fmt.d1(cal.java_sim)} simulated vs ${fmt.d1(cal.java_obs)} observed quintal per hectare (GKG), and the province ratios range
+from ${fmt.d2(d3.min(Object.values(cal.province_ratio)))} to ${fmt.d2(d3.max(Object.values(cal.province_ratio)))}.
+
+```{ojs}
+viewof runPick = Inputs.select(runOptions, {value: calRun, label: "Run", width: 460})
+```
+
+```{ojs}
+javaChart = {
+  const rows = javaYears.filter(d => d.run === runPick).flatMap(d => [
+    {year: d.year, series: "Simulated", value: d.sim},
+    {year: d.year, series: "Observed (BDSP/BPS)", value: d.obs}]);
+  return withDownload(Plot.plot({
+    width: Math.min(width, 900), height: 340, marginLeft: 50,
+    y: {label: "Java rice yield, ku/ha GKG", grid: true, zero: false},
+    x: {label: "Harvest year", tickFormat: d => String(d)},
+    color: {legend: true, domain: ["Simulated", "Observed (BDSP/BPS)"], range: ["#2a7f62", "#d9822b"]},
+    marks: [
+      Plot.lineY(rows, {x: "year", y: "value", stroke: "series", strokeWidth: 2, tip: true}),
+      Plot.dot(rows, {x: "year", y: "value", fill: "series", r: 3, tip: true})
+    ]
+  }), `xdssat-java-yield-${runPick}`);
+}
+```
+
+::: {.source-note}
+Java mean per harvest year, weighted by the rice area of each district, over the districts with an observed
+yield that year (the same weighting `scripts/compare_districts.py` prints). Observed: district yields from the
+Ministry of Agriculture BDSP portal [@bdsp], cleaned by `scripts/clean_bdsp.py`. Simulated: dry matter / 0.86
+(14% grain moisture, an assumption; see [Scientific method](science.qmd#gkg)).
+:::
+
+### The map: better, not yet right
+
+Getting the Java average right is the easy part; one factor can do it. Getting the *pattern* right is harder.
+The map shows simulated over observed yield for each district; switch runs to see how the calibration steps
+changed it.
+
+```{ojs}
+viewof ratioRun = Inputs.select(runOptions, {value: calRun, label: "Run", width: 460})
+```
+
+```{ojs}
+ratioMap = {
+  const by = new Map(districts.filter(d => d.run === ratioRun).map(d => [String(d.code), d]));
+  const w = Math.min(width, 960);
+  const center = 1;
+  const half = Math.max(0.45, d3.max(districts.filter(d => d.run === ratioRun), d => Math.abs(d.ratio - 1)));
+  return withDownload(Plot.plot({
+    width: w, height: Math.round(w * 0.42),
+    projection: {type: "mercator", domain: outline},
+    color: {type: "diverging", scheme: "PuOr", pivot: center, reverse: true, legend: true,
+            label: "Simulated / observed yield, district mean", domain: [center - half, center + half], clamp: true},
+    marks: [
+      Plot.geo(districtsGeo.features.filter(f => f.properties.java), {fill: "#e4e4e4", stroke: "none"}),
+      Plot.geo(districtsGeo.features.filter(f => by.has(f.properties.code)), {
+        fill: f => by.get(f.properties.code).ratio, stroke: "#666", strokeWidth: 0.4,
+        title: f => { const d = by.get(f.properties.code); return `${d.name} (${d.province})\nobs ${fmt.d1(d.obs_mean)} / sim ${fmt.d1(d.sim_mean)} ku/ha\nratio ${fmt.d2(d.ratio)}, ${d.years} years`; }}),
+      ...adminMarks(Plot, provinces, districtsGeo)
+    ]
+  }), `xdssat-district-ratio-${ratioRun}`, "Grey: fewer than 1,000 ha of simulated rice or fewer than 5 observed years.");
+}
+```
+
+The current run sits within ${fmt.d2(cal.ratio_p10)} to ${fmt.d2(cal.ratio_p90)} of the observed yield in 80%
+of the districts (10th to 90th percentile). Across the ${cal.districts} districts compared, the correlation
+between observed and simulated district means is r = ${fmt.d2(cal.spatial_r)}, and the standard deviation of
+the district means is ${fmt.d1(cal.sim_sd_districts)} ku/ha simulated against ${fmt.d1(cal.obs_sd_districts)} observed.
+
+With one SLPF for all rice and the default TCLDF (run ${oneRun}), that correlation was r = ${fmt.d2(one.spatial_r)}, with a spread of ${fmt.d1(one.sim_sd_districts)} ku/ha: the districts the model ranked high
+were not the ones that harvest most. That run is preselected in the chart below; the colour shows why.
+
+```{ojs}
+viewof scatterRun = Inputs.select(runOptions, {value: oneRun, label: "Run", width: 460})
+```
+
+```{ojs}
+scatter = {
+  const rows = districts.filter(d => d.run === scatterRun);
+  const hasLen = rows.some(d => d.season_len != null && isFinite(d.season_len));
+  return withDownload(Plot.plot({
+    width: Math.min(width, 640), height: 420, marginLeft: 50,
+    x: {label: "Observed district mean, ku/ha GKG", grid: true},
+    y: {label: "Simulated district mean, ku/ha GKG", grid: true},
+    color: hasLen ? {type: "linear", scheme: "Viridis", legend: true, label: "Simulated season length, days"} : undefined,
+    marks: [
+      Plot.line([[40, 40], [d3.max(rows, d => Math.max(d.sim_mean, d.obs_mean)), d3.max(rows, d => Math.max(d.sim_mean, d.obs_mean))]], {stroke: "#aaa", strokeDasharray: "4,3"}),
+      Plot.dot(rows, {x: "obs_mean", y: "sim_mean", fill: hasLen ? "season_len" : "#2a7f62", r: 4, stroke: "white", strokeWidth: 0.5,
+        tip: true, channels: {District: "name", Province: "province", "Season, d": "season_len"}})
+    ]
+  }), `xdssat-district-obs-vs-sim-${scatterRun}`);
+}
+```
+
+In that run, simulated district yield followed the simulated season length (r = ${fmt.d2(rLenSim)}), and
+season length followed night temperature (r = ${fmt.d2(rLenTmin)} with the mean daily minimum). The longest
+simulated seasons were in ${longest}. In CERES-Rice development runs on thermal time, so a cooler crop
+takes more days to mature and has more days to build biomass. Observed yields show no such bonus
+(r = ${fmt.d2(rLenObs)} with simulated season length); they are, if anything, higher where more of the rice is
+irrigated (r = ${fmt.d2(rIrrObs)}; simulated: r = ${fmt.d2(rIrrSim)}), while the model gave rain-fed strata
+more than irrigated ones in the wet season: ${fmt.int(oneInfo?.yield_wet_rainfed)} vs ${fmt.int(oneInfo?.yield_wet_irrigated)} kg/ha.
+
+Three steps address these. Raising TCLDF to ${cur.tcldf} °C makes cool nights during panicle development
+cost grains, which reduces the highland bonus but does not remove it. A separate SLPF for rain-fed rice lowers
+rain-fed yields. Finally, letting SLPF fall with the cell's mean season minimum temperature takes out most of
+the remaining bonus of the cool, long-season cells: wet-season yield in the current run is ${fmt.int(cur.yield_wet_irrigated)} kg/ha for irrigated and ${fmt.int(cur.yield_wet_rainfed)} kg/ha for rain-fed
+strata. Each step was checked with full runs against the districts:
+
+```{ojs}
+calSteps = [
+  {step: "1. One SLPF", run: oneTcRun, fitKey: "one"},
+  {step: "2. Irrigated / rain-fed pair", run: pairRun, fitKey: "two"},
+  {step: "3. Pair + Tmin slope (current)", run: calRun, fitKey: "temp"}
+].filter(d => d.run && summary.districts[d.run]).map(d => {
+  const v = summary.districts[d.run];
+  const ho = d3.sum(fit.cv, c => c.districts * c[`${d.fitKey}_rmse_log`]) / d3.sum(fit.cv, c => c.districts);
+  return {Calibration: d.step, Run: d.run, "RMSE log": v.rmse_log, "Within ±10%": v.within10, "Spatial r": v.spatial_r,
+          "SD sim / obs, ku/ha": `${fmt.d1(v.sim_sd_districts)} / ${fmt.d1(v.obs_sd_districts)}`, "Held-out RMSE log": ho};
+})
+Inputs.table(calSteps, {format: {"RMSE log": d => d.toFixed(3), "Within ±10%": fmt.pct, "Spatial r": fmt.d2, "Held-out RMSE log": d => d.toFixed(3)}, layout: "auto"})
+```
+
+::: {.source-note}
+All three with TCLDF ${cur.tcldf}. RMSE log: rice-area weighted root mean square of log(simulated/observed)
+over the ${cal.districts} district means. Within ±10%: share of districts whose ratio is between 0.9 and 1.1.
+Held-out: each province's districts scored with parameters fitted without that province
+(`fit_slpf.py` leave-one-province-out), averaged over districts.
+:::
+
+```{ojs}
+oneRows = districts.filter(d => d.run === oneRun)
+rLenSim = pearson(oneRows.map(d => d.season_len), oneRows.map(d => d.sim_mean))
+rLenObs = pearson(oneRows.map(d => d.season_len), oneRows.map(d => d.obs_mean))
+rLenTmin = pearson(oneRows.map(d => d.season_len), oneRows.map(d => d.tmina))
+rIrrObs = pearson(oneRows.map(d => d.irr_share), oneRows.map(d => d.obs_mean))
+rIrrSim = pearson(oneRows.map(d => d.irr_share), oneRows.map(d => d.sim_mean))
+longest = oneRows.filter(d => d.season_len != null).sort((a, b) => b.season_len - a.season_len).slice(0, 4).map(d => `${d.name} (${Math.round(d.season_len)} d, Tmin ${fmt.d1(d.tmina)} °C)`).join(", ")
+fitPair = `${fit.two.slpf_irrigated} irrigated / ${fit.two.slpf_rainfed} rain-fed`
+pairRun = Object.entries(summary.districts).find(([k, v]) => v.slpf_rainfed != null && v.tcldf != null)?.[0]
+oneTcRun = Object.entries(summary.districts).find(([k, v]) => v.slpf != null && v.slpf < 1 && v.slpf_rainfed == null && !v.slpf_table && v.tcldf != null)?.[0]
+slpfText = fit.temp
+  ? `${fmt.d2(fit.temp.slpf_irrigated)} for irrigated and ${fmt.d2(fit.temp.slpf_rainfed)} for rain-fed strata at a mean season minimum of ${fit.temp.tref} °C, changing by ${fit.temp.slope_per_C.toFixed(4)} per °C of the cell's minimum and kept within ${d3.min(fit.slpf_points)}-${d3.max(fit.slpf_points)}`
+  : `${cur.slpf} for irrigated and ${cur.slpf_rainfed} for rain-fed strata`
+calRows = districts.filter(d => d.run === calRun)
+rLenSimCal = pearson(calRows.map(d => d.season_len), calRows.map(d => d.sim_mean))
+```
+
+## The honest gaps
+
+::: {.gap-box}
+**The spatial pattern is partly fitted, not simulated.** Both the rain-fed SLPF and its temperature slope are
+statistical corrections. They lower rain-fed yields and the yields of cool, long-season cells because the
+district data say so, not because the model simulates what limits them (water, nutrients, management, the
+varieties actually grown in the highlands). The leave-one-province-out test in `fit_slpf.py` checks that
+they also predict districts they were not fitted on ([Scientific method](science.qmd#slpf-temp)), but the
+mechanism is open. Spatial r is ${fmt.d2(cal.spatial_r)}: the district levels fit (RMSE log ${cal.rmse_log.toFixed(3)}), but which
+districts harvest more than others is still only partly reproduced. The correlation of simulated district yield with season length is down to r = ${fmt.d2(rLenSimCal)}, from ${fmt.d2(rLenSim)} with one SLPF, largely because the SLPF slope was fitted against it.
+:::
+
+::: {.gap-box}
+**Year-to-year swings do not match.** After removing the trend, the median correlation between simulated and
+observed yield of a district over the years is ${fmt.d2(cal.r_detrended_median)}
+with ${fmt.pct(cal.r_detrended_pos)} of districts above zero; against a 5-year running mean instead of a
+linear trend, the median is ${fmt.d2(cal.r_highpass_median)} with ${fmt.pct(cal.r_highpass_pos)} above zero. The model's year-to-year swings follow solar
+radiation; the observed ones come partly in multi-year blocks that look non-weather (programmes, statistical
+methods), and a water-shortage explanation was tested and not supported (`HANDOFF.md`, findings of
+2026-11-06).
+:::
+
+::: {.gap-box}
+**No trend.** Observed Java yield rises by ${fmt.sign1(cal.java_obs_trend_decade)} ku/ha per decade, the model
+by ${fmt.sign1(cal.java_sim_trend_decade)}: the cultivar (IR 58) and nitrogen rate are held fixed for 30
+years, so technology change is outside the model.
+:::
+
+::: {.gap-box}
+**Assumptions still standing.** Planting dates come from a rainfall-onset rule with placeholder offsets
+(transplanting 20 days after onset, dry season 120 days after the wet season); the GKG moisture of 14% is
+assumed, not taken from a BPS definition; the older uniform and by-zone calendar runs predate a bug fix and are
+stale; ${calendarReruns}.
+
+```{ojs}
+calendarReruns = {
+  const r = runs.filter(d => (d.mode === "uniform" || d.mode === "by_zone") && d.slpf_table && d.slpf_table !== "None");
+  return r.length ? `reruns with the current calibration: ${r.map(d => d.run).join(", ")}` : "they have not been rerun with the current calibration";
+}
+```
+:::
+
+## Where to go next
+
+- [Data, AOI and variety](data.qmd): what goes in, and how much of Java it covers.
+- [How xdssat differs](../xdssat/gridding.qmd) from the usual way of running DSSAT.
+- [Scientific method](science.qmd): the reason for each step, with references.
+- [Implementation](../xdssat/implementation.qmd): which script does what, and the settings that change the results.
+- Setup from an empty machine: [`docs/getting-started.md`](https://github.com/bennyistanto/xdssat/blob/main/docs/getting-started.md).
+
+## References {.unnumbered}
+
+::: {#refs}
+:::

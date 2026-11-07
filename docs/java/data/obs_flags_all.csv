@@ -1,0 +1,12 @@
+rule,n
+area_production_inconsistent (area),81
+area_production_inconsistent (production),81
+column_constant_placeholder,66
+column_mostly_implausible,13
+column_production_scale,9
+column_small_scale,56
+decimal_shift_x100,43
+implausible_range,19
+outlier_vs_district,98
+yield_disagrees_with_production_over_area,265
+yield_from_production_over_area,662

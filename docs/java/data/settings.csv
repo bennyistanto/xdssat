@@ -1,0 +1,7 @@
+setting,variable,value,from
+ENGINE_DIR,XDSSAT_ENGINE,C:\TEMP\dsn\dssat,default
+WORK_ROOT,XDSSAT_WORK,C:\TEMP\dsn\work,default
+AGERA5_DIR,XDSSAT_AGERA5,E:\temp\agera5,default
+SOILGRIDS_DIR,XDSSAT_SOILGRIDS,E:\temp\soilgrids,default
+INPUTS_DIR,XDSSAT_INPUTS,E:\temp,default
+CACHE_DIR,XDSSAT_CACHE,E:\temp\xdssat,default

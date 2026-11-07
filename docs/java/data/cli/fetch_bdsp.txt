@@ -1,0 +1,31 @@
+usage: fetch_bdsp.py [-h] [--out OUT] [--prov PROV [PROV ...]] [--pause PAUSE]
+                     [--parse-only]
+
+Fetch district rice harvested area, production and yield from the Ministry of
+Agriculture BDSP portal (https://bdsp2.pertanian.go.id/bdsp/id/lokasi).
+
+    python scripts/fetch_bdsp.py                  # all provinces, three indicators
+    python scripts/fetch_bdsp.py --prov 31 32 33 34 35 36
+    python scripts/fetch_bdsp.py --parse-only     # rebuild the table from the saved pages
+
+The portal's "Lokasi" search (Cari) posts the form to lokasi/result and returns
+an HTML table: one row per district ("<BPS code> - <name>"), one column per year,
+values as text with a comma decimal separator. The page names BPS (Badan Pusat
+Statistik) as the data source. One request per province and indicator, sent one
+at a time with a pause (--pause, default 3 s). Codes come from the portal's own
+lookups (komoditas/getKomBySubsektor, indikator/getIndiByKomSubsek,
+satuan/getSatuan, lokasi/getProv), saved in lookups.json.
+
+Writes to --out (default <XDSSAT_CACHE>/obs/bdsp):
+    raw/<indicator>_<prov>.html    each reply as received (reruns skip these)
+    lookups.json
+    bdsp_padi_adm2_long.csv        indicator, unit, sheet (province), code, name,
+                                   year, raw (text as shown), value (parsed; 0 -> empty)
+
+options:
+  -h, --help            show this help message and exit
+  --out OUT
+  --prov PROV [PROV ...]
+                        province codes (default all)
+  --pause PAUSE         seconds between requests
+  --parse-only
