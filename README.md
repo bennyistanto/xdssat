@@ -23,6 +23,7 @@ guide, a case study (rice in Java, Indonesia) and a six-module DSSAT training wi
 |---|---|
 | `src/` | The Python modules: weather, soil and experiment files, the parallel runner, netCDF output, gridded inputs |
 | `scripts/` | Setup checks, building the engine, preparing inputs, running an area (`run_aoi.py`) |
+| `configs/` | Experiment files: `rice-java.yml` (the reference, every setting explained), `rice-java-all-options.yml` (every option in use), and your own `xdssat.yml` (not committed). See [configs/README.md](configs/README.md) |
 | `templates/` | Template experiment: `XDRI8601.RIX`, IRRI rice with irrigated and rainfed water levels |
 | `tests/` | `pytest` suite; tests marked `engine` run the real engine |
 | `notebooks/` | Engine check notebook |
@@ -31,11 +32,23 @@ guide, a case study (rice in Java, Indonesia) and a six-module DSSAT training wi
 
 ## Quick start
 
+Every setting of a run (machine paths, area, cultivars, N rates, water regimes, planting
+calendar, scenarios such as CO2 or warming, years) lives in **one file**. Nobody has to edit
+Python.
+
 ```bash
-python scripts/check_setup.py      # what is missing, and the command that fixes it
+cp configs/rice-java.yml configs/xdssat.yml   # then fill in its paths section; every setting is explained
+python scripts/check_setup.py      # checks the file and the machine, says what to fix and where
 python scripts/build_engine.py     # if DSSAT is not installed
-python -m pytest tests
+python scripts/run_aoi.py          # runs every cultivar x N rate x scenario of configs/xdssat.yml
 ```
+
+xdssat has no built-in folders: each computer sets its own in `configs/xdssat.yml` (or with
+`XDSSAT_*` environment variables). For further studies keep one file per study in `configs/`,
+for example `configs/co2-java.yml`, and run it with
+`python scripts/run_aoi.py --config configs/co2-java.yml`. Command-line flags
+(`--sample 30 --years 2015 2016` for a quick test) win over the file. The tests:
+`python -m pytest tests`.
 
 The full setup, from an empty machine to a run, is in the
 [getting-started guide](https://bennyistanto.github.io/xdssat/getting-started.html)
