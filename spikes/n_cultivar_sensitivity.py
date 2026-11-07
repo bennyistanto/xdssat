@@ -4,7 +4,7 @@
 
 A sample of Java cells (weighted by rice area), the per_cell calendar of the
 full run (its onset.csv), season years 1992-2014 (harvests 1993-2015, the BPS
-years), every treatment of management.TREATMENT_GRID: IR 58 / IR 64 x 0-140 kg
+years), every grid treatment of the template: IR 58 / IR 64 x 0-140 kg
 N, each stratum with its own water regime. Writes
 <CACHE>/checks/n_cultivar_sensitivity.csv and prints the area-weighted mean
 yield per cultivar and N rate, as kg/ha dry matter and as ku/ha GKG (14%
@@ -39,19 +39,24 @@ def load_script(name):
     return m
 
 
+TEMPLATE = FileX.read(mg.TEMPLATE)
+CULTIVARS = mg.template_cultivars(TEMPLATE)                       # IR 58, IR 64 in XDRI8601.RIX
+N_LEVELS = config.CURRENT.data["treatments"]["nitrogen_levels"]  # kg N -> fertilizer level
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--cells", type=int, default=40)
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--years", nargs=2, type=int, default=[1992, 2014])
-    ap.add_argument("--bps", type=Path, default=Path("C:/Users/benny/Downloads/produktivitas_padi_kuintaperha.csv"))
+    ap.add_argument("--bps", type=Path, required=True, help="BPS provincial productivity CSV (compare_bps.py)")
     ap.add_argument("--run", type=Path, default=config.CACHE_DIR / "runs" / "java_per_cell_1991-2020")
     ap.add_argument("--workers", type=int, default=32)
     ap.add_argument("--soc-factor", type=float, default=1.0,
                     help="multiply SLOC and SLNI of every profile (test of soil N supply)")
-    ap.add_argument("--cultivars", nargs="+", default=list(mg.CULTIVARS))
+    ap.add_argument("--cultivars", nargs="+", default=list(CULTIVARS))
     ap.add_argument("--tcldf", type=float, help="cold sterility threshold (C) for every cultivar used")
-    ap.add_argument("--n", nargs="+", type=int, default=list(mg.N_LEVELS))
+    ap.add_argument("--n", nargs="+", type=int, default=list(N_LEVELS))
     ap.add_argument("--slpf", type=float, default=1.0,
                     help="soil fertility factor (0-1], multiplies daily crop carbohydrate in CERES-Rice "
                          "(RI_Grosub.for:648-649); the yield-gap calibration factor")
@@ -65,16 +70,15 @@ def main():
     years = list(range(a.years[0], a.years[1] + 1))
     base = mg.per_cell(st, years, mg.planting_from_onset(cells, cells.onset_days.to_numpy()))
     parts = []
-    for (cv, water, n), k in mg.TREATMENT_GRID.items():
-        if cv not in a.cultivars or n not in a.n:
-            continue
+    for cv, water, n in [(c, w, n) for c in a.cultivars for w in ("irrigated", "rainfed") for n in a.n]:
+        k, _ = mg.template_treatment(TEMPLATE, config.CURRENT.water_level(water), N_LEVELS[n], CULTIVARS[cv][1])
         u = base[base.water == water].copy()
         u["trno_template"], u["cultivar"], u["n_kg"] = k, cv, n
         parts.append(u)
     units = pd.concat(parts, ignore_index=True)
     print(f"{st.cell.nunique()} cells, {len(st)} strata, {st.ha.sum():,.0f} ha; {len(units)} seasons")
 
-    cul_over = ({mg.CULTIVARS[c][1]: {"TCLDF": a.tcldf} for c in a.cultivars} if a.tcldf else None)
+    cul_over = ({CULTIVARS[c][1]: {"TCLDF": a.tcldf} for c in a.cultivars} if a.tcldf else None)
     profiles = read_sol(config.CACHE_DIR / "soils" / "java.SOL")
     for _p in profiles.values():
         _p.surface["SLPF"] = a.slpf
@@ -96,7 +100,7 @@ def main():
         write_sol(run_dir / "SOIL.SOL", [profiles[s] for s in sorted(set(u.soil_id))])
         write_cultivar_files(run_dir, cul_over)
 
-    res = run_units(units, FileX.read(mg.TEMPLATE), write_inputs, workers=a.workers,
+    res = run_units(units, TEMPLATE, write_inputs, workers=a.workers,
                     soils=profiles, ic_water=0.9)
     s = pd.concat([r.summary for r in res], ignore_index=True)
     failed = sum(len(r.failed) for r in res)
