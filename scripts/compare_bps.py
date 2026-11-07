@@ -1,6 +1,6 @@
 """Compare simulated rice yields with BPS provincial productivity.
 
-    python scripts/compare_bps.py --bps C:/Users/benny/Downloads/produktivitas_padi_kuintaperha.csv
+    python scripts/compare_bps.py --bps path/to/produktivitas_padi_kuintaperha.csv
 
 BPS table (bps.go.id, "Produktivitas Padi Menurut Provinsi", 1993-2015, from
 the Statistik Pertanian reports): quintal per ha of gabah kering giling (GKG,
@@ -51,11 +51,11 @@ def read_bps(path: Path) -> pd.DataFrame:
     return long.dropna().astype({"year": int}).sort_values(["province", "year"]).reset_index(drop=True)
 
 
-def pieces(aoi: str = "java") -> pd.DataFrame:
+def pieces(aoi: str | None = None) -> pd.DataFrame:
     """Rice ha per (cell, water regime, province)."""
     R = config.CACHE_DIR / "rasters"
     lat, lon, valid = agera5.grid()
-    grid, _ = rasters.IDN.window(*rasters.AOI[aoi])
+    grid, _ = rasters.IDN.window(*rasters.AOI[aoi or config.CURRENT.aoi])
     st = rasters.aggregate(R / "idn_rice.tif", {"region": R / "idn_region.tif",
                                                  "irr": R / "idn_irrigation_filled.tif",
                                                  "prov": R / "idn_province_filled.tif"},
@@ -93,7 +93,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bps", type=Path, required=True)
     ap.add_argument("--runs", type=Path, default=config.CACHE_DIR / "runs")
-    ap.add_argument("--aoi", default="java")
+    ap.add_argument("--aoi", default=config.CURRENT.aoi)
     ap.add_argument("--years", nargs=2, type=int, default=[1991, 2020])
     ap.add_argument("--moisture", type=float, default=0.14)
     ap.add_argument("--out", type=Path, default=config.CACHE_DIR / "checks" / "bps")

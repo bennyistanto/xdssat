@@ -46,11 +46,11 @@ def _script(name):
     return m
 
 
-def pieces(aoi: str = "java") -> pd.DataFrame:
+def pieces(aoi: str | None = None) -> pd.DataFrame:
     """Rice ha per (weather cell, water regime, district code)."""
     R = config.CACHE_DIR / "rasters"
     lat, lon, valid = agera5.grid()
-    grid, _ = rasters.IDN.window(*rasters.AOI[aoi])
+    grid, _ = rasters.IDN.window(*rasters.AOI[aoi or config.CURRENT.aoi])
     st = rasters.aggregate(R / "idn_rice.tif", {"region": R / "idn_region.tif",
                                                  "irr": R / "idn_irrigation_filled.tif",
                                                  "adm2": R / "idn_adm2_filled.tif"},

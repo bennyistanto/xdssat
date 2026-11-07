@@ -53,9 +53,13 @@ AEZ = "idn-soil/idn_phy_agroecological_zone_bbsdlp_a.shp"
 MOA = {"irrigated": "idn-lbs/idn_phy_ricefield_java_irrigated_moa_a.shp",
        "rainfed": "idn-lbs/idn_phy_ricefield_java_rainfed_moa_a.shp"}
 # IRIGASI_09 in the MoA files, ordered from most to least controlled water.
-ADM2 = Path("F:/temp/hybrid-bias-correction/data/subset/bnd/idn_bnd_adm2.shp")
+ADM2 = "idn_bnd_adm2.shp"      # in paths > boundaries (BPS-coded admin2 districts)
 MOA_CLASSES = {"Irigasi Teknis": 1, "Irigasi Semi Teknis": 2, "Irigasi Sederhana": 3,
                "Tadah Hujan": 4}
+
+# Extent of the MoA irrigated / rainfed rice maps, which cover Java only (a property of
+# that dataset, not a run setting; the run area is aoi > bbox in the experiment file).
+MOA_BOX = (105.0, -9.0, 114.7, -5.0)
 
 
 def coded(gdf, column, out_csv, title_case=False):
@@ -82,7 +86,8 @@ def main():
     ap.add_argument("--layers", nargs="+",
                     default=["region", "aez", "soil", "rice", "irrigation", "irrigation_filled",
                              "province", "province_filled", "adm2", "adm2_filled"])
-    ap.add_argument("--adm2", type=Path, default=ADM2, help="admin2 boundaries with a2bps codes")
+    ap.add_argument("--adm2", type=Path, help="admin2 boundaries with a2bps codes "
+                    "(default <paths > boundaries>/idn_bnd_adm2.shp)")
     ap.add_argument("--workers", type=int, default=16)
     a = ap.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
@@ -143,6 +148,7 @@ def main():
 
     if "adm2" in a.layers:
         t0 = time.time()
+        a.adm2 = a.adm2 or config.BOUNDARIES_DIR / ADM2
         adm = pyogrio.read_dataframe(a.adm2, columns=["a2bps", "a2name"], bbox=bbox)
         adm = adm[adm.geometry.notna() & ~adm.geometry.is_empty & (adm.a2bps.astype(str) != "0")]
         adm = rasters.to_grid_crs(adm)
@@ -182,7 +188,7 @@ def main():
         if f"{layer}_filled" not in a.layers:
             continue
         # MoA covers Java only: fill inside the island group "Jawa" of the region layer.
-        java, _ = grid.window(*rasters.AOI["java"])
+        java, _ = grid.window(*MOA_BOX)
         regions = pd.read_csv(a.out / f"{name}_region_classes.csv").set_index("name").code
         rice = rasters.read(a.out / f"{name}_rice.tif", java)
         region = rasters.read(a.out / f"{name}_region.tif", java)

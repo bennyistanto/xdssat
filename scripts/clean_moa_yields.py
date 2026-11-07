@@ -54,7 +54,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import config  # noqa: E402
 
 XLSX = config.CACHE_DIR / "temp" / "padi-produktivitas-moa.xlsx"
-BOUNDARY = Path("F:/temp/hybrid-bias-correction/data/subset/bnd/idn_bnd_adm2.shp")
+BOUNDARY = "idn_bnd_adm2.shp"      # in paths > boundaries (BPS-coded admin2 districts)
 LOW, HIGH = 10.0, 100.0               # plausible district rice productivity, ku/ha
 REL_LOW, REL_HIGH, WINDOW = 0.6, 1.6, 7
 SPLITS = {"94": ("95", "96", "97"), "91": ("92",)}   # old province sheet -> new province sheets
@@ -189,7 +189,8 @@ def harmonise_codes(d: pd.DataFrame, boundary_codes: set, flags: list) -> tuple[
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--xlsx", type=Path, default=XLSX)
-    ap.add_argument("--boundary", type=Path, default=BOUNDARY)
+    ap.add_argument("--boundary", type=Path,
+                    help="admin2 boundaries (default <paths > boundaries>/idn_bnd_adm2.shp)")
     ap.add_argument("--out", type=Path, default=config.CACHE_DIR / "obs")
     a = ap.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
@@ -203,6 +204,7 @@ def main():
     d = column_rules(d, flags)
     d = relative_rule(d, flags)
 
+    a.boundary = a.boundary or config.BOUNDARIES_DIR / BOUNDARY
     bnd = pyogrio.read_dataframe(a.boundary, read_geometry=False, columns=["a1bps", "a1name", "a2bps", "a2name"])
     bnd = bnd[bnd.a2bps.astype(str) != "0"].astype({"a2bps": str, "a1bps": str}).drop_duplicates("a2bps")
     d, mapping = harmonise_codes(d, set(bnd.a2bps), flags)

@@ -41,7 +41,7 @@ sys.path.insert(0, str(HERE.parent / "src"))
 import config  # noqa: E402
 
 REPO_URL = "https://github.com/DSSAT/dssat-csm-os.git"
-DEFAULT_BUILD = Path("C:/TEMP/dsn-build") if config.IS_WINDOWS else Path("/tmp/xdssat-build")
+# Build folder: default <paths > work>/build (short and outside OneDrive, like the work root).
 
 
 def run(cmd, cwd=None):
@@ -89,10 +89,12 @@ def main(argv=None):
                     help="dssat-csm-os checkout (default: sibling folder)")
     ap.add_argument("--clone", action="store_true", help="clone the source from GitHub")
     ap.add_argument("--ref", default=None, help="branch or tag to clone (with --clone)")
-    ap.add_argument("--build-dir", type=Path, default=DEFAULT_BUILD)
-    ap.add_argument("--engine-dir", type=Path, default=config.ENGINE_DIR)
+    ap.add_argument("--build-dir", type=Path, help="build folder (default <paths > work>/build)")
+    ap.add_argument("--engine-dir", type=Path, help="install folder (default paths > engine)")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
     args = ap.parse_args(argv)
+    args.build_dir = args.build_dir or config.WORK_ROOT / "build"
+    args.engine_dir = args.engine_dir or config.ENGINE_DIR
 
     for tool in ("gfortran", "cmake", "mingw32-make" if config.IS_WINDOWS else "make"):
         if shutil.which(tool) is None:
