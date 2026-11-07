@@ -8,6 +8,9 @@ description: "xdssat is an independent project built on DSSAT. What it uses, who
 supported by the DSSAT Foundation or the DSSAT development team. The names DSSAT and DSSAT-CSM appear on this
 site only to say which software xdssat works with. Questions about xdssat belong in
 [its issue tracker](https://github.com/bennyistanto/xdssat/issues), not with the DSSAT team.
+
+**It is also experimental.** So far it has been tested on one case (rice in Java) and the training examples. Use
+it at your own risk, and check its results against your own data before relying on them.
 :::
 
 ## DSSAT
