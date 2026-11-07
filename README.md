@@ -41,9 +41,11 @@ The full setup, from an empty machine to a run, is in the
 [getting-started guide](https://bennyistanto.github.io/xdssat/getting-started.html)
 ([docs/getting-started.md](docs/getting-started.md)).
 
-## Not an official DSSAT product
+## Not an official DSSAT product, and experimental
 
-xdssat is an independent project, not developed or endorsed by the DSSAT Foundation. If you publish results made
+xdssat is an independent project, not developed or endorsed by the DSSAT Foundation. It is also experimental:
+so far it has been tested on one case (rice in Java) and the training examples. Use it at your own risk, and
+check its results against your own data before relying on them. If you publish results made
 with it, please cite DSSAT as the DSSAT Foundation asks; see
 [Acknowledgements and how to cite](https://bennyistanto.github.io/xdssat/acknowledgements.html).
 
