@@ -140,10 +140,10 @@ withDownload(Plot.plot({
 
 ```{ojs}
 withDownload(Plot.plot({
-  width: Math.min(width, 900), height: 60 + runs.length * 42, marginLeft: 260,
+  width: Math.min(width, 900), height: 60 + runs.length * 42, marginLeft: 300, marginRight: 20,
   x: {label: "Area-weighted yield over all years, kg/ha dry matter", grid: true},
-  y: {label: null},
-  fy: {label: null},
+  y: {axis: null},
+  fy: {label: null, axis: "left"},
   color: {legend: true},
   marks: [
     Plot.barX(runs.flatMap(r => ["wet_irrigated", "wet_rainfed", "dry_irrigated"].map(s => ({run: r.run, system: s, v: r[`yield_${s}`]}))).filter(d => d.v != null),
