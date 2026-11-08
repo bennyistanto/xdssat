@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <title>How xdssat works: your data, prepared inputs, the DSSAT engine on every cell, gridded outputs</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#52514e"/>
+    </marker>
+  </defs>
+  <rect width="960" height="360" rx="14" fill="#fcfcfb"/>
+  <text x="480" y="34" text-anchor="middle" font-size="20" font-weight="600" fill="#0b0b0b">xdssat: the DSSAT engine on every cell of a region</text>
+
+  <!-- 1 your data -->
+  <rect x="24" y="62" width="196" height="268" rx="12" fill="#eef4fc" stroke="#2a78d6"/>
+  <text x="122" y="88" text-anchor="middle" font-size="15" font-weight="600" fill="#0b0b0b">1. Your data</text>
+  <g font-size="12.5" fill="#26251f">
+    <text x="40" y="116">Weather: AgERA5, ERA5-Land,</text><text x="52" y="132">NASA POWER, stations</text>
+    <text x="40" y="160">Crop mask: national map,</text><text x="52" y="176">WorldCover, MapSPAM</text>
+    <text x="40" y="204">Soil: SoilGrids, own profiles</text>
+    <text x="40" y="232">Water regime: national map,</text><text x="52" y="248">LGRIP30, MapSPAM</text>
+    <text x="40" y="276">Region, zones (optional)</text>
+  </g>
+  <text x="122" y="314" text-anchor="middle" font-size="11.5" fill="#52514e">any grid, CRS and format</text>
+
+  <!-- 2 prepare -->
+  <rect x="252" y="62" width="196" height="268" rx="12" fill="#fdf0ea" stroke="#eb6834"/>
+  <text x="350" y="88" text-anchor="middle" font-size="15" font-weight="600" fill="#0b0b0b">2. Prepare</text>
+  <g font-size="12.5" fill="#26251f">
+    <text x="268" y="118">prepare_weather.py</text>
+    <text x="268" y="142">prepare_crop_mask.py</text>
+    <text x="268" y="166">prepare_soils.py</text>
+    <text x="268" y="190">prepare_layers.py</text>
+    <text x="268" y="222">units, regrid, pixel areas,</text><text x="268" y="238">checks with plain messages</text>
+  </g>
+  <rect x="268" y="258" width="164" height="54" rx="8" fill="#ffffff" stroke="#eb6834" stroke-dasharray="4 3"/>
+  <text x="350" y="280" text-anchor="middle" font-size="12" fill="#26251f">one experiment file</text>
+  <text x="350" y="297" text-anchor="middle" font-size="12" fill="#26251f">configs/xdssat.yml</text>
+
+  <!-- 3 run -->
+  <rect x="480" y="62" width="216" height="268" rx="12" fill="#e9f7f1" stroke="#1baf7a"/>
+  <text x="588" y="88" text-anchor="middle" font-size="15" font-weight="600" fill="#0b0b0b">3. Run</text>
+  <g font-size="12.5" fill="#26251f">
+    <text x="496" y="116">strata: weather cell x</text><text x="508" y="132">water regime, with hectares</text>
+    <text x="496" y="160">WTH + SOL + FileX per chunk</text>
+  </g>
+  <g fill="#ffffff" stroke="#1baf7a">
+    <rect x="500" y="182" width="52" height="34" rx="6"/><rect x="560" y="182" width="52" height="34" rx="6"/><rect x="620" y="182" width="52" height="34" rx="6"/>
+    <rect x="500" y="222" width="52" height="34" rx="6"/><rect x="560" y="222" width="52" height="34" rx="6"/><rect x="620" y="222" width="52" height="34" rx="6"/>
+  </g>
+  <g font-size="10.5" fill="#26251f" text-anchor="middle">
+    <text x="526" y="203">dscsm048</text><text x="586" y="203">dscsm048</text><text x="646" y="203">dscsm048</text>
+    <text x="526" y="243">dscsm048</text><text x="586" y="243">dscsm048</text><text x="646" y="243">dscsm048</text>
+  </g>
+  <text x="588" y="282" text-anchor="middle" font-size="12" fill="#26251f">the unmodified DSSAT engine,</text>
+  <text x="588" y="298" text-anchor="middle" font-size="12" fill="#26251f">many processes in parallel</text>
+
+  <!-- 4 outputs -->
+  <rect x="728" y="62" width="208" height="268" rx="12" fill="#f3f1fb" stroke="#6250d6"/>
+  <text x="832" y="88" text-anchor="middle" font-size="15" font-weight="600" fill="#0b0b0b">4. Results</text>
+  <g>
+    <rect x="752" y="104" width="22" height="22" fill="#d9f0a3"/><rect x="774" y="104" width="22" height="22" fill="#78c679"/><rect x="796" y="104" width="22" height="22" fill="#238443"/><rect x="818" y="104" width="22" height="22" fill="#addd8e"/><rect x="840" y="104" width="22" height="22" fill="#41ab5d"/><rect x="862" y="104" width="22" height="22" fill="#d9f0a3"/>
+    <rect x="752" y="126" width="22" height="22" fill="#41ab5d"/><rect x="774" y="126" width="22" height="22" fill="#238443"/><rect x="796" y="126" width="22" height="22" fill="#addd8e"/><rect x="818" y="126" width="22" height="22" fill="#78c679"/><rect x="840" y="126" width="22" height="22" fill="#238443"/><rect x="862" y="126" width="22" height="22" fill="#78c679"/>
+  </g>
+  <g font-size="12.5" fill="#26251f">
+    <text x="744" y="176">CF netCDF per run:</text><text x="756" y="192">system x year x lat x lon</text>
+    <text x="744" y="220">yield, dates, water, N,</text><text x="756" y="236">area and production</text>
+    <text x="744" y="264">tables per season,</text><text x="756" y="280">district comparisons</text>
+  </g>
+  <text x="832" y="314" text-anchor="middle" font-size="11.5" fill="#52514e">regional totals are plain sums</text>
+
+  <g stroke="#52514e" stroke-width="2" marker-end="url(#a)">
+    <line x1="221" y1="196" x2="249" y2="196"/><line x1="449" y1="196" x2="477" y2="196"/><line x1="697" y1="196" x2="725" y2="196"/>
+  </g>
+</svg>
