@@ -61,26 +61,51 @@ def log(m):
     print(f"{time.strftime('%H:%M:%S')} {m}", flush=True)
 
 
-def build_strata(aoi=None, sample=None, seed=1, exp=None):
-    """Strata of the experiment's AOI (``aoi`` must be its aoi > name)."""
-    import agera5
+def build_strata(aoi=None, sample=None, seed=1, exp=None, ins=None):
+    """Strata of the experiment's AOI (``aoi`` must be its aoi > name), from its prepared inputs."""
+    import inputs
     import management as mg
     import rasters
     exp = exp or config.CURRENT
     if aoi not in (None, exp.aoi):
         raise ValueError(f"aoi {aoi!r} is not the experiment's aoi ({exp.aoi})")
-    R = exp.path("cache") / "rasters"
-    lat, lon, valid = agera5.grid()
-    grid, _ = rasters.IDN.window(*exp.bbox)
-    stats = rasters.aggregate(R / "idn_rice.tif",
-                              {"region": R / "idn_region.tif",
-                               "irr": R / "idn_irrigation_filled.tif",
-                               "aez": R / "idn_aez.tif"}, lat, lon, valid, grid=grid)
-    codes = pd.read_csv(R / "idn_region_classes.csv").set_index("name").code.to_dict()
-    if exp.region not in codes:
-        raise SystemExit(f"aoi > region '{exp.region}' ({exp.where('aoi.region')}) is not in "
-                         f"{R / 'idn_region_classes.csv'}; use one of: {', '.join(map(str, codes))}")
-    st = mg.strata(stats, codes, exp.region, regime=exp.regime_of_class())
+    ins = ins or inputs.open_all(exp)
+    lat, lon, valid = ins["weather"].grid()
+    crop = ins["crop_mask"]
+    grid, _ = crop.grid().window(*exp.bbox)
+    # class layers (sampled at the crop pixels) and share layers (weighted); region, water
+    # regime and zones are each optional
+    layers, weights = {}, {}
+    if ins.get("region") is not None:
+        layers["region"] = ins["region"].file()
+    wr = ins.get("water_regime")
+    if wr is not None:
+        (weights if wr.is_share else layers)["irr"] = wr.file()
+    if ins.get("zones") is not None:
+        layers["aez"] = ins["zones"].file()
+    # a crop pixel coarser than the class maps is split into sub-points (1 = its centre only)
+    sub = rasters.subdivision(grid)
+    if sub > 1:
+        print(f"crop pixels of about {rasters.pixel_metres(grid):.0f} m are read as {sub} x {sub} sub-points",
+              flush=True)
+    stats = rasters.aggregate(crop.file(), layers, lat, lon, valid, grid=grid,
+                              units_per_ha=crop.units_per_ha, class_band=crop.class_band, weights=weights,
+                              sub=sub)
+    codes = None
+    if ins.get("region") is not None and exp.region is not None:
+        codes = ins["region"].codes()
+        if exp.region not in codes:
+            raise SystemExit(f"aoi > region '{exp.region}' ({exp.where('aoi.region')}) is not a class of the "
+                             f"region input '{ins['region'].name}'; use one of: {', '.join(map(str, codes))}")
+    tr = exp.data["treatments"]
+    try:
+        st = mg.strata(stats, codes, exp.region, zone_col="aez" if "aez" in layers else None,
+                       regime=exp.regime_of_class(), default_regime=tr["default_regime"],
+                       share_regimes=tr["share_regimes"])
+    except ValueError as e:
+        raise SystemExit(f"{e}\n  crop mask '{crop.name}', water regime input "
+                         f"'{wr.name if wr is not None else None}'") from None
+    st["soil_id"] = ins["soil"].ids(st.iy, st.ix)
     if sample:
         cells = st.groupby("cell").ha.sum()
         keep = cells.sample(sample, weights=cells, random_state=seed).index
@@ -88,12 +113,12 @@ def build_strata(aoi=None, sample=None, seed=1, exp=None):
     return st
 
 
-def onset_days(st, years, threshold=50.0, n=3):
-    import agera5
+def onset_days(st, years, threshold=50.0, n=3, weather=None):
     import management as mg
+    weather = weather or __import__("inputs").open_all(config.CURRENT)["weather"]
     cells = st.drop_duplicates("cell")[["iy", "ix", "lat", "lon"]].reset_index(drop=True)
     start, end = mg.anchor_date(years[0]), mg.anchor_date(years[-1] + 1) - pd.Timedelta(days=1)
-    dates, v = agera5.series(cells.iy, cells.ix, start, end, variables=("RAIN",))
+    dates, v = weather.series(cells.iy, cells.ix, start, end, variables=("RAIN",))
     per_year, med = mg.onset_climatology(dates, v["RAIN"], years, threshold=threshold, n=n)
     cells["onset_days"] = med
     cells["onset_date_md"] = [(mg.anchor_date(2001) + pd.Timedelta(days=int(d))).strftime("%m-%d")
@@ -288,7 +313,7 @@ def main(argv=None):
         sys.exit(2)
     config.use(exp)
 
-    import agera5
+    import inputs
     import management as mg
     import outputs
     from filex import FileX, with_environment
@@ -319,7 +344,10 @@ def main(argv=None):
     for out in folders:
         out.mkdir(parents=True, exist_ok=True)
 
-    st = build_strata(exp.aoi, rn["sample"], rn["seed"], exp)
+    ins = inputs.open_all(exp)
+    weather = ins["weather"]
+    log("inputs: " + ", ".join(f"{k} {d.name}" for k, d in ins.items() if d is not None))
+    st = build_strata(exp.aoi, rn["sample"], rn["seed"], exp, ins)
     log(f"{len(st)} strata in {st.cell.nunique()} cells, {st.ha.sum():,.0f} ha "
         f"({st.groupby('water').ha.sum().round(0).to_dict()})")
 
@@ -332,7 +360,7 @@ def main(argv=None):
         cells = None
         if mode == "per_cell" or not se["zone_table"]:
             oy = on["years"] or d["years"]
-            cells = onset_days(st, list(range(oy[0], oy[1] + 1)), on["rain_mm"], on["dasarian"])
+            cells = onset_days(st, list(range(oy[0], oy[1] + 1)), on["rain_mm"], on["dasarian"], weather)
             extra["onset.csv"] = cells
             log(f"onset: median {np.nanmedian(cells.onset_days):.0f} days after the year start, "
                 f"{int(np.isnan(cells.onset_days).sum())} cells without onset (they use the default date)")
@@ -356,7 +384,7 @@ def main(argv=None):
             log(f"zone calendar for {table.zone.nunique()} zones")
             units = mg.by_zone(st, years, table, se["zone_column"], seasons)
 
-    last = agera5.last_common_date()
+    last = weather.last_common_date()
     season_days = rn["season_days"]
     late = units.pdate + pd.Timedelta(days=season_days) > last
     if late.any():
@@ -364,11 +392,14 @@ def main(argv=None):
         units = units[~late].reset_index(drop=True)
 
     base_template = FileX.read(exp.template_file)
-    soil_file = exp.path("cache") / "soils" / f"{exp.aoi}.SOL"
-    base_profiles = read_sol(soil_file)
+    soil_file = ins["soil"].file()
+    base_profiles = ins["soil"].profiles()
     missing = set(st.soil_id) - set(base_profiles)
     if missing:
-        raise SystemExit(f"{len(missing)} soil profiles missing from {soil_file.name}, e.g. {sorted(missing)[:3]}")
+        raise SystemExit(f"{len(missing)} weather cells with crop have no soil profile in {soil_file.name} "
+                         f"(soil input '{ins['soil'].name}'), e.g. {sorted(missing)[:3]}. The soil has one "
+                         f"profile per cell with crop in the crop mask it was made for; prepare it for this "
+                         f"weather grid and crop mask: python scripts/prepare_soils.py --aoi {exp.aoi}")
 
     # one job per combination: units with their template treatment, soils, cultivar file, template
     jobs = []
@@ -386,11 +417,15 @@ def main(argv=None):
         profiles = copy.deepcopy(base_profiles)
         for _p in profiles.values():
             _p.surface["SLPF"] = s["slpf"]
+        own_id = {}                            # rainfed copy ID -> the cell's own profile ID
+        if s["slpf_rainfed"] is not None or s["slpf_table"]:
+            rf = u.water == "rainfed"
+            own_id = dict(zip("XR" + u.loc[rf, "soil_id"].str[2:], u.loc[rf, "soil_id"]))
         if s["slpf_rainfed"] is not None:      # same soil, own SLPF: a copy per cell with ID XR<iy><ix>
             rf = u.water == "rainfed"
             u.loc[rf, "soil_id"] = "XR" + u.loc[rf, "soil_id"].str[2:]
             for sid in sorted(set(u.loc[rf, "soil_id"])):
-                p = copy.deepcopy(profiles["XS" + sid[2:]])
+                p = copy.deepcopy(profiles[own_id[sid]])
                 p.id = sid
                 p.surface["SLPF"] = s["slpf_rainfed"]
                 profiles[sid] = p
@@ -402,9 +437,10 @@ def main(argv=None):
                 raise SystemExit(f"{len(lack)} strata missing from {s['slpf_table']}, e.g. {list(lack[:3])}")
             rf = u.water == "rainfed"
             u.loc[rf, "soil_id"] = "XR" + u.loc[rf, "soil_id"].str[2:]
+            sid_of = u.drop_duplicates(["iy", "ix", "water"]).set_index(["iy", "ix", "water"]).soil_id
             for iy, ix, water in need:
-                sid = f"{'XR' if water == 'rainfed' else 'XS'}{iy:04d}{ix:04d}"
-                p = profiles[sid] if water != "rainfed" else copy.deepcopy(profiles["XS" + sid[2:]])
+                sid = sid_of[(iy, ix, water)]
+                p = profiles[sid] if water != "rainfed" else copy.deepcopy(profiles[own_id[sid]])
                 p.id = sid
                 p.surface["SLPF"] = float(tab[(iy, ix, water)])
                 profiles[sid] = p
@@ -426,18 +462,19 @@ def main(argv=None):
                          cul_over=cultivar_overrides(exp, cv, sc), summaries=[], failures=[], t0=time.time()))
     log(f"{len(units)} seasons per run ({units.groupby(['water', 'season']).size().to_dict()})")
 
-    weather = {}      # filled per block: dates, values {VAR: (time, cell)}, column of each cell
+    block = {}        # filled per block: dates, values {VAR: (time, cell)}, column of each cell
     crop = d["template"]["crop_model"]
 
     def writer(job):
         def write_inputs(run_dir, u):
-            dates, w, col = weather["dates"], weather["values"], weather["col"]
+            dates, w, col = block["dates"], block["values"], block["col"]
             cells = u.drop_duplicates("cell")[["cell", "wsta", "iy", "ix", "lat", "lon"]]
             for c in cells.itertuples():
-                df = agera5.cell_frame(dates, w, col[c.cell])
+                df = inputs.cell_frame(dates, w, col[c.cell])
                 tav, amp = tav_amp(df.TMAX, df.TMIN, df.index)
-                write_wth(run_dir / f"{c.wsta}.WTH", df, "AGE5", c.lat, c.lon, tav=tav, amp=amp,
-                          refht=2.0, wndht=agera5.WIND_HEIGHT, title=f"AgERA5 cell {c.iy},{c.ix}")
+                write_wth(run_dir / f"{c.wsta}.WTH", df, weather.station_code, c.lat, c.lon, tav=tav,
+                          amp=amp, refht=weather.temperature_height, wndht=weather.wind_height,
+                          title=f"{weather.name} cell {c.iy},{c.ix}")
             write_sol(run_dir / "SOIL.SOL", [job["profiles"][s] for s in sorted(set(u.soil_id))])
             write_cultivar_files(run_dir, job["cul_over"], crop)
         return write_inputs
@@ -453,8 +490,8 @@ def main(argv=None):
         cells = ub.drop_duplicates("cell")[["cell", "iy", "ix"]].reset_index(drop=True)
         start = ub.pdate.min() - pd.Timedelta(days=40)
         end = min(ub.pdate.max() + pd.Timedelta(days=season_days), last)
-        dates, w = agera5.series(cells.iy, cells.ix, start, end)
-        weather.update(dates=dates, values=w, col=dict(zip(cells.cell, range(len(cells)))))
+        dates, w = weather.series(cells.iy, cells.ix, start, end)
+        block.update(dates=dates, values=w, col=dict(zip(cells.cell, range(len(cells)))))
         for job in jobs:
             tb = time.time()
             uj = job["units"][job["units"].season_year.isin(b)]
@@ -485,9 +522,10 @@ def main(argv=None):
                     ha=float(st.ha.sum()), seasons=len(job["units"]), done=len(summary), failed=len(failed),
                     minutes=round((time.time() - t0) / 60, 1), template=str(exp.template_file),
                     engine=build.read_text().strip() if build.exists() else str(exp.path("engine")),
-                    weather_last_day=f"{last:%Y-%m-%d}")
+                    weather_last_day=f"{last:%Y-%m-%d}",
+                    inputs={k: d.summary() for k, d in ins.items() if d is not None})
         (out / "run_info.json").write_text(json.dumps(info, indent=2))
-        log(f"netCDF -> {outputs.write_run(out)}")
+        log(f"netCDF -> {outputs.write_run(out, lat_lon=weather.grid()[:2])}")
     log(f"done in {round((time.time() - t0) / 60, 1)} min -> {', '.join(str(j['out']) for j in jobs)}")
 
 

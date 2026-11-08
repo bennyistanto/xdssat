@@ -77,7 +77,7 @@ SURFACE_DEFAULTS = {"SCOM": "-99", "SALB": 0.13, "SLU1": 9.3, "SLDR": 0.60,
                     "SMHB": "IB001", "SMPX": "IB001", "SMKE": "IB001"}
 OM_PER_OC = 1.724
 
-# Organic carbon scaling to WISE (Benny's decision, 2026-11-06). SoilGrids SOC
+# Organic carbon scaling to WISE. SoilGrids SOC
 # is higher than the measured WISE 1.1 profiles in Indonesia. Factor = median of
 # WISE OC / SoilGrids OC over layers paired at each WISE site, per depth band
 # (``wise_soc_pairs`` + ``soc_factors`` on dssat-csm-data/Soil/WI.SOL, regional
@@ -194,7 +194,10 @@ class SoilGridsLayer:
         fx = (np.asarray(x) - self.gt[0]) / self.gt[1]
         fy = (np.asarray(y) - self.gt[3]) / self.gt[5]
         out = np.full(fx.shape, NODATA, dtype="int32")
-        pt_idx, src_idx = self.tree.query(shapely.points(fx, fy), predicate="intersects")
+        # look the tile up by the centre of the point's pixel: a point on a tile edge then lies
+        # in exactly one tile (the one floor() names), not on the edge of two
+        px, py = np.floor(fx) + 0.5, np.floor(fy) + 0.5
+        pt_idx, src_idx = self.tree.query(shapely.points(px, py), predicate="intersects")
         pt_idx, first = np.unique(pt_idx, return_index=True)
         src_idx = src_idx[first]
         self.missing += int((~self.exists[src_idx]).sum()) + int(fx.size - pt_idx.size)
@@ -216,23 +219,48 @@ def cache_path(prop: str, depth: str, region: str = "idn", cache_dir: Path | Non
     return Path(cache_dir or config.CACHE_DIR) / "soilgrids" / region / f"{prop}_{depth}_mean.tif"
 
 
+def area_points(lat, lon, valid, bbox=None, centres: bool = False):
+    """Lon/lat of the corners (and with ``centres`` the centres) of the land cells of a
+    weather grid, optionally only those whose centre lies in ``bbox`` (west, south, east,
+    north) widened by one cell. The step is the grid's own (``rasters.weather_step``)."""
+    import rasters
+    h = rasters.weather_step(np.asarray(lat), np.asarray(lon)) / 2
+    yy, xx = np.nonzero(valid)
+    if bbox is not None:
+        w, s, e, n = bbox
+        keep = ((lon[xx] >= w - 2 * h) & (lon[xx] <= e + 2 * h) & (lat[yy] >= s - 2 * h) & (lat[yy] <= n + 2 * h))
+        yy, xx = yy[keep], xx[keep]
+    offs = ([(0.0, 0.0)] if centres else []) + [(-h, -h), (h, -h), (-h, h), (h, h)]
+    plon = np.concatenate([lon[xx] + dx for dx, _ in offs])
+    plat = np.concatenate([lat[yy] + dy for _, dy in offs])
+    return plon, plat
+
+
 def build_region_cache(region: str = "idn", props=tuple(PROPS), depths=tuple(DEPTHS),
                        root: Path | None = None, cache_dir: Path | None = None,
-                       margin_px: int = 8, log=print) -> list[Path]:
-    """Copy the region's part of each SoilGrids layer into one GeoTIFF per layer.
+                       margin_px: int = 8, log=print, points=None) -> list[Path]:
+    """Copy an area's part of each SoilGrids layer into one GeoTIFF per layer.
 
     Same 250 m Homolosine grid as the source (pixels copied, not resampled),
-    window = the region's AgERA5 land cells plus a margin. Tiles absent from
-    the mirror (sea) stay NODATA. One sequential pass per layer, so later
-    sampling reads one file instead of many small tiles on a slow disk.
+    window = the area's land cells plus a margin: ``points`` (lon, lat arrays,
+    e.g. ``area_points`` of a weather input in aoi > bbox), or by default the
+    land cells of the AgERA5 cache ``region``. ``region`` names the cache folder.
+    Tiles absent from the mirror (sea) stay NODATA. One sequential pass per
+    layer, so later sampling reads one file instead of many small tiles on a
+    slow disk.
     """
-    import agera5
     from rasterio.transform import Affine
-    lat, lon, valid = agera5.grid(region)
-    yy, xx = np.nonzero(valid)
-    h = agera5.RES / 2
-    plon = np.concatenate([lon[xx] - h, lon[xx] + h, lon[xx] - h, lon[xx] + h])
-    plat = np.concatenate([lat[yy] - h, lat[yy] - h, lat[yy] + h, lat[yy] + h])
+    if points is None:
+        import agera5
+        lat, lon, valid = agera5.grid(region)
+        yy, xx = np.nonzero(valid)
+        h = agera5.RES / 2
+        plon = np.concatenate([lon[xx] - h, lon[xx] + h, lon[xx] - h, lon[xx] + h])
+        plat = np.concatenate([lat[yy] - h, lat[yy] - h, lat[yy] + h, lat[yy] + h])
+    else:
+        plon, plat = (np.asarray(v, dtype="float64") for v in points)
+    if plon.size == 0:
+        raise ValueError("no land cells in the area")
     gx, gy = (np.asarray(v) for v in _to_igh.transform(plon, plat))
     done = []
     for prop in props:
@@ -284,44 +312,106 @@ def build_region_cache(region: str = "idn", props=tuple(PROPS), depths=tuple(DEP
 _LAYERS: dict = {}
 
 
+def cached_areas(prop: str, depth: str, cache_dir: Path | None = None) -> list[Path]:
+    """The area caches of one layer (``<cache>/soilgrids/<area>/``), the original ``idn`` first."""
+    base = Path(cache_dir or config.CACHE_DIR) / "soilgrids"
+    found = sorted(base.glob(f"*/{prop}_{depth}_mean.tif")) if base.is_dir() else []
+    return sorted(found, key=lambda p: (p.parent.name != "idn", p.parent.name))
+
+
 def _layer(prop, depth, root):
     key = (prop, depth, str(root))
     if key not in _LAYERS:
-        cached = cache_path(prop, depth)
-        _LAYERS[key] = (CachedLayer(cached) if root is None and cached.exists()
-                        else SoilGridsLayer(vrt_path(prop, depth, root)))
+        vrt = vrt_path(prop, depth, root)
+        caches = cached_areas(prop, depth) if root is None else []
+        _LAYERS[key] = CachedLayer(caches, vrt) if caches else SoilGridsLayer(vrt)
     return _LAYERS[key]
 
 
-class CachedLayer:
-    """Point sampler on a regional cache GeoTIFF (``build_region_cache``)."""
+def vrt_origin(vrt: Path) -> tuple[float, float] | None:
+    """Left and top edge of a SoilGrids .vrt grid (its GeoTransform), read without parsing the tiles."""
+    import re
+    try:
+        with open(vrt, encoding="utf-8") as f:
+            head = f.read(4096)
+    except OSError:
+        return None
+    m = re.search(r"<GeoTransform>\s*([^<]+)</GeoTransform>", head)
+    if not m:
+        return None
+    gt = [float(v) for v in m.group(1).split(",")]
+    return gt[0], gt[3]
 
-    def __init__(self, path: Path):
-        self.path = path
+
+class CachedLayer:
+    """Point sampler on area cache GeoTIFFs (``build_region_cache``), in order.
+
+    A point outside every cache is read from the mirror's tiles (``fallback``,
+    the layer's .vrt) when given, so an area without its own cache still works,
+    only slower. ``missing`` counts points with no value: outside every cache
+    and, with a fallback, on a tile the mirror does not have.
+
+    With a fallback, pixel indices are computed from the .vrt's origin, exactly
+    as ``SoilGridsLayer`` does: a point on a pixel edge (crop pixel centres can
+    fall exactly on SoilGrids rows, e.g. MODIS over Luzon) then gets the same
+    pixel with or without a cache.
+    """
+
+    def __init__(self, paths, fallback: Path | None = None):
+        self.paths = [Path(p) for p in ([paths] if isinstance(paths, (str, Path)) else paths)]
+        self.path = self.paths[0]
+        self.fallback = fallback
+        self.origin = vrt_origin(Path(fallback)) if fallback is not None else None
+        self._fb = None
         self.missing = 0
 
+    def _rowcol(self, t, x, y):
+        if self.origin is None:
+            rr, cc = rasterio.transform.rowcol(t, x, y)
+            return np.asarray(rr), np.asarray(cc)
+        gx0, gy0 = self.origin
+        c0 = int(round((t.c - gx0) / t.a))
+        r0 = int(round((t.f - gy0) / t.e))
+        cc = np.floor((np.asarray(x) - gx0) / t.a).astype(np.int64) - c0
+        rr = np.floor((np.asarray(y) - gy0) / t.e).astype(np.int64) - r0
+        return rr, cc
+
     def sample(self, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-        with rasterio.open(self.path) as src:
-            rr, cc = rasterio.transform.rowcol(src.transform, x, y)
-            rr, cc = np.asarray(rr), np.asarray(cc)
-            inside = (rr >= 0) & (rr < src.height) & (cc >= 0) & (cc < src.width)
-            out = np.full(rr.shape, NODATA, dtype="int32")
-            self.missing += int((~inside).sum())
-            if inside.any():
-                r0, c0 = rr[inside].min(), cc[inside].min()
-                win = Window(c0, r0, cc[inside].max() - c0 + 1, rr[inside].max() - r0 + 1)
-                a = src.read(1, window=win)
-                out[inside] = a[rr[inside] - r0, cc[inside] - c0]
+        x, y = np.asarray(x), np.asarray(y)
+        out = np.full(x.shape, NODATA, dtype="int32")
+        todo = np.ones(x.shape, bool)
+        for path in self.paths:
+            if not todo.any():
+                break
+            with rasterio.open(path) as src:
+                rr, cc = self._rowcol(src.transform, x[todo], y[todo])
+                inside = (rr >= 0) & (rr < src.height) & (cc >= 0) & (cc < src.width)
+                if inside.any():
+                    r0, c0 = rr[inside].min(), cc[inside].min()
+                    win = Window(c0, r0, cc[inside].max() - c0 + 1, rr[inside].max() - r0 + 1)
+                    a = src.read(1, window=win)
+                    idx = np.nonzero(todo)[0][inside]
+                    out[idx] = a[rr[inside] - r0, cc[inside] - c0]
+                    todo[idx] = False
+        if todo.any():
+            if self.fallback is not None and Path(self.fallback).exists():
+                if self._fb is None:
+                    self._fb = SoilGridsLayer(Path(self.fallback))
+                before = self._fb.missing
+                out[todo] = self._fb.sample(x[todo], y[todo])
+                self.missing += self._fb.missing - before
+            else:
+                self.missing += int(todo.sum())
         return out
 
 
 def _sample_tile(args):
     """Weighted sums of every SoilGrids layer per weather cell, for one tile."""
-    rice_path, layers, wlat, wlon, grid, win, root, keys = args
-    px = rasters.rice_pixels(rice_path, layers, wlat, wlon, grid, win)
+    rice_path, layers, wlat, wlon, grid, win, root, keys, units_per_ha, class_band, sub = args
+    px = rasters.crop_pixels(rice_path, layers, wlat, wlon, grid, win, class_band, sub)
     if px is None:
         return None, 0
-    w = px["share"].to_numpy("float64") / 100.0
+    w = px["share"].to_numpy("float64") / units_per_ha
     x, y = _to_igh.transform(px["lon"].to_numpy(), px["lat"].to_numpy())
     x, y = np.asarray(x), np.asarray(y)
     out = px[keys].copy()
@@ -343,15 +433,27 @@ def _sample_tile(args):
 
 def cell_properties(rice_path, wlat, wlon, grid=rasters.IDN, layers: dict | None = None,
                     keys=("iy", "ix"), root: Path | None = None, tile: int = 2048,
-                    workers: int = 16, log=print) -> pd.DataFrame:
-    """Rice-weighted mean SoilGrids properties per weather cell (or per ``keys``).
+                    workers: int = 16, log=print, units_per_ha: float = 100.0,
+                    class_band: int | None = 2, sub: int | None = None) -> pd.DataFrame:
+    """Crop-weighted mean SoilGrids properties per weather cell (or per ``keys``).
 
-    Returns one row per key with ``ha`` and ``<prop>_<depth>`` columns in
-    conventional units (NaN where no rice pixel had data).
+    ``rice_path`` is the crop mask (band 1: crop area, ``units_per_ha`` units per
+    ha; ``class_band`` its crop class or None), on ``grid`` in any CRS. Returns
+    one row per key with ``ha`` and ``<prop>_<depth>`` columns in conventional
+    units (NaN where no crop pixel had data).
+
+    ``sub``: sub-points per side of each crop pixel; default ``rasters.subdivision``, the
+    same as the runner's strata, so both see the same weather cells with crop.
     """
     layers = layers or {}
     keys = list(keys)
-    jobs = [(rice_path, layers, wlat, wlon, grid, win, root, keys) for win in grid.tiles(tile)]
+    # a small area would be one job on one process: halve the tile until every worker has one
+    while tile > 256 and len(list(grid.tiles(tile))) < workers:
+        tile //= 2
+    if sub is None:
+        sub = rasters.subdivision(grid)
+    jobs = [(rice_path, layers, wlat, wlon, grid, win, root, keys, units_per_ha, class_band, sub)
+            for win in grid.tiles(tile)]
     parts, missing = [], 0
     with ProcessPoolExecutor(max_workers=workers) as ex:
         for part, miss in ex.map(_sample_tile, jobs):
@@ -397,11 +499,13 @@ def profile_id(iy: int, ix: int, prefix: str = "XS") -> str:
 
 
 def make_profile(row, lat: float, lon: float, sid: str,
-                 soc_scale: dict | None = SOC_SCALE) -> SoilProfile:
+                 soc_scale: dict | None = SOC_SCALE, country: str = "Indonesia") -> SoilProfile:
     """One SoilProfile from a row of ``cell_properties`` (six SoilGrids depths).
 
     ``soc_scale`` multiplies SoilGrids organic carbon per depth (default
-    ``SOC_SCALE``, scaled to WISE); pass None to keep SoilGrids as is.
+    ``SOC_SCALE``, scaled to WISE profiles of Indonesia); pass None to keep
+    SoilGrids as is. ``country`` is the header text only (``prepare > soil >
+    country``); DSSAT does not use it in the simulation.
     """
     g = {p: np.array([row[f"{p}_{d}"] for d in DEPTHS], dtype="float64") for p in PROPS}
     scale = np.array([soc_scale[d] for d in DEPTHS]) if soc_scale else np.ones(len(DEPTHS))
@@ -421,17 +525,17 @@ def make_profile(row, lat: float, lon: float, sid: str,
         texture=texture_class(g["sand"][0], g["silt"][0], g["clay"][0]),
         depth=float(LAYER_BOTTOMS[-1]),
         description="SoilGrids 2.0, S&R 2006" + (", SOC scaled to WISE" if soc_scale else ""),
-        site="-99", country="Indonesia", lat=float(lat), lon=float(lon), family="-99",
+        site="-99", country=country, lat=float(lat), lon=float(lon), family="-99",
         surface=dict(SURFACE_DEFAULTS))
 
 
 def profiles(props: pd.DataFrame, wlat, wlon, prefix: str = "XS",
-             soc_scale: dict | None = SOC_SCALE) -> dict[str, SoilProfile]:
+             soc_scale: dict | None = SOC_SCALE, country: str = "Indonesia") -> dict[str, SoilProfile]:
     """Soil profiles keyed by ID for every row of ``props`` (after ``fill_from_nearest``)."""
     out = {}
     for r in props.to_dict("records"):
         sid = profile_id(r["iy"], r["ix"], prefix)
-        out[sid] = make_profile(r, wlat[r["iy"]], wlon[r["ix"]], sid, soc_scale)
+        out[sid] = make_profile(r, wlat[r["iy"]], wlon[r["ix"]], sid, soc_scale, country)
     return out
 
 
@@ -445,13 +549,15 @@ def wise_soc_pairs(wise_sol: Path, country: str = "Indonesia", bbox=None) -> pd.
     """Pair each WISE layer's organic carbon with SoilGrids at the profile site.
 
     A WISE layer is matched to the SoilGrids depth interval holding its
-    mid-depth (layers deeper than 200 cm are dropped). Needs the regional
-    SoilGrids cache. ``bbox`` = (lon_min, lat_min, lon_max, lat_max).
+    mid-depth (layers deeper than 200 cm are dropped). SoilGrids is read as for
+    the profiles: from an area cache where one covers the site, else from the
+    mirror's tiles, so any country works. ``country`` is the WISE header text
+    (``None`` for all), ``bbox`` = (lon_min, lat_min, lon_max, lat_max).
     """
     from sol import read_sol
     rows = []
     for sid, p in read_sol(wise_sol).items():
-        if (p.country or "").strip() != country or p.lat is None or p.lon is None:
+        if (country is not None and (p.country or "").strip() != country) or p.lat is None or p.lon is None:
             continue
         if bbox and not (bbox[0] <= p.lon <= bbox[2] and bbox[1] <= p.lat <= bbox[3]):
             continue
@@ -463,7 +569,7 @@ def wise_soc_pairs(wise_sol: Path, country: str = "Indonesia", bbox=None) -> pd.
             if mid > 200 or not (oc > 0):
                 continue
             depth = next(d for d, bot in zip(DEPTHS, LAYER_BOTTOMS) if mid <= bot)
-            sg = CachedLayer(cache_path("soc", depth)).sample(x, y)[0]
+            sg = _layer("soc", depth, None).sample(x, y)[0]
             if sg == NODATA:
                 continue
             rows.append(dict(id=sid, lat=p.lat, lon=p.lon, mid=mid, depth=depth,

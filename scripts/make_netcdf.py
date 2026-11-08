@@ -1,6 +1,6 @@
 """Write the gridded CF netCDF of a finished run.
 
-    python scripts/make_netcdf.py E:/temp/xdssat/runs/java_per_cell_1991-2020
+    python scripts/make_netcdf.py <cache>/runs/java_per_cell_1991-2020
     python scripts/make_netcdf.py RUN_DIR --out results.nc
 
 Reads summary.csv, strata.csv and run_info.json from the run folder and writes

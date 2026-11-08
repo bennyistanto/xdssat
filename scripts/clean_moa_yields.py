@@ -1,7 +1,7 @@
 """Clean the Ministry of Agriculture district rice productivity workbook into a CSV.
 
     python scripts/clean_moa_yields.py
-    python scripts/clean_moa_yields.py --xlsx E:/temp/xdssat/temp/padi-produktivitas-moa.xlsx
+    python scripts/clean_moa_yields.py --xlsx <folder>/padi-produktivitas-moa.xlsx
 
 Input: one worksheet per province (sheet name = BPS province code), columns
 No, Lokasi ("<BPS code> - <name>"), 1970 ... 2026. Values are text with a

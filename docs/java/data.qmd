@@ -38,7 +38,7 @@ mapW = Math.min(width, 960)
 | Rice experiment IRMZ8601 | IRRI, Munoz 1986, in `dssat-csm-data` (BSD-3) | DSSAT FileX `.RIX` | Template management: transplanting, flood, split N |
 
 ::: {.source-note}
-Counts and file details: `temp/inputs-detail.md` and the module docstrings of `src/agera5.py`,
+Counts and file details: the module docstrings of `src/agera5.py`,
 `src/soils.py`, `src/rasters.py`; `scripts/prepare_rasters.py` lists the input paths. The provenance of the
 boundary files beyond their BPS codes is not documented in this repository. On every map, province lines
 (bold) and district lines (thin) are cut to the Java area of interest plus 1° and simplified by 0.002° by
@@ -297,10 +297,11 @@ withDownload(Plot.plot({
 ```
 
 ::: {.source-note}
-`checks/n_cultivar_sensitivity.csv` (before the fix) and `n_cultivar_sensitivity_soc1.csv` (after): 40 cells,
+`checks/n_cultivar_sensitivity.csv` (before the correction of the initial soil nitrogen) and
+`n_cultivar_sensitivity_soc1.csv` (after): 40 cells,
 season years 1992-2014, SLPF 1, per_cell calendar; area-weighted by stratum rice ha. IR 64 has a longer
 season and is higher at every N rate; neither cultivar nor N alone brings the model down to the observed
-level (`HANDOFF.md`, 2026-11-06), which is why the level is calibrated with SLPF.
+level, which is why the level is calibrated with SLPF.
 :::
 
 ## References {.unnumbered}

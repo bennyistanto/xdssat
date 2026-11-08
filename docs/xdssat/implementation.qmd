@@ -36,8 +36,10 @@ page does not repeat it; it maps each step to its script and to the settings tha
 
 ## Settings: where things live
 
-All locations are read in `src/config.py` from environment variables. The defaults are the author's machine.
-The table is what `config.py` resolved when the site data were exported.
+Every setting of a run is in one experiment file (`configs/xdssat.yml`, or `--config <file>`), read and
+checked by `src/config.py`. xdssat has no built-in folders: each computer sets its own in the `paths` section,
+or with the environment variables below, which win over the file. The table is what `config.py` resolved when
+the site data were exported.
 
 ```{ojs}
 Inputs.table(settings, {header: {setting: "config.py name", variable: "Environment variable", value: "Value at export", from: "From"}, layout: "auto"})
@@ -47,8 +49,9 @@ Inputs.table(settings, {header: {setting: "config.py name", variable: "Environme
 |---|---|
 | `XDSSAT_ENGINE` | Which `dscsm048` build runs, so which DSSAT version produces the results. Must be a short path outside OneDrive. |
 | `XDSSAT_WORK` | Where the per-process run folders are made. Short path (the engine keeps paths in fixed 80-102 character buffers; `config.MAX_RUN_DIR_LEN` = 60). |
-| `XDSSAT_AGERA5`, `XDSSAT_SOILGRIDS`, `XDSSAT_INPUTS` | Source data read by the preparation scripts. |
-| `XDSSAT_CACHE` | Where every derived product and run is written and read back. |
+| `XDSSAT_AGERA5`, `XDSSAT_SOILGRIDS`, `XDSSAT_INPUTS`, `XDSSAT_BOUNDARIES` | Source data read by the preparation scripts. |
+| `XDSSAT_CACHE` | Where every prepared input and run is written and read back. |
+| `XDSSAT_CONFIG` | Which experiment file is read when no `--config` is given. |
 
 ## The steps
 
@@ -56,13 +59,17 @@ Inputs.table(settings, {header: {setting: "config.py name", variable: "Environme
 |---|---|---|---|---|---|
 | 0 | Check the setup | `check_setup.py` | config, engine | nothing | `--no-run` (skip the engine test) |
 | 0 | Build the engine | `build_engine.py` | `dssat-csm-os` | engine folder + `BUILD_INFO.txt` | `--source`, `--clone --ref` (engine version), `--engine-dir` |
-| 1 | Weather cache | `build_agera5_cache.py` | AgERA5 global netCDF | `agera5/idn/<VAR>/` int16, DSSAT units | `--vars`, `--years` |
-| 2 | 100 m rasters | `prepare_rasters.py` | rice, MoA, AEZ, soil, admin2 polygons | `rasters/idn_*.tif` + class tables | `--layers` (which layers), `--adm2` (district boundaries), `--aoi` (test window) |
-| 3 | SoilGrids tiles | `fetch_soilgrids.py` | ISRIC server | tiles in `XDSSAT_SOILGRIDS` | `--props`, `--depths`, `--dry-run` |
-| 4 | SoilGrids cache | `build_soilgrids_cache.py` | SoilGrids mirror | `soilgrids/idn/*.tif` | `--region` |
-| 5 | Soil profiles | `prepare_soils.py` | rasters, SoilGrids cache | `soils/<aoi>.SOL`, `<aoi>_soilgrids_cells.csv` | `--aoi` (none = Indonesia), **`--no-soc-scale`** (keep SoilGrids SOC) |
-| 6 | Template FileX | `make_templates.py` | `dssat-csm-data` IRMZ8601 | `templates/XDRI8601.RIX` | none; treatments from `management.TREATMENT_GRID` |
-| 7 | Run | `run_aoi.py` | all of the above | `runs/<aoi>_<mode>_<y0>-<y1>[suffix]/` | see below |
+| 1 | Weather (case study) | `build_agera5_cache.py` | AgERA5 global netCDF | `agera5/idn/<VAR>/` int16, DSSAT units | `--vars`, `--years` |
+| 1 | Weather (any source) | `prepare_weather.py` | daily or sub-daily netCDF, station or POWER files | `inputs/weather/<name>/` | section `prepare > weather`; `--inspect`, `--overwrite` |
+| 2 | 100 m rasters (case study) | `prepare_rasters.py` | rice, MoA, AEZ, soil, admin2 polygons | `rasters/idn_*.tif` + class tables | `--layers` (which layers), `--adm2` (district boundaries), `--aoi` (test window) |
+| 2 | Crop mask (any source) | `prepare_crop_mask.py` | land-cover, crop-share, crop-area or field map | `inputs/crop_mask/<name>/` | section `prepare > crop_mask`; `--inspect`, `--overwrite` |
+| 2 | Water regime, region, zones (any source) | `prepare_layers.py` | class or share maps, rasters or polygons | `inputs/<kind>/<name>/` | sections `prepare > water_regime`, `region`, `zones`; `--kind`, `--inspect` |
+| 3 | SoilGrids tiles | `fetch_soilgrids.py` | ISRIC server | tiles in `XDSSAT_SOILGRIDS` | `--aoi` (the area's land cells), `--props`, `--depths`, `--dry-run` |
+| 4 | SoilGrids area cache (optional, faster) | `build_soilgrids_cache.py` | SoilGrids mirror | `soilgrids/<area>/*.tif` | `--aoi` |
+| 5 | Soil profiles | `prepare_soils.py` | crop mask, weather grid, SoilGrids or your `.SOL` | `inputs/soil/<name>/` or `soils/<aoi>.SOL` | section `prepare > soil`; `--aoi`, `--weather`, `--crop-mask`, **`--no-soc-scale`** |
+| 5 | Organic carbon factors | `fit_soc_scale.py` | WISE profiles (`WI.SOL`), SoilGrids | the `soc_scale` setting, printed | `--country`, `--bbox` |
+| 6 | Template FileX | `make_templates.py` | `dssat-csm-data` IRMZ8601 | `templates/XDRI8601.RIX` | none; one treatment per cultivar, water level and N rate |
+| 7 | Run | `run_aoi.py` | the prepared inputs named in the experiment file | `runs/<aoi>_<mode>_<y0>-<y1>[suffix]/` | `--config`, `--check`; see below |
 | 8 | netCDF | `make_netcdf.py` (also called by `run_aoi.py`) | run folder | `<run>.nc` | `--out` |
 | 9 | Observations | `fetch_bdsp.py`, `clean_bdsp.py` | BDSP portal | `obs/bdsp_rice_*_adm2.csv` + flags | `--boundary` (code moves) |
 | 10 | Compare | `compare_districts.py`, `compare_bps.py` | run, obs, rasters | `checks/districts/`, `checks/bps/` | **`--moisture`** (GKG), `--min-ha` (districts kept) |
@@ -74,6 +81,9 @@ Compiled from the scripts' docstrings and their `--help` (below). Step order and
 :::
 
 ### `run_aoi.py`: the options that change the simulation
+
+Each option sets one setting of the experiment file for this run and wins over the file; the defaults are
+those of `configs/rice-java.yml`.
 
 | Option | Default | Effect on the run | Effect on the output |
 |---|---|---|---|
@@ -109,7 +119,7 @@ currentSettings = summary.current.slpf_table && summary.current.slpf_table !== "
 ### What the settings do to the results
 
 Every run folder in the cache, as Java area-weighted yield per season year. Switch the system to see how mode,
-the initial-N fix, SLPF and TCLDF move the series.
+the initial soil nitrogen correction, SLPF and TCLDF move the series.
 
 ```{ojs}
 viewof rySys = Inputs.radio(new Map([["Wet, irrigated", "wet_irrigated"], ["Wet, rain-fed", "wet_rainfed"], ["Dry, irrigated", "dry_irrigated"]]), {value: "wet_irrigated", label: "System"})
@@ -144,18 +154,20 @@ withDownload(Plot.plot({
 
 ::: {.source-note}
 From each run's netCDF: `production.sum() / harvested_area.sum() * 1000` per system (and per season year in
-the line chart). Runs made before the initial soil-N fix are kept for comparison only.
+the line chart). Runs made before the correction of the initial soil nitrogen are kept for comparison only.
 :::
 
 ## Run outputs
 
 | File | Content |
 |---|---|
-| `strata.csv` | one row per weather cell and water regime, with rice ha and zone |
+| `experiment.yml` | the resolved settings of the folder; rerun it with `run_aoi.py --config <folder>/experiment.yml` |
+| `strata.csv` | one row per weather cell and water regime, with crop ha and zone |
 | `units.csv` | one row per simulated season (cell, regime, planting date, template treatment) |
 | `summary.csv` | DSSAT seasonal summary joined to the units (`HWAH`, `MDAT`, `TMINA`, ...) |
 | `failed.csv` | seasons the engine rejected, with its error message |
 | `onset.csv` | `per_cell`: onset per cell (days after 1 Aug, date, years with an onset) |
+| `zone_table.csv` | `by_zone`: the planting calendar of each zone |
 | `run_info.json` | arguments, counts, timings, engine path |
 | `<run>.nc` | CF-1.10 netCDF, `(system, time, lat, lon)`; layout on [How xdssat differs](gridding.qmd#cf-netcdf-output) |
 
@@ -176,4 +188,4 @@ html`<pre class="cli-help">${cliText}</pre>`
 ## Tests
 
 `python -m pytest tests`; tests marked `engine` run the real DSSAT executable and are skipped when it is
-absent. Counts change as tests are added; see `HANDOFF.md` and the test folder rather than a number here.
+absent. The tests are in `tests/`, one file per module or topic.

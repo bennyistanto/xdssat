@@ -1,0 +1,386 @@
+---
+title: "Input data"
+subtitle: "What a run needs, in what form, how to bring your own data, and the alternatives when you have none"
+---
+
+A run reads six kinds of **prepared input**. Each is a dataset in a standard form,
+stored in `<paths > cache>/inputs/<kind>/<name>/` with a short description,
+`input.json`. The experiment file names which dataset of each kind a run uses
+(section `inputs`). The source of a dataset does not matter: your own data is
+always the first choice, and the global datasets listed under **Alternatives**
+fill the gaps where you have none.
+
+| Kind | Required | Used for | Standard form | Made with |
+|---|---|---|---|---|
+| [`weather`](#weather) | yes | every simulated day | daily netCDF per variable and year, regular lat/lon grid | `prepare_weather.py` |
+| [`crop_mask`](#crop-mask) | yes | which weather cells are simulated, and the area that weights every result | GeoTIFF of crop hectares per pixel, any grid and CRS | `prepare_crop_mask.py` |
+| [`soil`](#soil) | yes | the soil profile of each weather cell | DSSAT `.SOL` file plus `soil_map.csv` | `prepare_soils.py` |
+| [`water_regime`](#water-regime) | no | irrigated or rainfed management | GeoTIFF of classes, or of the irrigated share | `prepare_layers.py` |
+| [`region`](#region-and-zones) | no | which crop belongs to the area | GeoTIFF of classes | `prepare_layers.py` |
+| [`zones`](#region-and-zones) | no | one planting calendar per zone | GeoTIFF of classes | `prepare_layers.py` |
+
+## How preparing works
+
+Every kind follows the same four steps.
+
+1. **Look at your file.** `--inspect` prints what a file holds: variables and
+   units, grid and CRS, time steps, the most common values.
+
+   ```bash
+   python scripts/prepare_weather.py --inspect <file>
+   python scripts/prepare_crop_mask.py --inspect <file>
+   python scripts/prepare_layers.py --inspect <file>
+   ```
+
+2. **Describe it** in the `prepare` section of the experiment file: where the
+   file is, what its values mean, and the name of the dataset to write.
+   [`configs/rice-java.yml`](https://github.com/bennyistanto/xdssat/blob/main/configs/rice-java.yml)
+   explains every setting;
+   [`configs/rice-java-all-options.yml`](https://github.com/bennyistanto/xdssat/blob/main/configs/rice-java-all-options.yml)
+   has a complete example of each.
+
+3. **Run the prepare script.** It converts the file to the standard form, writes
+   `input.json` and checks the result against the requirements below.
+
+4. **Use it**: set `inputs > <kind>` to the new name. Before every run the same
+   checks run again, and a problem stops the run with a message that names the
+   setting, what is wrong and how to fix it.
+
+```bash
+python scripts/register_inputs.py --list   # the prepared datasets, and whether the experiment's choice passes
+```
+
+File paths in the `prepare` section may use the folders of the `paths` section:
+`{inputs}`, `{cache}`, `{agera5}`, `{soilgrids}`, `{engine}`. A `*` in a file
+name matches several files, for example the tiles of one map.
+
+## Weather
+
+**Used for:** the daily weather of every simulated season. Each weather cell is
+one DSSAT weather file.
+
+### Standard form
+
+| Variable | Meaning | Unit | Required |
+|---|---|---|---|
+| `SRAD` | solar radiation, daily total | MJ m⁻² d⁻¹ | yes |
+| `TMAX` | maximum air temperature | °C | yes |
+| `TMIN` | minimum air temperature | °C | yes |
+| `RAIN` | precipitation, daily total | mm d⁻¹ | yes |
+| `DEWP` | dew point temperature | °C | no |
+| `WIND` | wind run | km d⁻¹ | no |
+
+- Daily values on a regular latitude-longitude grid of any cell size, at most
+  999 rows by 9,999 columns.
+- One CF netCDF file per variable and year, stored as integers with a scale of
+  0.1 (the weather files reach the engine with one decimal).
+- Every run year and the year after it: a season planted late in a year runs
+  into the next one.
+- The measurement heights of temperature (default 2 m) and wind (10 m for most
+  reanalyses, 2 m for NASA POWER) are written into each weather file.
+
+### Bring your own
+
+Section `prepare > weather`, then `python scripts/prepare_weather.py`. Each
+variable can come from its own source, for example rain from one product and
+temperature from another.
+
+**Gridded daily files** (netCDF). For each variable give `files` (with `{year}`
+where the year goes, or `*`) and `variable` (its name in the file). The script:
+
+- cuts each variable to `aoi > bbox` plus one cell (or `box`);
+- converts it to DSSAT units from the file's own `units` attribute. Understood:
+  K, °C, J m⁻², MJ m⁻², W m⁻², kWh m⁻², metres or kg m⁻² of rain, mm, m s⁻¹,
+  km h⁻¹, km d⁻¹. A file without a units attribute needs `units:` per variable;
+- takes wind from one speed variable, or from two components `[u, v]`;
+- puts every variable on one grid (`grid_step`, or the grid of the TMAX
+  source). `regrid` per variable: `exact` (same cells), `mean` (area mean, for a
+  finer source), `linear` (bilinear from the cells with data, for a coarser
+  source) or `nearest`. Left out, it is chosen from the two grids. Longitudes
+  0-360 and either latitude order are handled.
+
+**Sub-daily files** (for example ERA5-Land hourly) need `daily:` per variable,
+which says how a day is made:
+
+| `daily:` | For | Example |
+|---|---|---|
+| `max` | daily maximum of instantaneous values | TMAX from hourly 2 m temperature |
+| `min` | daily minimum | TMIN |
+| `mean` | daily mean | DEWP, WIND |
+| `sum` | amounts per time step | hourly rain totals |
+| `accumulated` | running totals since 00 UTC | ERA5-Land precipitation and radiation |
+
+`utc_offset_hours` (for Java, 7) makes the days local. The files of the years
+before and after are read too, so the first and last local day of a year are
+complete; a missing day stops the preparation with its date.
+
+**Point sources** (weather stations, NASA POWER points) go under `points:`
+instead of `variables:`, with `grid_step`. Each point is a DSSAT `.WTH` file or
+a CSV table; every cell of the grid takes the series of its nearest point.
+
+- A NASA POWER daily point download (CSV) is read as it is: the location, the
+  parameter names (`T2M_MAX`, `T2M_MIN`, `PRECTOTCORR`, `ALLSKY_SFC_SW_DWN`,
+  `T2MDEW`, `WS2M`) and their units come from its header; -999 is no data.
+- Your own table needs a date column (`DATE`, or `YEAR` with `DOY`, or `YEAR`,
+  `MO`, `DY`), `columns:` (which column holds which variable), `units:` and the
+  location (`lat`, `lon`) if the file does not give it.
+- Every point needs SRAD, TMAX, TMIN and RAIN on every day of the years; a gap
+  stops the preparation with the date.
+
+### Alternatives
+
+| Dataset | Grid | Period | Notes |
+|---|---|---|---|
+| [AgERA5](https://doi.org/10.24381/cds.6c68c9bb) | 0.1°, daily | 1979 to present | all six variables; agrometeorological indicators derived from ERA5; Copernicus licence |
+| [ERA5-Land](https://doi.org/10.24381/cds.e2161bac) | 0.1°, hourly | 1950 to present | use `daily:` per variable; precipitation and radiation are accumulated since 00 UTC |
+| [NASA POWER](https://power.larc.nasa.gov/docs/services/api/temporal/daily/) | point or region | see the POWER documentation | daily; meteorology from MERRA-2 (0.5° x 0.625°), radiation from CERES; free download per point (CSV) |
+| [CHIRPS 2.0](https://doi.org/10.1038/sdata.2015.66) | 0.05°, daily | 1981 to present | rain only, 50°S-50°N; combine with temperature and radiation from another source |
+
+### What the checks refuse
+
+A missing required variable; a year without files; a grid that is not regular
+or has more than 999 x 9,999 cells; for gridded sources, a unit that is not
+understood; for points, a day without data.
+
+::: {.callout-note collapse="true"}
+## Tested on Java
+
+- Java weather prepared from the global AgERA5 archive (2015-2017, all six
+  variables) is identical value by value to the AgERA5 cache of the case study
+  (2.1 million values per variable), and a full Java run with it gives the same
+  results for all 5,658 seasons of 2015-2016.
+- The same weather at 0.25°: 227 cells instead of 1,187, the same total rice
+  area, area-weighted yields within 2% of the 0.1° run.
+- A NASA POWER point download for Bandung (2015-2016) is read without settings;
+  a 2015 run of 20 cells on it ran all 51 seasons.
+- Hourly files and station tables are tested with synthetic files
+  (`tests/test_weather_sources.py`).
+:::
+
+## Crop mask
+
+**Used for:** which weather cells are simulated, and the hectares that weight
+every result. The soil profile of a cell is also weighted by the crop under it.
+
+### Standard form
+
+- A GeoTIFF on any north-up grid and CRS (degrees, UTM, equal-area ...).
+- Band 1: crop area per pixel; `units_per_ha` in `input.json` says how many
+  units make a hectare (1 for hectares; 100 for the percent of a 1 ha pixel).
+- Optional second band with a crop class (for example the field type); it is
+  kept as a column of the strata.
+- Each pixel goes to the weather cell under it. A pixel coarser than about
+  100 m is read as sub-points about 100 m apart (at most 10 x 10 per pixel),
+  each with its part of the area, so it is shared between the weather cells and
+  the water regime, region and soil classes it covers.
+
+### Bring your own
+
+Section `prepare > crop_mask`, then `python scripts/prepare_crop_mask.py`.
+`values:` says what the map holds:
+
+| `values:` | Map | Setting |
+|---|---|---|
+| `classes` | a land-cover or crop-type map | `classes:` the codes of the crop |
+| `fraction`, `percent` | the crop's share of each pixel | |
+| `ha`, `m2`, `km2` | crop area per pixel | |
+| `polygons` | a vector file of fields | optional `class_column`, `select`, `pixel_m` |
+
+- Pixel areas are exact: on the WGS84 ellipsoid for maps in degrees, the map
+  area divided by the CRS's area scale for projected maps.
+- `aggregate: n` sums n x n source pixels into one (for example 10 m to
+  100 m); `split: n` cuts each source pixel into n x n parts.
+- Several tiles of one map (`files` with `*`) are read as one.
+- Polygons are burned with every touched pixel counted (`all_touched`), on an
+  equal-area grid of `pixel_m` metres, the share of each pixel counted on
+  20 m sub-pixels.
+
+### Alternatives
+
+A map of the crop itself (a national field map, as the ATR/BPN rice fields for
+Java) is the best crop mask. Without one:
+
+| Dataset | Pixel | Crop | Setting | Licence |
+|---|---|---|---|---|
+| [ESA WorldCover 2021 v200](https://esa-worldcover.org) | 10 m | cropland (class 40) | `values: classes`, `classes: [40]`, `aggregate: 10` | CC BY 4.0 |
+| [GFSAD LGRIP30](https://doi.org/10.5067/Community/LGRIP/LGRIP30.001) | 30 m | irrigated (2) and rainfed (3) cropland, nominal 2015 | `classes: [2, 3]` | NASA LP DAAC, Earthdata login |
+| [MapSPAM 2020 v2r2](https://doi.org/10.7910/DVN/SWPENT) | 5 arc-min (about 9 km) | physical area of 46 crops, by technology | `values: ha`, file `..._A_RICE_A.tif` for rice | see the Dataverse record |
+| [MODIS MCD12Q1 v061](https://lpdaac.usgs.gov/documents/1409/MCD12_User_Guide_V61.pdf) | 500 m | IGBP croplands (12), cropland mosaics (14) | `classes: [12, 14]` | NASA LP DAAC |
+
+A general cropland class does not say which crop grows there: with it, the crop
+of the experiment is simulated on all cropland. MapSPAM is crop-specific but
+coarse, and its pixels place reported statistics with a model. The Java case
+study compares all four with the national rice map:
+[alternative inputs on Java](../java/alternatives.qmd).
+
+### What the checks refuse
+
+A raster without a CRS or not north-up; a mask that does not cover
+`aoi > bbox`; `units_per_ha` of zero or less; a class band the file does not
+have.
+
+## Soil
+
+**Used for:** the soil profile of every simulated season. Each weather cell
+with crop gets one profile.
+
+### Standard form
+
+- A DSSAT `.SOL` file and `soil_map.csv`: one row per weather cell with crop,
+  with the cell (`iy`, `ix`), its profile (`soil_id`), its crop area (`ha`) and
+  the share of that area on the profile (`share`).
+- At most 20 layers per profile, the engine's limit (`NL = 20` in
+  `ModuleDefs.for`).
+- A soil belongs to one weather grid and one crop mask: it has a profile only
+  for the cells with crop. `input.json` records both, and the checks refuse the
+  soil with another weather input or crop mask.
+- Each cell gets its own copy of its profile (ID `XS<row><col>`), so settings
+  per cell or stratum, such as the soil fertility factor `SLPF`, apply to that
+  cell only.
+
+### Bring your own
+
+Section `prepare > soil`, then `python scripts/prepare_soils.py --aoi <aoi>`.
+
+`method: sol` takes your own profiles from a `.SOL` file (a soil survey, WISE,
+the generic HC27 profiles):
+
+- `profile:` one profile for every cell, or
+- `map:` which profile lies where: a raster of codes with `classes:` (a CSV of
+  `code, soil_id`) or a vector file with `id_column:`. Each cell takes the
+  profile under most of its crop; a cell whose crop lies wholly off the map
+  takes the profile of the nearest cell that has one.
+
+`method: soilgrids` builds a profile per cell from SoilGrids 2.0: the
+crop-weighted mean of every property and depth under the cell's crop, turned
+into DSSAT layers with the pedotransfer functions of Saxton and Rawls (2006)
+([`src/soils.py`](https://github.com/bennyistanto/xdssat/blob/main/src/soils.py)).
+
+- It reads a local copy of SoilGrids (`paths > soilgrids`, the layout of the
+  ISRIC download site). `python scripts/fetch_soilgrids.py --aoi <aoi>`
+  downloads the tiles an area lacks (`--dry-run` counts them);
+  `python scripts/build_soilgrids_cache.py --aoi <aoi>` copies the area into one
+  file per layer, which makes preparing faster.
+- `soc_scale` scales SoilGrids organic carbon to measured profiles:
+  `wise_indonesia`, `none`, or six factors by depth.
+  `python scripts/fit_soc_scale.py --country <name>` fits the factors to the
+  WISE profiles of a country and prints the setting.
+
+| Country | 0-30 cm | 30-100 cm | 100-200 cm | WISE profiles |
+|---|---|---|---|---|
+| Indonesia | 0.70 | 0.63 | 0.47 | 78 |
+| Philippines | 0.72 | 0.83 | 0.64 | 49 |
+| Thailand | 0.72 | 0.61 | 0.58 | 50 |
+| India | 0.70 | 0.86 | 0.75 | 92 |
+
+The factors are the median WISE / SoilGrids ratio of organic carbon per depth
+band (WISE 1.1 in DSSAT's `WI.SOL`). The topsoil factor is close to 0.7 in all
+four countries; the deeper ones differ, so factors fitted for one country do not
+carry over to another.
+
+### Alternatives
+
+| Dataset | Content | Notes |
+|---|---|---|
+| [SoilGrids 2.0](https://doi.org/10.5194/soil-7-217-2021) | 250 m, six depths to 200 cm: texture, organic carbon, bulk density, coarse fragments, nitrogen, pH, CEC | `method: soilgrids`; CC BY 4.0 |
+| HC27 generic profiles | 27 profiles by texture, rooting depth and organic carbon (HarvestChoice), in DSSAT's `HC.SOL` | `method: sol` with one `profile:`; the file's header explains how to choose one |
+| WISE 1.1 profiles | 3,404 measured profiles worldwide, in DSSAT's `WI.SOL` | `method: sol`, or to fit `soc_scale` |
+
+### What the checks refuse
+
+A profile ID of the map that the file does not have; a profile with more than
+20 layers; a soil made for another weather input or crop mask, or with other
+sub-points of the crop mask.
+
+::: {.callout-note collapse="true"}
+## Tested on Java
+
+- One SoilGrids profile per BBSDLP soil-map class inside each cell, instead of
+  one per cell (`scripts/soil_class_sensitivity.py`, 30 cells, 2015-2016):
+  5.3 times the seasons; area-weighted yields changed by 0.0% (irrigated dry),
+  -0.1% (irrigated wet) and -0.3% (rainfed); per cell the median change was
+  0.0% and the largest 5.9%. SoilGrids varies smoothly, so this does not show
+  how much a survey with its own profile per class would change; the script
+  measures that for any class map.
+- The organic carbon factors: `none` instead of `wise_indonesia` (30 cells,
+  2015-2016) changed area-weighted yield by -0.2% (irrigated) and -2.5%
+  (rainfed), and irrigation water by +10.5%.
+- One profile for all of Java, the IRRI soil of the template (`IBRI910002`):
+  rainfed yield 6,099 kg/ha against 8,003 kg/ha with SoilGrids (2015-2016).
+- Central Luzon (Philippines): the SoilGrids copy had every tile; profiles for
+  166 cells took 2.2 minutes from the tiles, or 14 s from an area cache built
+  once in 2.3 minutes, with the same result.
+:::
+
+## Water regime
+
+**Used for:** whether a crop pixel is managed as irrigated or rainfed. The
+water regimes and their management levels in the template are set in
+`treatments > water_regimes`; the seasons each regime is planted in, in
+`seasons > calendar`.
+
+### Standard form
+
+One of:
+
+- **A class map:** a GeoTIFF of codes and a class table (`code, name`).
+  `treatments > water_regimes > <regime> > irrigation_classes` lists the codes
+  of each regime.
+- **An irrigated share:** a GeoTIFF of the irrigated share of each pixel (0-1,
+  no value where unknown). Each crop pixel's area is split: the share goes to
+  `treatments > share_regimes > share` (irrigated), the rest to `rest`
+  (rainfed).
+
+The map may be on any grid and CRS; it is read at the crop pixels.
+
+**Optional.** `treatments > default_regime` gives a regime to crop the map does
+not cover: crop on code 0, on a code no regime lists, or where the share has no
+value, and all crop when there is no water regime input. With
+`default_regime: null`, such crop stops the run with the area it concerns.
+
+### Bring your own
+
+Section `prepare > water_regime`, then `python scripts/prepare_layers.py`.
+
+| `values:` | Map |
+|---|---|
+| `classes` | a raster of codes (with `classes:`, a CSV of `code, name`), several tiles (`files` with `*`), or a vector file with `class_column:` |
+| `fraction`, `percent` | a raster of the irrigated share |
+| `ratio` | two rasters of crop area on one grid, `irrigated:` and `total:` |
+
+### Alternatives
+
+A national irrigation map (as the Ministry of Agriculture map for Java) is the
+best water regime. Without one:
+
+| Dataset | Content | Setting | Accuracy |
+|---|---|---|---|
+| [GFSAD LGRIP30](https://doi.org/10.5067/Community/LGRIP/LGRIP30.001) | 30 m classes, nominal 2015: 0 water, 1 non-cropland, 2 irrigated, 3 rainfed; 10° x 10° tiles | `values: classes`, `files: "{inputs}/lgrip30/LGRIP30_2015_*.tif"`; irrigated `[2]`, rainfed `[3]`, `default_regime: rainfed` | overall 86.5% globally, 79.2% in Southeast Asia ([user guide](https://lpdaac.usgs.gov/documents/1619/LGRIP30_User_Guide_v1.pdf)) |
+| [MapSPAM 2020 v2r2](https://doi.org/10.7910/DVN/SWPENT) | irrigated physical area of a crop over all its physical area, 5 arc-min | `values: ratio`, `irrigated: ..._A_RICE_I.tif`, `total: ..._A_RICE_A.tif` | not given per pixel |
+
+LGRIP30 calls a cropland irrigated when it has "at least one artificial
+irrigation during the crop growing period", and its cropland includes
+plantations. Both maps are compared with the national map on Java in
+[alternative inputs on Java](../java/alternatives.qmd).
+
+### What the checks refuse
+
+A class map without a class table; a share above 1 (or above 100 with
+`percent`); a map that does not cover `aoi > bbox`.
+
+## Region and zones
+
+**Region** (optional): a class map; `aoi > region` names the class to keep, so
+only crop inside it is simulated. Without a region input set
+`aoi > region: null`, and `aoi > bbox` alone decides.
+
+**Zones** (optional): a class map for `seasons > mode: by_zone`, one planting
+calendar per zone: from `seasons > zone_table`, or the median rainfall onset of
+each zone's cells.
+
+Both: section `prepare > region` or `prepare > zones` with `values: classes`
+(a raster with a class table, several tiles, or a vector file with
+`class_column`), then `python scripts/prepare_layers.py`. A vector file is
+burned on an equal-area grid of `pixel_m` metres (default 100), every touched
+pixel counted. Administrative boundaries of the country, or an agro-ecological
+zone map, are the usual sources.

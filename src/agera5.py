@@ -210,28 +210,21 @@ def build_cache(region: str = "idn", variables=tuple(VARIABLES), years=None,
 
 
 # ---------------------------------------------------------------- reading
+# The cache is a standard weather input (src/inputs.py); reading goes through it.
 
 
-def _read_cache_year(region, var, year, iy, ix, cache_dir=None):
-    with _LOCK, netCDF4.Dataset(cache_path(region, var, year, cache_dir)) as f:
-        x = f[var]
-        x.set_auto_maskandscale(False)
-        raw = x[:, iy, ix]
-        tv = f["time"]
-        dates = pd.Timestamp("1900-01-01") + pd.to_timedelta(tv[:], unit="D")
-    vals = np.where(raw == PACK_FILL, np.nan, raw * PACK_SCALE)
-    return pd.DatetimeIndex(dates), vals
+def store(region: str = "idn", cache_dir: Path | None = None) -> "inputs.Weather":
+    """The cached region as a standard weather dataset (``inputs.Weather``)."""
+    import inputs
+    folder = Path(cache_dir or config.CACHE_DIR) / "agera5" / region
+    return inputs.Weather.from_layout(folder, f"{{var}}/agera5_{region}_{{var}}_{{year}}.nc",
+                                      variables=tuple(VARIABLES), wind_height=WIND_HEIGHT)
 
 
 def grid(region: str = "idn", cache_dir: Path | None = None, var: str = "TMAX",
          year: int = 2000) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """(lat, lon, valid) of a cached region; valid = cell has data on day 1."""
-    with _LOCK, netCDF4.Dataset(cache_path(region, var, year, cache_dir)) as f:
-        lat, lon = f["lat"][:].data, f["lon"][:].data
-        x = f[var]
-        x.set_auto_maskandscale(False)
-        valid = x[0, :, :] != PACK_FILL
-    return lat, lon, np.asarray(valid)
+    return store(region, cache_dir).grid(var, year)
 
 
 def cell_index(lat: np.ndarray, lon: np.ndarray, glat, glon) -> tuple[np.ndarray, np.ndarray]:
@@ -249,31 +242,7 @@ def series(iy, ix, start, end, region: str = "idn", variables=tuple(VARIABLES),
     ``iy`` and ``ix`` are row and column indices into the cached region grid.
     Only the bounding block of the cells is read from each yearly file.
     """
-    iy, ix = np.asarray(iy), np.asarray(ix)
-    start, end = pd.Timestamp(start), pd.Timestamp(end)
-    by, bx = slice(iy.min(), iy.max() + 1), slice(ix.min(), ix.max() + 1)
-    out, dates = {}, None
-    for var in variables:
-        parts, dparts = [], []
-        for y in range(start.year, end.year + 1):
-            d, v = _read_cache_year(region, var, y, by, bx, cache_dir)
-            parts.append(v[:, iy - by.start, ix - bx.start])
-            dparts.append(d)
-        d = pd.DatetimeIndex(np.concatenate(dparts))
-        v = np.concatenate(parts)
-        keep = (d >= start) & (d <= end)
-        d, v = d[keep], v[keep]
-        if dates is None:
-            dates = d
-        elif not d.equals(dates):
-            missing = dates.symmetric_difference(d)
-            raise ValueError(f"{var}: dates differ from {variables[0]} on {len(missing)} days, "
-                             f"e.g. {missing[:3].tolist()}")
-        out[var] = v
-    expected = pd.date_range(start, min(end, dates[-1]), freq="D")
-    if not dates.equals(expected):
-        raise ValueError(f"daily series has gaps between {start:%Y-%m-%d} and {end:%Y-%m-%d}")
-    return dates, out
+    return store(region, cache_dir).series(iy, ix, start, end, variables)
 
 
 def cell_frame(dates: pd.DatetimeIndex, values: dict[str, np.ndarray], k: int) -> pd.DataFrame:
@@ -284,10 +253,4 @@ def cell_frame(dates: pd.DatetimeIndex, values: dict[str, np.ndarray], k: int) -
 def last_common_date(region: str = "idn", variables=tuple(VARIABLES),
                      cache_dir: Path | None = None) -> pd.Timestamp:
     """Last day that every cached variable has (the newest year is often partial)."""
-    ends = []
-    for var in variables:
-        folder = cache_path(region, var, 2000, cache_dir).parent
-        last = max(int(p.stem.rsplit("_", 1)[1]) for p in folder.glob(f"agera5_{region}_{var}_*.nc"))
-        with netCDF4.Dataset(cache_path(region, var, last, cache_dir)) as f:
-            ends.append(pd.Timestamp("1900-01-01") + pd.Timedelta(days=int(f["time"][-1])))
-    return min(ends)
+    return store(region, cache_dir).last_common_date(variables)

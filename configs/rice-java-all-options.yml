@@ -46,6 +46,86 @@ aoi:
   # island group of the agro-ecological zone map
   region: Jawa
 
+# The prepared datasets this run reads (configs/rice-java.yml explains each kind).
+inputs:
+  # daily weather on a 0.1 degree grid
+  weather: agera5_idn
+  # crop area per pixel
+  crop_mask: rice_atrbpn_idn
+  # one soil profile per weather cell
+  soil: soilgrids_java
+  # irrigation classes per pixel
+  water_regime: irrigation_moa_idn
+  # region classes per pixel (aoi > region keeps one)
+  region: islands_bbsdlp_idn
+  # zone classes for by_zone (null = none)
+  zones: aez_bbsdlp_idn
+
+# How to make a weather input from your own files: here, the Java box from the global AgERA5
+# archive in paths > agera5 (python scripts/prepare_weather.py --config <this file>). The
+# result, agera5_java, holds the same values as agera5_idn for Java (checked value by value);
+# change grid_step to 0.25 for a coarser grid. The variable names are those of the AgERA5
+# files (see --inspect). RAIN shows regrid: mean (an area mean, the right choice for rain from
+# a finer grid; on the same grid it copies the values).
+prepare:
+  # the weather dataset to make, and where each variable comes from
+  weather:
+    name: agera5_java
+    description: "AgERA5 for the Java box, prepared from the global archive"
+    box: null
+    grid_step: null
+    years: [1991, 2021]
+    station_code: AGE5
+    temperature_height_m: 2
+    variables:
+      TMAX: {files: "{agera5}/t2mmax/agera5_t2mmax_{year}.nc", variable: Temperature_Air_2m_Max_24h}
+      TMIN: {files: "{agera5}/t2mmin/agera5_t2mmin_{year}.nc", variable: Temperature_Air_2m_Min_24h}
+      SRAD: {files: "{agera5}/srad/agera5_srad_{year}.nc", variable: Solar_Radiation_Flux}
+      RAIN: {files: "{agera5}/precip/agera5_precip_{year}.nc", variable: Precipitation_Flux, regrid: mean}
+      DEWP: {files: "{agera5}/t2mdp/agera5_t2mdp_{year}.nc", variable: Dew_Point_Temperature_2m_Mean_24h}
+      WIND: {files: "{agera5}/ws10m/agera5_ws10m_{year}.nc", variable: Wind_Speed_10m_Mean_24h, height_m: 10}
+  # a crop mask from a land-cover map: MODIS MCD12Q1 IGBP 2020 (500 m, degrees), classes 12
+  # (Croplands) and 14 (Cropland/Natural Vegetation Mosaics): 6.43 million ha in the Java box,
+  # 5.97 million ha in Jawa, against 3.37 million ha of ATR/BPN rice fields. 1.81 million ha of
+  # it (30%) lie off the Java irrigation map and run as rainfed (treatments > default_regime).
+  crop_mask:
+    name: cropland_mcd12q1_2020_java
+    files: "{inputs}/mcd12q1/wld_phy_mcd12q1_igbp_2020.tif"
+    values: classes
+    classes: [12, 14]
+    aggregate: 1
+    box: null
+    source: "MODIS MCD12Q1 v061, IGBP classification (LC_Type1), 2020"
+    description: "IGBP croplands and cropland mosaics, as crop ha per 500 m pixel"
+  # SoilGrids with the organic carbon factors written out (these six are wise_indonesia).
+  # Your own profiles instead, one generic HC27 profile for every cell:
+  #   soil: {name: hc27_loam_java, method: sol, file: "{engine}/Soil/HC.SOL", profile: HC_GEN0011}
+  soil:
+    name: null
+    method: soilgrids
+    soc_scale: {0-5cm: 0.70, 5-15cm: 0.70, 15-30cm: 0.70, 30-60cm: 0.63, 60-100cm: 0.63, 100-200cm: 0.47}
+    country: Indonesia
+  # an irrigated share from two area rasters (the SPAM 2020 v2r2 rice files, as unzipped)
+  water_regime:
+    name: spam2020_rice_irrigated_java
+    values: ratio
+    irrigated: "{inputs}/spam2020/spam2020_V2r2_global_A_RICE_I.tif"
+    total: "{inputs}/spam2020/spam2020_V2r2_global_A_RICE_A.tif"
+    box: null
+    source: "SPAM 2020 v2r2, physical area of rice, irrigated (I) and all technologies (A)"
+    description: "irrigated share of rice area"
+  # a region map from polygons (a province boundary file; the file name is a placeholder)
+  region:
+    name: provinces_java
+    values: classes
+    files: "{boundaries}/idn_adm1.shp"
+    class_column: ADM1_EN
+    pixel_m: 100
+    layer: null
+    source: "province boundaries"
+    description: "provinces of Java"
+  zones: null
+
 # The standard template and crop model.
 template:
   # the FileX every season copies
@@ -71,6 +151,10 @@ treatments:
   water_regimes:
     irrigated: {template_level: 1, irrigation_classes: [1, 2, 3]}
     rainfed: {template_level: 3, irrigation_classes: [4]}
+  # crop off the irrigation map (class 0) is rainfed instead of stopping the run
+  default_regime: rainfed
+  # with an irrigated-share map: the share is irrigated, the rest rainfed
+  share_regimes: {share: irrigated, rest: rainfed}
   # soil water at the start of each season, share of plant-available water
   initial_soil_water: 0.9
 

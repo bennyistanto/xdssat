@@ -3,7 +3,7 @@
     python scripts/prepare_rasters.py                    # all of Indonesia
     python scripts/prepare_rasters.py --aoi java --out C:/TEMP/x   # a window, for testing
 
-Inputs (under XDSSAT_INPUTS, default E:/temp):
+Inputs (under paths > inputs of the experiment file, or XDSSAT_INPUTS):
     idn-lbs/idn_phy_luasbakusawah_atrbpn_2024_a.gpkg   rice fields, ATR/BPN 2024
     idn-soil/idn_phy_tanahsemidetil_50k_bbsdlp_a.shp   soil, BBSDLP 1:50k (no Papua)
     idn-soil/idn_phy_agroecological_zone_bbsdlp_a.shp  island groups and AEZ zones
@@ -205,6 +205,10 @@ def main():
         log(f"{layer}: Java rice {w.sum():,.0f} ha; filled from nearest pixel {w[moved].sum():,.0f} ha "
             f"({moved.mean() * 100:.1f}% of pixels); distance km median {np.median(km):.2f}, "
             f"p90 {np.percentile(km, 90):.2f}, max {km.max():.1f}")
+    if a.out == config.CACHE_DIR / "rasters":
+        import inputs
+        log("registered as prepared inputs (src/inputs.py):")
+        inputs.register_existing(config.CACHE_DIR, name, config.CURRENT.aoi, log=log)
 
 
 if __name__ == "__main__":

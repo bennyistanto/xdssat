@@ -6,8 +6,8 @@ A Quarto website with Observable JS (Observable Plot) charts and maps. `getting-
 | Section | Files |
 |---|---|
 | Home: xdssat as a bridge between DSSAT and Python | `index.qmd` |
-| xdssat | `xdssat/index.qmd`, `xdssat/gridding.qmd`, `xdssat/implementation.qmd`, `getting-started.md` |
-| Case study: rice in Java | `java/index.qmd` (story), `java/data.qmd`, `java/science.qmd`; their data in `java/data/` |
+| xdssat | `xdssat/index.qmd`, `xdssat/gridding.qmd`, `xdssat/implementation.qmd`, `getting-started.md`, `xdssat/data.qmd` (input data) |
+| Case study: rice in Java | `java/index.qmd` (story), `java/data.qmd`, `java/alternatives.qmd` (alternative input data), `java/science.qmd`; their data in `java/data/` |
 | DSSAT training (6 modules, adapted from the 2018 International Training Program on DSSAT) | `learn/index.qmd` (from the case study to DSSAT itself), `learn/module1.qmd` ... `module6.qmd`; their data in `learn/data/moduleN/` |
 | Notebooks | `notebooks/index.qmd`, `notebooks/module1.ipynb` ... `module6.ipynb`; helpers `notebooks/learnlib.py` and `notebooks/glue.py` (GLUE port); the course's data files in `notebooks/course-data/` |
 | About (navbar, right) | `faq.qmd`, `acknowledgements.qmd` (not an official DSSAT product; how to cite DSSAT and xdssat), `rebuild.qmd` |

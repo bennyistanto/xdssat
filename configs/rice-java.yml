@@ -2,8 +2,9 @@
 # configs/rice-java.yml - case study: rice in Java
 # ==========================================================================================
 # One experiment file holds every setting of an xdssat run: where things are on this computer,
-# the area, the varieties, the fertilizer and water treatments, the planting calendar, the
-# scenarios (CO2, warming, calibration factors) and the years. You never need to edit Python.
+# the prepared input data, the area, the varieties, the fertilizer and water treatments, the
+# planting calendar, the scenarios (CO2, warming, calibration factors) and the years. You
+# never need to edit Python.
 # This file is the reference: every setting is explained here. configs/README.md lists the
 # other files; configs/rice-java-all-options.yml shows every option in use.
 #
@@ -106,31 +107,309 @@ paths:
 # ==========================================================================================
 # aoi: the area of interest
 # ==========================================================================================
-# Which rice is simulated. The box picks the part of the national 100 m grid to read; the
-# region then keeps only the rice inside it. Rice is grouped by AgERA5 weather cell (0.1
-# degree, about 11 km), and each cell is simulated once per water regime.
+# Which crop is simulated. The box picks the part of the crop mask to read; the region, when
+# there is a region input, keeps only the crop inside it. The crop is grouped by weather cell
+# (AgERA5: 0.1 degree, about 11 km), and each cell is simulated once per water regime.
 #
-# Limits today: the irrigation classes come from the Ministry of Agriculture map, which covers
-# Java only, so the area must lie in Java (a province, a district group). Rice with no
-# irrigation class stops the run with a message. A new area also needs its soil profiles once:
+# Any area works for which the inputs are prepared (see the inputs section). The soil input
+# is made for the area once:
 #   python scripts/prepare_soils.py --config <this file> --aoi <name>
+# The Ministry of Agriculture irrigation map of the case study covers Java only; elsewhere use
+# another water regime map or treatments > default_regime.
 # ------------------------------------------------------------------------------------------
 aoi:
-  # Short name, used in file and folder names (soils/<name>.SOL, runs/<name>_...).
+  # Short name, used in file and folder names (runs/<name>_..., soil files).
   # Allowed: letters, digits, _ or -, at most 20 characters, no spaces.
-  # Changing it needs a matching soils/<name>.SOL (prepare_soils.py, see above). Default: java
+  # A new name needs a soil input made for the area (prepare_soils.py, see above). Default: java
   name: java
   # Box around the area in degrees:
   #   [west longitude, south latitude, east longitude, north latitude]
   # Allowed: west < east within -180..180, south < north within -90..90.
-  # Too small: rice outside the box is left out, even inside the region.
+  # Too small: crop outside the box is left out, even inside the region.
   # Too large: only slower to prepare (more of the grid is read); the region still decides.
   # Default (all of Java): [105.0, -9.0, 114.7, -5.0]
   bbox: [105.0, -9.0, 114.7, -5.0]
-  # Region name as listed in <cache>/rasters/idn_region_classes.csv (island groups of the
-  # agro-ecological zone map, e.g. Jawa). Only rice inside this region is simulated.
-  # A name not in that file stops the run and lists the valid names. Default: Jawa
+  # Region name: a class of the region input (inputs > region; for the Java case study the
+  # island groups of the agro-ecological zone map, e.g. Jawa). Only crop inside this region is
+  # simulated. A name the region input does not have stops the run and lists the valid names.
+  # null: no region filter, aoi > bbox alone decides (needed when inputs > region is null).
+  # Default: Jawa
   region: Jawa
+
+
+# ==========================================================================================
+# inputs: the prepared data this run reads
+# ==========================================================================================
+# A run needs six kinds of input. Each is a prepared dataset: files in a standard form plus a
+# small description (input.json) in <cache>/inputs/<kind>/<name>/. Here you only name which
+# dataset of each kind to use. Where the data came from does not matter to the run: weather
+# from AgERA5, ERA5-Land, NASA POWER or CHIRPS, a crop mask from a national map or a global
+# land-cover map, soil from SoilGrids or a soil survey. What matters is that the prepared
+# dataset meets the requirements, which every check and run tests first, in plain words.
+#
+#   weather       daily SRAD, TMAX, TMIN, RAIN (DEWP, WIND optional) on a lat/lon grid,
+#                 in DSSAT units, for every run year and the year after
+#   crop_mask     where the crop grows, as area per pixel; decides which weather cells are
+#                 simulated and weights every result by crop area. Always needed.
+#   soil          one DSSAT soil profile per weather cell
+#   water_regime  a class per pixel (e.g. irrigation type) that treatments > water_regimes
+#                 turns into irrigated or rainfed, or the irrigated share of each pixel (0-1),
+#                 which splits its crop area. null = every crop pixel gets
+#                 treatments > default_regime.
+#   region        a class per pixel; aoi > region names the one to keep (null = the bbox
+#                 decides)
+#   zones         a class per pixel for seasons > mode: by_zone (null = not used)
+# Rasters may be on any grid and CRS; class layers are read at the crop pixel centres.
+#
+# The full list of requirements is in src/inputs.py. To see the datasets you have, and
+# whether this file's choice meets the requirements:  python scripts/register_inputs.py --list
+# Files made by the original xdssat scripts are registered with
+#   python scripts/register_inputs.py
+# under the names below.
+# ------------------------------------------------------------------------------------------
+inputs:
+  # Daily weather. Too short a record: run years without weather (or without the following
+  # year, which every season runs into) stop the run before it starts.
+  # Default: agera5_idn (AgERA5 0.1 degree, cut to Indonesia)
+  weather: agera5_idn
+  # Crop area per pixel. A map that also counts non-crop land as crop puts simulated rice on
+  # it (too much area, wrong places); one that misses fields leaves them out.
+  # Default: rice_atrbpn_idn (ATR/BPN 2024 rice fields, share of each 1 ha pixel)
+  crop_mask: rice_atrbpn_idn
+  # Soil profiles, one per weather cell with crop (it must be made for the weather input and
+  # crop mask above). Default: soilgrids_java (SoilGrids 2.0, built by prepare_soils.py)
+  soil: soilgrids_java
+  # Irrigation classes (or irrigated share) per pixel; null = treatments > default_regime for
+  # all crop. Default: irrigation_moa_idn (MoA irrigation map of Java, gaps filled from the
+  # nearest class under the ATR/BPN rice fields)
+  water_regime: irrigation_moa_idn
+  # Region classes per pixel; null = no region filter (then aoi > region: null too).
+  # Default: islands_bbsdlp_idn (island groups of the BBSDLP agro-ecological zone map; Jawa is
+  # one of them)
+  region: islands_bbsdlp_idn
+  # Zone classes per pixel, used only by seasons > mode: by_zone and kept as a column of the
+  # strata. null = no zones. Default: aez_bbsdlp_idn (BBSDLP agro-ecological zones)
+  zones: aez_bbsdlp_idn
+
+
+# ==========================================================================================
+# prepare: making prepared inputs from your own files
+# ==========================================================================================
+# The inputs section above names datasets that already exist. This section says how to make
+# one from files you downloaded yourself, with the matching script: weather
+# (prepare_weather.py), crop mask (prepare_crop_mask.py), soil (prepare_soils.py), and water
+# regime, region and zones (prepare_layers.py). Each script has --inspect <file> to show what
+# a file holds, except prepare_soils.py.
+#
+# Weather: each DSSAT variable names its own files, so rain can come from one product and
+# temperature from another. The files must hold DAILY values on a regular latitude-longitude
+# grid (netCDF). To read off the variable names, units and grid of a file:
+#     python scripts/prepare_weather.py --inspect <file>
+# Units are read from each file's own units attribute and converted to DSSAT units
+# (K, J m-2, W m-2, kWh m-2, metres or kg m-2 of rain, m s-1 ... are understood). All
+# variables are put on one grid: grid_step, or, if null, the grid of the TMAX source.
+#   files      the file, with {year} where the year goes if there is one file per year.
+#              {agera5}, {inputs}, {cache} ... stand for the folders under paths.
+#   variable   the variable's name inside the file; for WIND also [u, v] components
+#   units      only if the file has no units attribute or an unusual one
+#   regrid     exact (same cells), mean (source finer, e.g. 0.05 to 0.1 degree), linear
+#              (source coarser) or nearest. Leave it out: chosen from the two grids.
+#   height_m   WIND only: measurement height in m (10 for most reanalyses, 2 for POWER WS2M)
+#   daily      only for files with more than one value per day (ERA5-Land hourly): how the
+#              day is made. max (TMAX), min (TMIN), mean (DEWP, WIND), sum (amounts per time
+#              step), accumulated (running totals since 00 UTC, as ERA5-Land's precipitation
+#              and radiation: ECMWF documents that its 00 UTC value is the previous day's
+#              total). Days are local: utc_offset_hours below (Java: 7). The files of the
+#              years before and after are read too, for the first and last local day.
+#              A file pattern may hold * for several files (e.g. monthly downloads).
+#
+# Point sources instead of gridded files (points:, not variables:): each entry is a DSSAT
+# .WTH station file or a CSV table (a NASA POWER daily point download, or your own columns
+# with columns: and units:). Every cell of the grid (grid_step needed) takes the series of
+# its nearest point. Every point needs SRAD, TMAX, TMIN and RAIN on every day of the years;
+# a day without them stops with its date. POWER column names (T2M_MAX, T2M_MIN, PRECTOTCORR,
+# ALLSKY_SFC_SW_DWN, T2MDEW, WS2M) and units in its header are recognised; check with
+#     python scripts/prepare_weather.py --inspect <file.csv>
+#   points:
+#     - {file: "D:/power/site_a.csv"}
+#     - {file: "D:/stations/BDG.WTH"}
+#     - {file: "D:/stations/bmkg_bogor.csv", lat: -6.6, lon: 106.8,
+#        columns: {TMAX: tx, TMIN: tn, RAIN: rr, SRAD: rs}, units: {SRAD: "MJ m-2", RAIN: mm, TMAX: C, TMIN: C}}
+#
+# An example with three sources (names as such products often use them; CHECK them with
+# --inspect, products and versions differ):
+#   prepare:
+#     weather:
+#       name: mixed_java
+#       grid_step: 0.1
+#       variables:
+#         TMAX: {files: "D:/era5land/tmax_{year}.nc", variable: t2m}
+#         TMIN: {files: "D:/era5land/tmin_{year}.nc", variable: t2m}
+#         SRAD: {files: "D:/power/power_java.nc", variable: ALLSKY_SFC_SW_DWN}
+#         RAIN: {files: "D:/chirps/chirps-v2.0.{year}.days_p05.nc", variable: precip}
+#         WIND: {files: "D:/era5land/wind_{year}.nc", variable: [u10, v10], height_m: 10}
+# configs/rice-java-all-options.yml has a complete example that works with the AgERA5 archive.
+#
+# Crop mask: any map that says where the crop is becomes crop hectares per pixel, on the
+# map's own grid and CRS (degrees, UTM, equal-area ...). Pixel areas are exact (the
+# ellipsoid for degrees; the CRS's area scale for projected maps). To see a file's CRS,
+# pixel size and most common values:
+#     python scripts/prepare_crop_mask.py --inspect <file>
+#   values: classes    a land-cover map; list the crop class codes under classes. E.g. ESA
+#                      WorldCover (10 m): [40] Cropland; MODIS MCD12Q1 IGBP (500 m): [12]
+#                      Croplands, [14] Cropland/Natural Vegetation Mosaics. A general
+#                      cropland class does not say which crop grows there: for rice it means
+#                      "rice may grow on any cropland"; a rice map (as ATR/BPN for Java) is
+#                      better where there is one.
+#   values: fraction | percent   a crop share per pixel (0-1 or 0-100)
+#   values: ha | m2 | km2        a crop area per pixel, e.g. MapSPAM physical area (ha)
+#   values: polygons             a vector file of fields (shapefile, GeoPackage ...), burned on
+#                                an equal-area grid as the Java rice map
+# A crop pixel coarser than about 100 m is read as sub-points about 100 m apart (at most
+# 10 x 10 per pixel), each with its part of the area, so one pixel can span weather cells and
+# the classes of the water regime and region maps (MODIS 500 m: 5 x 5). Aggregate 10 m
+# WorldCover (aggregate: 10 gives 100 m) for a smaller file and a faster run; a 9 km map
+# (MapSPAM's 5 arc-minutes) is read as 10 x 10 points of about 900 m without any setting.
+# The crop mask also decides which weather cells get a soil profile, so prepare the soil for
+# it afterwards (python scripts/prepare_soils.py --aoi <aoi> --crop-mask <name>). The water
+# regime map must have a class under every crop pixel (the Java irrigation map has one under
+# the ATR/BPN rice fields only).
+#
+# An example with WorldCover tiles (CHECK the file names and classes with --inspect):
+#   prepare:
+#     crop_mask:
+#       name: cropland_worldcover_java
+#       files: "D:/worldcover/ESA_WorldCover_10m_2021_v200_*_Map.tif"
+#       values: classes
+#       classes: [40]
+#       aggregate: 10
+#       source: "ESA WorldCover 10 m 2021 v200, CC-BY 4.0"
+#
+# Soil: one DSSAT profile per weather cell with crop, so the soil belongs to one weather input
+# and one crop mask (inputs > weather and inputs > crop_mask when it is made). Two methods:
+#   method: soilgrids   the crop-weighted mean of SoilGrids 2.0 (250 m, global) under the crop
+#                       pixels of each cell, turned into DSSAT layers by pedotransfer (Saxton
+#                       and Rawls 2006; src/soils.py). Reads the SoilGrids mirror (paths >
+#                       soilgrids) for any area: fetch_soilgrids.py --aoi <aoi> fetches the
+#                       tiles it lacks; build_soilgrids_cache.py --aoi <aoi> (optional) makes
+#                       preparing it faster.
+#   method: sol         your own profiles in a DSSAT .SOL file (a soil survey, WISE, the 27
+#                       generic HC27 profiles in DSSAT's HC.SOL ...), with
+#                         profile: one ID for every cell, or
+#                         map: a raster of codes (+ classes: CSV of code, soil_id) or a vector
+#                         file (+ id_column) saying which profile lies where. Each cell takes
+#                         the profile under most of its crop; a cell whose crop is wholly off
+#                         the map takes the nearest cell's.
+# A profile may have at most 20 layers (the engine's limit). Then:
+#     python scripts/prepare_soils.py --aoi <aoi>
+# An example with one HC27 profile everywhere (Loam, high fertility, 120 cm; pick yours with
+# the decision tree at the top of HC.SOL):
+#   prepare:
+#     soil:
+#       name: hc27_loam_java
+#       method: sol
+#       file: "{engine}/Soil/HC.SOL"
+#       profile: HC_GEN0011
+# ------------------------------------------------------------------------------------------
+prepare:
+  # How to make a weather input (null = this file does not make one). The keys:
+  #   name                  the dataset to write; use it in inputs > weather afterwards
+  #   description           free text, kept in the dataset's description
+  #   box                   [west, south, east, north]; null = aoi > bbox (plus one cell)
+  #   grid_step             cell size in degrees; null = the grid of the TMAX source.
+  #                         Finer cells: more weather cells to simulate (run time grows with
+  #                         them) and a bigger soil file; at most 999 x 9999 cells.
+  #   years                 [first, last]; null = the run years and the year after
+  #   station_code          4 letters or digits written into the weather files (default XDWX)
+  #   temperature_height_m  height of the temperature measurements, m (default 2)
+  #   variables             SRAD, TMAX, TMIN, RAIN needed; DEWP, WIND optional (see above)
+  #   utc_offset_hours      for sub-daily files: local time minus UTC, so days are local (default 0)
+  #   points                point sources instead of variables (see above)
+  #   wind_height_m         points only: wind measurement height, m (default 2, as POWER WS2M)
+  # Then: python scripts/prepare_soils.py --weather <name>, and set inputs > weather and
+  # inputs > soil to the new datasets. Default: null
+  weather: null
+  # How to make a crop mask input (null = this file does not make one). The keys:
+  #   name          the dataset to write; use it in inputs > crop_mask afterwards
+  #   files         the map; * matches several tiles (they must share one grid).
+  #                 {inputs}, {cache} ... stand for the folders under paths.
+  #   values        classes, fraction, percent, ha, m2, km2 or polygons (see above)
+  #   classes       values: classes only, the crop class codes, e.g. [40]
+  #   aggregate     source pixels per side summed into one output pixel (default 1 = the
+  #                 source grid). Larger: a smaller file and a faster run, each pixel coarser.
+  #   split         cut each source pixel into split x split equal parts (default 1), for
+  #                 maps whose pixels are not much smaller than a weather cell
+  #   box           [west, south, east, north]; null = aoi > bbox
+  #   source, description   free text, kept in the dataset's input.json
+  #   polygons only: layer (of a multi-layer file), select ({column: [values]} to keep),
+  #                 class_column (kept as the crop class), pixel_m (default 100),
+  #                 subpixels (default 5, i.e. 20 m sub-pixels count the share)
+  # Then: python scripts/prepare_soils.py --aoi <aoi> --crop-mask <name>, and set
+  # inputs > crop_mask and inputs > soil to the new datasets. Default: null
+  crop_mask: null
+  # How python scripts/prepare_soils.py makes the soil input (see above). The keys:
+  #   name        the soil input to write, in <cache>/inputs/soil/<name>/. null (SoilGrids
+  #               only) keeps the original names: <cache>/soils/<aoi>.SOL, registered as
+  #               soilgrids_<aoi> (plus _<weather> and _<crop mask> when they are not the
+  #               Java defaults).
+  #   method      soilgrids or sol
+  #   soc_scale   soilgrids only: a factor on SoilGrids organic carbon by depth.
+  #               wise_indonesia: 0.70 down to 30 cm, 0.63 to 100 cm, 0.47 to 200 cm, the
+  #               median of measured WISE 1.1 / SoilGrids over 78 profiles of Indonesia
+  #               (src/soils.py, measured 2026-11-06); SoilGrids is higher than WISE there.
+  #               none: SoilGrids as is. Or six factors, one per SoilGrids depth
+  #               (0-5cm, 5-15cm, 15-30cm, 30-60cm, 60-100cm, 100-200cm).
+  #               How much it matters (measured on a 30-cell sample of Java, 2015-2016, the
+  #               other settings as in this file): none instead of wise_indonesia (more
+  #               carbon) changed area-weighted yield by -0.2% irrigated and -2.5% rainfed,
+  #               N uptake by -0.2% and -2.9%, and irrigation water by +10.5%.
+  #               Outside Indonesia, wise_indonesia has no basis: use none, or fit factors
+  #               to the WISE profiles of your country and paste what it prints:
+  #                   python scripts/fit_soc_scale.py --country Philippines
+  #               Fitted with that script (WISE 1.1 profiles), 0-30 / 30-100 / 100-200 cm:
+  #               Indonesia 0.70 / 0.63 / 0.47 (78 profiles), Philippines 0.72 / 0.83 / 0.64
+  #               (49), Thailand 0.72 / 0.61 / 0.58 (50), India 0.70 / 0.86 / 0.75 (92).
+  #   country     text in the profile header only (the engine does not use it)
+  #   sol only:   file, and profile or map (+ classes or id_column, layer of a multi-layer
+  #               vector file); description and source are free text for input.json
+  # Default: SoilGrids with the Indonesian factors, as the Java case study
+  soil:
+    name: null
+    method: soilgrids
+    soc_scale: wise_indonesia
+    country: Indonesia
+  # How python scripts/prepare_layers.py makes a water regime, region or zone input from your
+  # own map (null = this file does not make one). The keys:
+  #   name          the input to write; use it in inputs > water_regime / region / zones
+  #   values        classes: a class map, a raster of codes (classes: CSV of code, name) or a
+  #                 vector file (class_column; burned on an equal-area grid of pixel_m metres,
+  #                 default 100). Water regime only: fraction or percent, a raster of the
+  #                 irrigated share of each pixel; or ratio, two rasters of crop area on one
+  #                 grid, irrigated and total (e.g. MapSPAM physical area of the crop, the
+  #                 file suffixes _I irrigated and _A all technologies), share = irrigated / total.
+  #   files         the map (classes, fraction, percent); {inputs}, {cache} ... as above
+  #   irrigated, total   the two area rasters (ratio)
+  #   box           [west, south, east, north]; null = aoi > bbox
+  #   layer         the layer of a multi-layer vector file
+  #   source, description   free text, kept in the input's input.json
+  # A class map in several tiles: files with *, joined over the box. E.g. GFSAD LGRIP30
+  # (Landsat, 30 m, nominal 2015, 10 x 10 degree tiles from NASA LP DAAC with an Earthdata
+  # login; Java: tiles S10E100 and S10E110): 0 water, 1 non-cropland, 2 irrigated, 3 rainfed.
+  #   water_regime: {name: lgrip30_java, values: classes, files: "{inputs}/lgrip30/*.tif"}
+  # with  treatments > water_regimes: irrigated classes [2], rainfed [3], and
+  # default_regime: rainfed for crop on classes 0 and 1.
+  # Example (the SPAM 2020 v2r2 rice files of the physical-area zip):
+  #   water_regime:
+  #     name: spam2020_rice_irrigated
+  #     values: ratio
+  #     irrigated: "{inputs}/spam2020/spam2020_V2r2_global_A_RICE_I.tif"
+  #     total: "{inputs}/spam2020/spam2020_V2r2_global_A_RICE_A.tif"
+  # Default: null for all three
+  water_regime: null
+  # A region map, same keys (values: classes only). Default: null
+  region: null
+  # A zone map for seasons > mode: by_zone, same keys (values: classes only). Default: null
+  zones: null
 
 
 # ==========================================================================================
@@ -185,8 +464,8 @@ cultivars:
 # treatments: fertilizer and water
 # ==========================================================================================
 # Nitrogen rates are run as separate folders (every rate x every cultivar x every scenario).
-# Water regimes are not chosen per run: every rice field gets the regime of its irrigation
-# class in the MoA map, and one run covers both regimes.
+# Water regimes are not chosen per run: every crop pixel gets the regime of its class in the
+# water regime input (in the case study, the MoA irrigation classes), and one run covers both.
 # ------------------------------------------------------------------------------------------
 treatments:
   # Nitrogen rates to run, in kg N/ha (urea, 2/3 at 18 and 1/3 at 41 days after transplanting,
@@ -202,8 +481,10 @@ treatments:
   # add a fertilizer level to the template FileX first, then list it here.
   # Default: {0: 0, 35: 1, 70: 2, 105: 3, 140: 4}
   nitrogen_levels: {0: 0, 35: 1, 70: 2, 105: 3, 140: 4}
-  # Water regimes. Each rice field gets the regime of its MoA irrigation class
-  # (1 technical, 2 semi-technical, 3 simple irrigation, 4 rainfed). template_level is the
+  # Water regimes. Each crop pixel gets the regime of its class in the water regime input; the
+  # codes below are the MoA irrigation classes of the case study (1 technical, 2 semi-technical,
+  # 3 simple irrigation, 4 rainfed). For another map list its own codes (LGRIP30: irrigated
+  # [2], rainfed [3]). template_level is the
   # irrigation level (MI) of the template: 1 = constant 50 mm flood (fully irrigated),
   # 3 = rainfed with 150 mm bunds (holds only rain). Each class belongs to exactly one regime.
   # Moving class 3 (simple irrigation) to rainfed, say, tests how much the weakest irrigation
@@ -212,6 +493,18 @@ treatments:
   water_regimes:
     irrigated: {template_level: 1, irrigation_classes: [1, 2, 3]}
     rainfed: {template_level: 3, irrigation_classes: [4]}
+  # The regime of crop that the water regime map does not cover: class 0 (no class) in a class
+  # map, no value in a share map, or all crop when inputs > water_regime is null.
+  # null: such crop stops the run with the area it concerns. A regime name (e.g. rainfed)
+  # gives it that regime, and also crop on a class no regime lists (e.g. LGRIP30's
+  # non-cropland class). Outside an irrigation map's area, rainfed is the cautious choice:
+  # irrigated rice there would be assumed, not mapped.
+  # Measured (Java 2015-2016, MODIS MCD12Q1 cropland as the crop mask): 30% of its area lies
+  # off the MoA irrigation map. Default: null
+  default_regime: null
+  # With an irrigated-share map, which regime takes the share and which the rest of each
+  # pixel's crop area. Both must be water regimes above. Default: share irrigated, rest rainfed
+  share_regimes: {share: irrigated, rest: rainfed}
   # Soil water at the start of each season, as a share of the plant-available water of every
   # soil layer: 0 = wilting point (dry), 1 = field capacity (wet). Applied to every season.
   # Allowed 0 to 1. Recommended 0.5 to 1.

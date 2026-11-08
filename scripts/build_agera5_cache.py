@@ -4,7 +4,8 @@
     python scripts/build_agera5_cache.py --years 2000 2001 --vars TMAX TMIN
 
 Resumable: files already in the cache are skipped. See src/agera5.py for the
-layout, the unit conversions and the packing.
+layout, the unit conversions and the packing. At the end the cache is registered
+as the weather input agera5_<region> (src/inputs.py, scripts/register_inputs.py).
 """
 import argparse
 import sys
@@ -29,6 +30,9 @@ def main():
     agera5.build_cache(a.region, a.vars, a.years, a.cache_dir, a.workers,
                        log=lambda m: print(m, flush=True))
     print(f"done in {(time.time() - t0) / 60:.1f} min", flush=True)
+    import inputs
+    print("registered as prepared inputs (src/inputs.py):")
+    inputs.register_existing(a.cache_dir, a.region, config.CURRENT.aoi)
 
 
 if __name__ == "__main__":

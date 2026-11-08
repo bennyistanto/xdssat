@@ -1,0 +1,257 @@
+---
+title: "Alternative input data"
+subtitle: "How the Java results change when national maps are replaced by global datasets"
+---
+
+```{ojs}
+import {withDownload, adminMarks, cellFeatures, fmt, pearson} from "../assets/js/dl.js"
+runs = FileAttachment("data/alternatives/runs.csv").csv({typed: true})
+years = FileAttachment("data/alternatives/years.csv").csv({typed: true})
+cells = FileAttachment("data/alternatives/cells.csv").csv({typed: true})
+waterMaps = FileAttachment("data/alternatives/water_maps.csv").csv({typed: true})
+outline = FileAttachment("data/java_outline.geojson").json()
+provinces = FileAttachment("data/provinces.geojson").json()
+districtsGeo = FileAttachment("data/districts.geojson").json()
+base = runs.find(d => d.variant === "baseline")
+variants = runs.filter(d => d.variant !== "baseline")
+groups = ["crop mask", "water regime", "soil", "weather"]
+dark = document.body.classList.contains("quarto-dark")
+// categorical slots 1-3 (validated all-pairs, light and dark) and a neutral for the national run
+slots = dark ? ["#3987e5", "#d95926", "#199e70"] : ["#2a78d6", "#eb6834", "#1baf7a"]
+neutral = dark ? "#c3c2b7" : "#52514e"
+// the two ends of the PuOr scheme the site's other difference maps use
+lessColor = dark ? "#f1a340" : "#c4620c"
+moreColor = dark ? "#998ec3" : "#5e3c99"
+mapW = Math.min(width, 900)
+yearRange = `${d3.min(years, d => d.season_year)}-${d3.max(years, d => d.season_year)}`
+```
+
+The Java case study uses national data where it exists: the ATR/BPN rice field map (2024) as the crop mask
+and the Ministry of Agriculture irrigation map as the water regime. This page shows how the simulated results
+change when global datasets take their place, as they would in an area without national data. How each dataset
+is prepared is described in [Input data](../xdssat/data.qmd).
+
+Each run changes **one input** and keeps the others of the national run. All runs: Jawa, agricultural years
+${yearRange}, uniform calendar (wet season 15 November, dry season 1 April for irrigated rice), IR 58,
+140 kg N, SLPF 1. SLPF 1 is the uncalibrated model, so the levels are higher than reported yields; the
+differences between runs are what this page shows. Crop outside a water regime map is rainfed
+(`treatments > default_regime`).
+
+```{ojs}
+Inputs.table(runs.map(d => ({
+  "Input changed": d.group, "Run": d.label, "Source": d.source,
+  "Rice area, M ha": d.ha / 1e6, "Irrigated, M ha": d.ha_irrigated / 1e6, "Weather cells": d.cells,
+  "Production, Mt/yr": d.production_t / 1e6, "Change": d.production_t_change_pct,
+  "Failed seasons": d.failed
+})), {format: {"Rice area, M ha": fmt.d2, "Irrigated, M ha": fmt.d2, "Production, Mt/yr": fmt.d1,
+  "Change": d => d === 0 ? "" : `${d > 0 ? "+" : ""}${d.toFixed(1)}%`}, layout: "auto", rows: 12})
+```
+
+## How much production changes
+
+Mean simulated production per year (dry grain), each run against the national run:
+
+```{ojs}
+barRows = groups.flatMap(g => variants.filter(d => d.group === g))
+  .map(d => ({...d, row: `${d.group}: ${d.label} (${d.production_t_change_pct > 0 ? "+" : ""}${d.production_t_change_pct.toFixed(1)}%)`}))
+changeBars = withDownload(Plot.plot({
+  width: Math.min(width, 860), height: 60 + barRows.length * 34, marginLeft: 300, marginRight: 20,
+  x: {label: "Change in production from the national run, %", grid: true},
+  y: {label: null, domain: barRows.map(d => d.row)},
+  color: {domain: ["less", "more"], range: [lessColor, moreColor], legend: true, label: "Production against the national run"},
+  marks: [
+    Plot.barX(barRows, {x: "production_t_change_pct", y: "row", insetTop: 6, insetBottom: 6, rx: 4,
+      fill: d => d.production_t_change_pct < 0 ? "less" : "more",
+      title: d => `${d.label}\n${fmt.d1(d.production_t / 1e6)} Mt/yr against ${fmt.d1(base.production_t / 1e6)}\nirrigated ${fmt.d2(d.ha_irrigated / 1e6)} M ha, rainfed ${fmt.d2(d.ha_rainfed / 1e6)} M ha`,
+      tip: true}),
+    Plot.ruleX([0], {stroke: neutral})
+  ]
+}), "xdssat-alternatives-production-change")
+```
+
+```{ojs}
+byGroup = Object.fromEntries(groups.map(g => [g, variants.filter(d => d.group === g)]))
+pct = (v) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`
+extreme = (g) => byGroup[g].reduce((a, b) => Math.abs(b.production_t_change_pct) > Math.abs(a.production_t_change_pct) ? b : a)
+cropText = byGroup["crop mask"].map(d => `${d.label} ${pct(d.production_t_change_pct)}`).join(", ")
+waterText = byGroup["water regime"].map(d => `${d.label} ${pct(d.production_t_change_pct)}`).join(", ")
+soilText = byGroup["soil"].map(d => `${d.label} ${pct(d.production_t_change_pct)}`).join(", ")
+weatherText = byGroup["weather"].map(d => `${d.label} ${pct(d.production_t_change_pct)}`).join(", ")
+```
+
+- **Crop mask** sets where rice is simulated and how much: ${cropText}.
+- **Water regime** sets the irrigated area, and only irrigated rice is planted in the dry season:
+  ${waterText}.
+- **Soil**: ${soilText}.
+- **Weather grid**: ${weatherText}.
+
+## Production per year
+
+Simulated production of both seasons per agricultural year, the national run (grey) against the runs of each
+kind of input:
+
+```{ojs}
+annual = d3.rollups(years, v => d3.sum(v, d => d.production_t) / 1e6, d => d.variant, d => d.season_year)
+  .flatMap(([v, ys]) => ys.map(([y, p]) => ({variant: v, season_year: y, mt: p})))
+labelOf = new Map(runs.map(d => [d.variant, d.label]))
+yearPlot = (g) => {
+  const vs = ["baseline", ...byGroup[g].map(d => d.variant)];
+  const rows = annual.filter(d => vs.includes(d.variant)).map(d => ({...d, label: labelOf.get(d.variant)}));
+  const last = d3.max(rows, d => d.season_year);
+  // end labels: keep at least 7% of the value range between neighbours
+  const ends = rows.filter(d => d.season_year === last).map(d => ({...d, ly: d.mt})).sort((a, b) => a.mt - b.mt);
+  const [lo, hi] = d3.extent(rows, d => d.mt);
+  const gap = (hi - lo) * 0.07;
+  for (let i = 1; i < ends.length; i++) if (ends[i].ly - ends[i - 1].ly < gap) ends[i].ly = ends[i - 1].ly + gap;
+  return withDownload(Plot.plot({
+    width: Math.min(width, 430), height: 250, marginLeft: 45, marginRight: 150,
+    x: {label: "Agricultural year", tickFormat: d => String(d)},
+    y: {label: "Production, Mt", grid: true},
+    color: {domain: vs.map(v => labelOf.get(v)), range: [neutral, ...slots], legend: true},
+    marks: [
+      Plot.lineY(rows, {x: "season_year", y: "mt", stroke: "label", strokeWidth: 2, tip: true}),
+      Plot.text(ends, {x: "season_year", y: "ly", text: "label", dx: 6, textAnchor: "start", fill: "currentColor"})
+    ]
+  }), `xdssat-alternatives-years-${g.replace(" ", "-")}`);
+}
+html`<div class="grid">${groups.map(g => html`<div class="g-col-12 g-col-md-6"><h4>${g}</h4>${yearPlot(g)}</div>`)}</div>`
+```
+
+## Where the difference is
+
+Mean production per year in each weather cell, the selected run minus the national run (on the selected run's
+own grid; for the 0.25° weather, the national run summed into its cells):
+
+```{ojs}
+viewof pick = Inputs.select(new Map(variants.map(d => [`${d.group}: ${d.label}`, d.variant])), {label: "Run"})
+```
+
+```{ojs}
+diffMap = {
+  const rows = cells.filter(d => d.variant === pick);
+  const half = rows[0].grid_deg / 2;
+  const m = d3.quantile(rows.map(d => Math.abs(d.diff_t)).sort(d3.ascending), 0.95) || 1;
+  const r = runs.find(d => d.variant === pick);
+  return withDownload(Plot.plot({
+    width: mapW, height: Math.round(mapW * 0.42),
+    projection: {type: "mercator", domain: outline},
+    caption: `${r.label} minus the national run: ${fmt.d1(r.production_t / 1e6)} against ${fmt.d1(base.production_t / 1e6)} Mt per year`,
+    color: {type: "diverging", scheme: "PuOr", pivot: 0, domain: [-m, m], clamp: true, legend: true,
+      label: "Difference in production per year, t (purple: more, orange: less)"},
+    marks: [
+      Plot.geo(provinces, {fill: dark ? "#2b2b2a" : "#f1f1f1", clip: true}),
+      Plot.geo(cellFeatures(rows, half).features, Plot.centroid({fill: d => d.properties.diff_t,
+        title: d => `cell ${d.properties.lat.toFixed(2)}, ${d.properties.lon.toFixed(2)}\nnational ${fmt.int(d.properties.baseline_t)} t/yr\nthis run ${fmt.int(d.properties.production_t)} t/yr\ndifference ${fmt.int(d.properties.diff_t)} t/yr`,
+        tip: true})),
+      ...adminMarks(Plot, provinces, districtsGeo)
+    ]
+  }), `xdssat-alternatives-diff-${pick}`);
+}
+```
+
+The input itself for the selected run, in the same cells: rice area for a crop mask, irrigated share of the
+rice for a water regime, and production per year for soil and weather:
+
+```{ojs}
+inputMap = {
+  const r = runs.find(d => d.variant === pick);
+  const rows = cells.filter(d => d.variant === pick && d.crop_ha > 0);
+  const half = rows[0].grid_deg / 2;
+  const kind = r.group === "crop mask" ? "area" : r.group === "water regime" ? "share" : "production";
+  const val = kind === "area" ? (d => d.crop_ha) : kind === "share" ? (d => d.irrigated_ha / d.crop_ha) : (d => d.production_t);
+  const color = kind === "share"
+    ? {type: "linear", scheme: "BuGn", domain: [0, 1], legend: true, label: "Irrigated share of the cell's rice", tickFormat: ".0%"}
+    : kind === "area"
+      ? {type: "sqrt", scheme: "YlGn", legend: true, label: "Rice area in the cell, ha"}
+      : {type: "sqrt", scheme: "YlGn", legend: true, label: "Production per year, t"};
+  return withDownload(Plot.plot({
+    width: mapW, height: Math.round(mapW * 0.42),
+    projection: {type: "mercator", domain: outline},
+    color,
+    marks: [
+      Plot.geo(provinces, {fill: dark ? "#2b2b2a" : "#f1f1f1", clip: true}),
+      Plot.geo(cellFeatures(rows.map(d => ({...d, v: val(d)})), half).features, Plot.centroid({fill: d => d.properties.v,
+        title: d => `cell ${d.properties.lat.toFixed(2)}, ${d.properties.lon.toFixed(2)}\n${kind === "share" ? fmt.pct(d.properties.v) : fmt.int(d.properties.v)}`,
+        tip: true})),
+      ...adminMarks(Plot, provinces, districtsGeo)
+    ]
+  }), `xdssat-alternatives-input-${pick}`);
+}
+```
+
+## The inputs compared
+
+### Crop mask
+
+```{ojs}
+cellKey = (d) => `${d.lat.toFixed(2)},${d.lon.toFixed(2)}`
+baseCells = new Map(cells.filter(d => d.variant === "baseline").map(d => [cellKey(d), d.crop_ha]))
+maskRows = byGroup["crop mask"].map(r => {
+  const own = new Map(cells.filter(d => d.variant === r.variant).map(d => [cellKey(d), d.crop_ha]));
+  const keys = [...new Set([...baseCells.keys(), ...own.keys()])];
+  return {"Crop mask": r.label, "Source": r.source, "Rice area, M ha": r.ha / 1e6, "Weather cells": r.cells,
+    "Correlation of the area per cell with ATR/BPN": pearson(keys.map(k => baseCells.get(k) ?? 0), keys.map(k => own.get(k) ?? 0))};
+})
+Inputs.table([{"Crop mask": base.label, "Source": "ATR/BPN rice fields 2024", "Rice area, M ha": base.ha / 1e6,
+  "Weather cells": base.cells, "Correlation of the area per cell with ATR/BPN": 1}, ...maskRows],
+  {format: {"Rice area, M ha": fmt.d2, "Correlation of the area per cell with ATR/BPN": fmt.d2}, layout: "auto"})
+```
+
+A general cropland class does not say which crop grows there: with WorldCover or MODIS, rice is simulated on
+all cropland. MODIS counts cropland/natural vegetation mosaics as well. MapSPAM is specific to rice, but it
+places reported areas with an allocation model on a 9 km grid.
+
+### Water regime
+
+Rice area of the ATR/BPN map by class of the Ministry of Agriculture map and of the other two water regime
+maps, million ha:
+
+```{ojs}
+waterTable = (map) => {
+  const cls = [...new Set(waterMaps.filter(d => d.map === map).map(d => d.cls))];
+  return ["irrigated", "rainfed"].map(m => Object.fromEntries([["Ministry of Agriculture", m],
+    ...cls.map(c => [`${map}: ${c}`, (waterMaps.find(d => d.map === map && d.moa === m && d.cls === c)?.ha ?? 0) / 1e6])]));
+}
+tableFormat = (rows) => Object.fromEntries(Object.keys(rows[0]).slice(1).map(k => [k, fmt.d2]))
+lgAgree = {
+  const w = waterMaps.filter(d => d.map === "LGRIP30" && (d.cls === "irrigated" || d.cls === "rainfed"));
+  return d3.sum(w.filter(d => d.cls === d.moa), d => d.ha) / d3.sum(w, d => d.ha);
+}
+lgCover = {
+  const w = waterMaps.filter(d => d.map === "LGRIP30");
+  return d3.sum(w.filter(d => d.cls === "irrigated" || d.cls === "rainfed"), d => d.ha) / d3.sum(w, d => d.ha);
+}
+lgAgreeText = fmt.pct(lgAgree)
+lgCoverText = fmt.pct(lgCover)
+```
+
+```{ojs}
+Inputs.table(waterTable("LGRIP30"), {format: tableFormat(waterTable("LGRIP30")), layout: "auto"})
+```
+
+```{ojs}
+Inputs.table(waterTable("MapSPAM"), {format: tableFormat(waterTable("MapSPAM")), layout: "auto"})
+```
+
+Where LGRIP30 has cropland (${lgCoverText} of the rice area), it agrees with the Ministry of Agriculture map on
+${lgAgreeText} of the area. Neither map is ground truth, so this measures agreement, not accuracy; the LGRIP30
+user guide reports 79.2% overall accuracy for Southeast Asia. LGRIP30 counts a cropland as irrigated with "at
+least one artificial irrigation during the crop growing period".
+
+### Soil and weather
+
+The soil runs replace the SoilGrids profiles of every cell: SoilGrids without the organic carbon factors fitted
+to WISE profiles, and one generic profile for all of Java (the IRRI soil of the template, or an HC27 loam).
+The weather run uses AgERA5 regridded to 0.25° (an area mean for rain), so a weather cell holds about six times
+the area and its soil is the crop-weighted mean of the larger cell.
+
+## Reproduce
+
+```bash
+python docs/scripts/run_alternatives.py --list    # the runs and the prepared inputs each needs
+python docs/scripts/run_alternatives.py           # all runs
+python docs/scripts/export_alternatives.py        # writes docs/java/data/alternatives/
+```
+
+Each run's experiment file is written next to its results (`<cache>/runs/alternatives/<run>.yml`); the inputs
+are prepared as described in [Input data](../xdssat/data.qmd).

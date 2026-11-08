@@ -23,8 +23,8 @@ mapW = Math.min(width, 960)
 | | Common DSSAT use | xdssat |
 |---|---|---|
 | Unit of simulation | A field experiment: one plot, a few treatments | One stratum = one 0.1° weather cell x one water regime, one treatment per season |
-| Weather | One station file, often typed in or converted by hand | One `.WTH` per cell, written from the AgERA5 cache (`src/wth.py`) |
-| Soil | A profile picked from a DSSAT soil file (WISE, local survey) | One profile per cell built from SoilGrids 2.0 (`src/soils.py`) |
+| Weather | One station file, often typed in or converted by hand | One `.WTH` per weather cell, written from a gridded weather input such as AgERA5 (`src/wth.py`) |
+| Soil | A profile picked from a DSSAT soil file (WISE, local survey) | One profile per weather cell, from SoilGrids 2.0 or from your own profiles (`src/soils.py`, `src/soilprep.py`) |
 | Management | The experiment's own FileX, edited in the DSSAT shell or XBuild | A template FileX; every unit copies one treatment and shifts all its dates (`src/filex.py`) |
 | Planting date | Fixed by the experiment | Per cell from rainfall onset, per zone, or uniform (`src/management.py`) |
 | Running | The DSSAT shell, one batch, one process | Chunks of up to `--chunk-size` units, each its own folder and `dscsm048` process, `--workers` in parallel (`src/runner.py`) |
@@ -35,12 +35,15 @@ mapW = Math.min(width, 960)
 The engine itself is not touched: xdssat builds or reuses the stock DSSAT-CSM 4.8 executable
 [@jones2003; @dssatcsmos] and talks to it only through its own text files.
 
-## Gridding: 100 m pixels to 0.1° weather cells to strata
+## Gridding: crop pixels to weather cells to strata
 
-Rice fields, irrigation class, province, district and zone are burned onto one 100 m equal-area grid
-(ESRI:54034), where one pixel is one hectare. Each pixel goes to the AgERA5 cell that holds its centre. Within
-a cell all rice shares one weather series and one soil profile, so the only split that changes the simulation
-is the water regime: a cell has an irrigated stratum, a rain-fed stratum, or both.
+Each pixel of the crop mask goes to the weather cell that holds its centre, carrying its hectares; the water
+regime, region and zone maps are read at the same pixel (any grid and CRS, see [Input data](data.qmd)). Within
+a cell all of the crop shares one weather series and one soil profile, so the only split that changes the
+simulation is the water regime: a cell has an irrigated stratum, a rain-fed stratum, or both.
+
+In the Java case study the rice fields, irrigation class, province, district and zone are burned onto one
+100 m equal-area grid (ESRI:54034), where one pixel is one hectare, and the weather cells are AgERA5's 0.1°.
 
 ```{ojs}
 strataCount = d3.rollups(cells, v => v.length, d => (d.ha_irrigated > 0 ? "irrigated" : "") + (d.ha_irrigated > 0 && d.ha_rainfed > 0 ? " + " : "") + (d.ha_rainfed > 0 ? "rain-fed" : ""))
@@ -69,6 +72,9 @@ The rice area per cell spans several orders of magnitude, so weighting matters: 
 rice should not count as much as one with ten thousand. Every stratum carries its hectares into the outputs.
 
 ## Data preparation: netCDF and GeoTIFF to WTH, SOL and FileX
+
+The Java case study's preparation, from its source files to the engine's input files. Other sources go through
+the prepare scripts described in [Input data](data.qmd) and end in the same standard inputs.
 
 ```{mermaid}
 %%{init: {"theme": "neutral"}}%%
@@ -121,13 +127,13 @@ withDownload(Plot.plot({
 ```
 
 ::: {.source-note}
-From each run's `run_info.json`. Status labels: "current" is the run the site is exported from; the others are
-labelled in `export_data.py` from `HANDOFF.md` (runs made before the initial soil-N fix are stale).
+From each run's `run_info.json`. Status labels: "current" is the run the site is exported from; "stale" marks
+runs made before a correction of the initial soil nitrogen, kept for comparison (`export_data.py`).
 :::
 
 ## CF netCDF output
 
-Each run ends with one netCDF file on the AgERA5 grid, dimensions `(system, time, lat, lon)`. A *system* is a
+Each run ends with one netCDF file on the weather grid, dimensions `(system, time, lat, lon)`. A *system* is a
 season and water regime that was simulated (`wet_irrigated`, `wet_rainfed`, `dry_irrigated`), so no slab is
 empty by construction: rain-fed rice has no dry season. `time` is 1 August of each agricultural year; the
 actual dates are variables. Area variables make regional totals a plain sum: the mean yield of any region is

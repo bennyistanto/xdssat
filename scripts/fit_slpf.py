@@ -1,9 +1,9 @@
 """Fit the soil fertility factor SLPF separately for irrigated and rainfed rice
 against district yields, from three or more runs that differ only in SLPF.
 
-    python scripts/fit_slpf.py --runs E:/temp/xdssat/runs/java_per_cell_1991-2020_slpf0.63_tcldf19 \
-        E:/temp/xdssat/runs/java_per_cell_1991-2020_slpf0.73_tcldf19 \
-        E:/temp/xdssat/runs/java_per_cell_1991-2020_slpf0.83_tcldf19
+    python scripts/fit_slpf.py --runs <cache>/runs/java_per_cell_1991-2020_slpf0.63_tcldf19 \
+        <cache>/runs/java_per_cell_1991-2020_slpf0.73_tcldf19 \
+        <cache>/runs/java_per_cell_1991-2020_slpf0.83_tcldf19
 
 Method
 1. Each simulated season (cell, water regime, season, season year) has its

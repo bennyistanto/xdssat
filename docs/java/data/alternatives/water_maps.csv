@@ -1,0 +1,15 @@
+map,moa,cls,ha
+LGRIP30,irrigated,irrigated,1726384.0
+LGRIP30,irrigated,non-cropland,243076.6
+LGRIP30,irrigated,rainfed,667339.0
+LGRIP30,irrigated,water,544.1
+LGRIP30,rainfed,irrigated,332079.2
+LGRIP30,rainfed,non-cropland,190026.4
+LGRIP30,rainfed,rainfed,212652.1
+LGRIP30,rainfed,water,67.7
+MapSPAM,irrigated,irrigated,1640228.9
+MapSPAM,irrigated,rainfed,654084.7
+MapSPAM,irrigated,no MapSPAM rice,343030.1
+MapSPAM,rainfed,irrigated,298862.2
+MapSPAM,rainfed,rainfed,253898.8
+MapSPAM,rainfed,no MapSPAM rice,182064.5

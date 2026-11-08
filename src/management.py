@@ -110,22 +110,59 @@ def template_treatment(template: FileX, water_level: int, n_level: int, ingeno: 
 # ------------------------------------------------------------ strata
 
 
-def strata(stats: pd.DataFrame, region_codes: dict, region: str | None = None,
-           zone_col: str | None = "aez", regime: dict | None = None) -> pd.DataFrame:
-    """Strata from a ``rasters.aggregate`` table with ``region`` and ``irr`` columns.
+def strata(stats: pd.DataFrame, region_codes: dict | None, region: str | None = None,
+           zone_col: str | None = "aez", regime: dict | None = None, default_regime: str | None = None,
+           share_regimes: dict | None = None) -> pd.DataFrame:
+    """Strata (weather cell x water regime) from a ``rasters.aggregate`` table.
 
-    ``region_codes`` maps region name to its raster code. Rice outside
-    ``region`` is dropped; rice with irrigation class 0 (no MoA data) raises,
-    because the regime would be unknown. ``region`` defaults to aoi > region and
-    ``regime`` (irrigation class -> water regime) to ``REGIME``.
+    Region: with ``region_codes`` (region name -> raster code) crop outside
+    ``region`` (default aoi > region) is dropped; with None, all crop counts (the
+    bbox decided). Water regime, from whichever the table has:
+
+    * ``irr``: a class map; ``regime`` maps a class to its regime (default
+      ``REGIME``). Class 0 (no class under the crop), and with ``default_regime``
+      also any class no regime lists, gets ``default_regime``; without it they raise.
+    * ``irr_ha`` and ``irr_known_ha``: an irrigated-share map; the share goes to
+      ``share_regimes['share']``, the rest to ``share_regimes['rest']``, crop
+      where the map has no value to ``default_regime`` (or raises).
+    * neither (no water regime input): all crop gets ``default_regime``.
     """
-    region = region or config.CURRENT.region
     regime = REGIME if regime is None else regime
-    s = stats[stats["region"] == region_codes[region]].copy()
-    if (s["irr"] == 0).any():
-        raise ValueError(f"{(s['irr'] == 0).sum()} strata have no irrigation class; "
-                         "use the filled irrigation raster")
-    s["water"] = s["irr"].map(regime)
+    if region_codes is not None:
+        region = region or config.CURRENT.region
+        s = stats[stats["region"] == region_codes[region]].copy()
+    else:
+        s = stats.copy()
+    hint = "set treatments > default_regime to the regime of crop off the map (e.g. rainfed)"
+    if "irr_ha" in s:
+        sr = share_regimes or {"share": "irrigated", "rest": "rainfed"}
+        known = s["irr_known_ha"]
+        unknown = s["ha"] - known
+        parts = [s.assign(ha=s["irr_ha"], water=sr["share"]), s.assign(ha=known - s["irr_ha"], water=sr["rest"])]
+        if (unknown > 1e-9).any():
+            if default_regime is None:
+                raise ValueError(f"{unknown.sum():,.0f} ha of crop ({100 * unknown.sum() / s.ha.sum():.1f}% of "
+                                 "the area) lie where the irrigated-share map has no value, so their water "
+                                 f"regime is unknown; {hint}.")
+            parts.append(s.assign(ha=unknown, water=default_regime))
+        s = pd.concat(parts, ignore_index=True).drop(columns=["irr_ha", "irr_known_ha"])
+        s = s[s["ha"] > 1e-9]
+    elif "irr" in s:
+        if (s["irr"] == 0).any() and default_regime is None:
+            z = s[s["irr"] == 0]
+            raise ValueError(f"{z.ha.sum():,.0f} ha of crop ({100 * z.ha.sum() / s.ha.sum():.1f}% of the area, "
+                             f"{len(z)} strata) lie where the water regime map has no class, so their water "
+                             "regime is unknown. The water regime map must give a class under every crop pixel "
+                             "(the Java irrigation map was gap-filled under the ATR/BPN rice fields only), "
+                             f"or {hint}.")
+        s["water"] = s["irr"].map(regime)
+        if default_regime is not None:          # no class, or a class no regime lists (e.g. non-cropland)
+            s.loc[s["water"].isna(), "water"] = default_regime
+    else:
+        if default_regime is None:
+            raise ValueError("there is no water regime input (inputs > water_regime is null), so "
+                             "treatments > default_regime must give the regime of all crop (e.g. rainfed).")
+        s["water"] = default_regime
     if s["water"].isna().any():
         bad = sorted(s.loc[s["water"].isna(), "irr"].unique())
         raise ValueError(f"irrigation classes {bad} have no water regime "

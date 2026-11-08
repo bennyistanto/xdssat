@@ -1,7 +1,7 @@
 """Compare simulated rice yields with district (admin2) statistics from BDSP.
 
     python scripts/compare_districts.py                        # per_cell run
-    python scripts/compare_districts.py --run E:/temp/xdssat/runs/java_per_cell_1991-2020_ir64_n105
+    python scripts/compare_districts.py --run <cache>/runs/java_per_cell_1991-2020_ir64_n105
 
 Observed: <XDSSAT_CACHE>/obs/bdsp_rice_{yield,area}_adm2.csv (scripts/clean_bdsp.py),
 ku/ha GKG and harvested ha per district and calendar year.

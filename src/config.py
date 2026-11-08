@@ -79,11 +79,19 @@ PATH_KEYS = {
 # Required by run_aoi.py; the others are needed only to prepare inputs.
 RUN_PATHS = ("engine", "work", "cache")
 
-# The default experiment: today's Java run. Keep in step with configs/rice-java.yml.
+# The default experiment: the Java case study. Keep in step with configs/rice-java.yml.
 # No folder has a default: every machine sets its own (experiment file or environment).
 DEFAULTS: dict = {
     "paths": {key: None for key in PATH_KEYS},
     "aoi": {"name": "java", "bbox": [105.0, -9.0, 114.7, -5.0], "region": "Jawa"},
+    # Prepared datasets in <paths > cache>/inputs/<kind>/<name>/ (src/inputs.py); names only.
+    "inputs": {"weather": "agera5_idn", "crop_mask": "rice_atrbpn_idn", "soil": "soilgrids_java",
+               "water_regime": "irrigation_moa_idn", "region": "islands_bbsdlp_idn",
+               "zones": "aez_bbsdlp_idn"},
+    # How to make prepared inputs from the user's own files (scripts/prepare_*.py); null = not used.
+    "prepare": {"weather": None, "crop_mask": None, "water_regime": None, "region": None, "zones": None,
+                "soil": {"name": None, "method": "soilgrids", "soc_scale": "wise_indonesia",
+                         "country": "Indonesia"}},
     "template": {"file": "templates/XDRI8601.RIX", "crop_model": "RICER048"},
     "cultivars": {"IR 58": "IB0012"},
     "treatments": {
@@ -93,6 +101,8 @@ DEFAULTS: dict = {
             "irrigated": {"template_level": 1, "irrigation_classes": [1, 2, 3]},
             "rainfed": {"template_level": 3, "irrigation_classes": [4]},
         },
+        "default_regime": None,
+        "share_regimes": {"share": "irrigated", "rest": "rainfed"},
         "initial_soil_water": 0.9,
     },
     "seasons": {
@@ -113,7 +123,8 @@ DEFAULTS: dict = {
             "seed": 1, "season_days": 220, "output_folder": None},
 }
 
-SECTIONS = ("paths", "aoi", "template", "treatments", "seasons", "run")   # merged key by key
+SECTIONS = ("paths", "aoi", "inputs", "prepare", "template", "treatments", "seasons", "run")   # key by key
+INPUT_OPTIONAL = ("zones", "water_regime", "region")
 WHOLE = ("cultivars", "scenarios", "years")                               # replaced whole
 MODES = ("uniform", "per_cell", "by_zone")
 # scenario environment key -> FileX *ENVIRONMENT MODIFICATIONS column (IPENV.for:1000)
@@ -175,7 +186,7 @@ class Experiment:
         return tuple(float(v) for v in self.data["aoi"]["bbox"])
 
     @property
-    def region(self) -> str:
+    def region(self) -> str | None:
         return self.data["aoi"]["region"]
 
     # management -------------------------------------------------------
@@ -490,8 +501,40 @@ def validate(raw: dict, file=None, lines: dict | None = None) -> list[str]:
         elif not (-180 <= b[0] < b[2] <= 180 and -90 <= b[1] < b[3] <= 90):
             c.bad("aoi.bbox", f"{b} is not a box: the order is west, south, east, north, in degrees "
                               "(west smaller than east, south smaller than north).", ex)
-    if "region" in aoi:
-        c.text("aoi.region", aoi["region"], "region: Jawa", what="a region name from idn_region_classes.csv")
+    if aoi.get("region") is not None:
+        c.text("aoi.region", aoi["region"], "region: Jawa", what="a class name of the region input, or null")
+    ins_ = g("inputs")
+    if ins_.get("region", DEFAULTS["inputs"]["region"]) is None and \
+            aoi.get("region", DEFAULTS["aoi"]["region"]) is not None:
+        c.bad("aoi.region", f"'{aoi.get('region', DEFAULTS['aoi']['region'])}' names a region, but there is no "
+                            "region input (inputs > region is null), so aoi > bbox alone decides which crop "
+                            "counts. Set region: null, or name a region input.", "region: null")
+
+    for k, v in g("inputs").items():
+        if k not in DEFAULTS["inputs"]:
+            continue
+        if v is None and k in INPUT_OPTIONAL:
+            continue
+        if v is None:
+            c.bad(f"inputs.{k}", f"a run needs a {k.replace('_', ' ')} input; null is allowed only for "
+                                 f"{', '.join(INPUT_OPTIONAL)}.", f"{k}: {DEFAULTS['inputs'][k]}")
+        else:
+            c.text(f"inputs.{k}", v, f"{k}: {DEFAULTS['inputs'][k]}", r"[A-Za-z0-9_.-]{1,60}",
+                   "the name of a prepared dataset: letters, digits, '.', '_' or '-'")
+
+    pw = g("prepare").get("weather")
+    if pw is not None:
+        _check_prepare_weather(c, pw)
+    pc = g("prepare").get("crop_mask")
+    if pc is not None:
+        _check_prepare_crop_mask(c, pc)
+    ps = g("prepare").get("soil")
+    if ps is not None:
+        _check_prepare_soil(c, ps)
+    for kind in ("water_regime", "region", "zones"):
+        pl = g("prepare").get(kind)
+        if pl is not None:
+            _check_prepare_layer(c, kind, pl)
 
     tp = g("template")
     if "file" in tp:
@@ -572,6 +615,21 @@ def validate(raw: dict, file=None, lines: dict | None = None) -> list[str]:
                         c.bad(f"{key}.irrigation_classes", f"class {x} is also given to '{seen[x]}'; "
                                                            "each class belongs to one regime.", ex)
                     seen[x] = name
+    if tr.get("default_regime") is not None and isinstance(regimes, dict) and tr["default_regime"] not in regimes:
+        c.bad("treatments.default_regime", f"{tr['default_regime']!r} should be one of the water regimes "
+                                           f"({', '.join(regimes)}), or null.", "default_regime: rainfed")
+    if "share_regimes" in tr:
+        sr = tr["share_regimes"]
+        ex = "share_regimes: {share: irrigated, rest: rainfed}"
+        if not isinstance(sr, dict) or set(sr) != {"share", "rest"}:
+            c.bad("treatments.share_regimes", "should name the regime of the share and of the rest.", ex)
+        elif isinstance(regimes, dict):
+            for k, v in sr.items():
+                if v not in regimes:
+                    c.bad(f"treatments.share_regimes.{k}", f"{v!r} should be one of the water regimes "
+                                                           f"({', '.join(regimes)}).", ex)
+            if sr["share"] == sr["rest"]:
+                c.bad("treatments.share_regimes", "share and rest should be two different regimes.", ex)
     if "initial_soil_water" in tr:
         c.number("treatments.initial_soil_water", tr["initial_soil_water"], 0, 1,
                  example="initial_soil_water: 0.9")
@@ -672,8 +730,318 @@ def validate(raw: dict, file=None, lines: dict | None = None) -> list[str]:
     if "season_days" in rn:
         c.number("run.season_days", rn["season_days"], 60, 400, integer=True, example="season_days: 220")
     if rn.get("output_folder") is not None:
-        c.text("run.output_folder", rn["output_folder"], "output_folder: E:/temp/xdssat/runs", what="a folder")
+        c.text("run.output_folder", rn["output_folder"], "output_folder: <cache>/runs", what="a folder")
     return c.problems
+
+
+PREPARE_WEATHER_KEYS = ("name", "description", "box", "grid_step", "years", "station_code",
+                        "temperature_height_m", "variables", "points", "utc_offset_hours", "wind_height_m")
+SOURCE_KEYS = ("files", "variable", "units", "regrid", "height_m", "daily")
+POINT_KEYS = ("file", "lat", "lon", "columns", "units", "missing", "date_format")
+DAILY_HOW = ("max", "min", "mean", "sum", "accumulated")
+REGRID = ("exact", "mean", "linear", "nearest")
+
+
+PREPARE_CROP_KEYS = ("name", "description", "source", "files", "values", "classes", "aggregate", "split",
+                     "box", "layer", "class_column", "select", "pixel_m", "subpixels")
+CROP_VALUES = ("classes", "fraction", "percent", "ha", "m2", "km2", "polygons")
+
+
+PREPARE_SOIL_KEYS = ("name", "description", "source", "method", "soc_scale", "country", "file", "map",
+                     "classes", "id_column", "layer", "profile")
+SOIL_DEPTHS = ("0-5cm", "5-15cm", "15-30cm", "30-60cm", "60-100cm", "100-200cm")
+
+
+PREPARE_LAYER_KEYS = ("name", "description", "source", "files", "values", "classes", "class_column", "layer",
+                      "pixel_m", "box", "irrigated", "total")
+
+
+def _check_prepare_layer(c: _Checker, kind: str, pl):
+    key = f"prepare.{kind}"
+    ex = f"{kind}: {{name: my_{kind}, files: ..., values: classes}}"
+    if not isinstance(pl, dict):
+        c.bad(key, "should hold name, files and values indented below it, or be null.", ex)
+        return
+    c.unknown(key, pl, list(PREPARE_LAYER_KEYS))
+    if "name" not in pl:
+        c.bad(key, f"needs a name: the {kind.replace('_', ' ')} input to write.", f"name: my_{kind}")
+    else:
+        c.text(f"{key}.name", pl["name"], f"name: my_{kind}", r"[A-Za-z0-9_.-]{1,60}",
+               "letters, digits, '.', '_' or '-'")
+    v = pl.get("values", "classes")
+    allowed = ("classes", "fraction", "percent", "ratio") if kind == "water_regime" else ("classes",)
+    if v not in allowed:
+        c.bad(f"{key}.values", f"{v!r} should be {' or '.join(allowed)}"
+                               + (": classes for a class map, fraction or percent for an irrigated-share "
+                                  "raster, ratio for irrigated / total area rasters." if kind == "water_regime"
+                                  else " (a class map)."), "values: classes")
+        return
+    if v == "ratio":
+        for k in ("irrigated", "total"):
+            if not pl.get(k):
+                c.bad(f"{key}.{k}", f"values: ratio needs {k}: the raster of {k} crop area.",
+                      f'{k}: "{{inputs}}/spam/..."')
+        if pl.get("files"):
+            c.bad(f"{key}.files", "values: ratio takes irrigated and total, not files.")
+    else:
+        if not pl.get("files"):
+            c.bad(f"{key}.files", "needs files: the map (a raster, or for classes also a vector file).",
+                  'files: "{inputs}/maps/irrigation.tif"')
+        for k in ("irrigated", "total"):
+            if pl.get(k):
+                c.bad(f"{key}.{k}", f"{k} is used only with values: ratio.")
+    if v != "classes":
+        for k in ("classes", "class_column", "layer", "pixel_m"):
+            if pl.get(k) is not None:
+                c.bad(f"{key}.{k}", f"{k} is used only with values: classes.")
+    elif str(pl.get("files", "")).lower().endswith((".shp", ".gpkg", ".geojson", ".json", ".parquet", ".fgb",
+                                                     ".gdb", ".kml")) and not pl.get("class_column"):
+        c.bad(f"{key}.class_column", "a vector map needs class_column: the column holding the class.",
+              "class_column: IRRIGATION")
+    if pl.get("pixel_m") is not None:
+        c.number(f"{key}.pixel_m", pl["pixel_m"], 5, 10000, example="pixel_m: 100")
+    if pl.get("box") is not None:
+        b = pl["box"]
+        if (not isinstance(b, list) or len(b) != 4
+                or not all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in b)
+                or not (b[0] < b[2] and b[1] < b[3])):
+            c.bad(f"{key}.box", f"{b!r} should be [west, south, east, north] in degrees, or null for "
+                                "aoi > bbox.", "box: [105.0, -9.0, 114.7, -5.0]")
+
+
+def _check_prepare_soil(c: _Checker, ps):
+    key = "prepare.soil"
+    ex = "soil: {name: hc27_java, method: sol, file: ..., profile: HC_GEN0011}"
+    if not isinstance(ps, dict):
+        c.bad(key, "should hold method and its settings indented below it, or be null.", ex)
+        return
+    c.unknown(key, ps, list(PREPARE_SOIL_KEYS))
+    m = ps.get("method", "soilgrids")
+    if m not in ("soilgrids", "sol"):
+        c.bad(f"{key}.method", f"{m!r} should be soilgrids (SoilGrids 2.0 by pedotransfer) or sol (your own "
+                               ".SOL file of profiles).", "method: sol")
+        return
+    if ps.get("name") is not None:
+        c.text(f"{key}.name", ps["name"], "name: hc27_java", r"[A-Za-z0-9_.-]{1,60}",
+               "letters, digits, '.', '_' or '-'")
+    if "country" in ps:
+        c.text(f"{key}.country", ps["country"], "country: Indonesia", r".{1,11}", "at most 11 characters")
+    if m == "soilgrids":
+        for k in ("file", "map", "classes", "id_column", "layer", "profile"):
+            if ps.get(k) is not None:
+                c.bad(f"{key}.{k}", f"{k} is used only with method: sol.")
+        s = ps.get("soc_scale", "none")
+        if isinstance(s, dict):
+            c.unknown(f"{key}.soc_scale", s, list(SOIL_DEPTHS))
+            for d in SOIL_DEPTHS:
+                if d not in s:
+                    c.bad(f"{key}.soc_scale", f"a factor for every SoilGrids depth is needed; {d} is missing.",
+                          "soc_scale: {0-5cm: 0.7, 5-15cm: 0.7, 15-30cm: 0.7, 30-60cm: 0.63, 60-100cm: 0.63, "
+                          "100-200cm: 0.47}")
+                else:
+                    c.number(f"{key}.soc_scale.{d}", s[d], 0, 3, open_lo=True, example=f"{d}: 0.7")
+        elif s not in ("wise_indonesia", "none", None):
+            c.bad(f"{key}.soc_scale", f"{s!r} should be wise_indonesia (factors fitted to WISE profiles of "
+                                      "Indonesia), none (SoilGrids as is) or six factors by depth.", "soc_scale: none")
+        return
+    # method: sol
+    if ps.get("soc_scale") not in (None, "none"):
+        c.bad(f"{key}.soc_scale", "soc_scale is used only with method: soilgrids.")
+    if not ps.get("name"):
+        c.bad(f"{key}.name", "method: sol needs a name: the soil input to write (then use it in inputs > soil).",
+              "name: hc27_java")
+    if not ps.get("file"):
+        c.bad(f"{key}.file", "method: sol needs file: the .SOL file holding the profiles.",
+              'file: "{inputs}/soils/HC.SOL"')
+    else:
+        c.text(f"{key}.file", ps["file"], 'file: "{inputs}/soils/HC.SOL"', what="a .SOL file path")
+    has_map, has_prof = ps.get("map") is not None, ps.get("profile") is not None
+    if has_map == has_prof:
+        c.bad(key, "method: sol needs either map (which profile where) or profile (one profile for every "
+                   "cell), not both and not neither.", "profile: HC_GEN0011")
+    if has_prof:
+        c.text(f"{key}.profile", ps["profile"], "profile: HC_GEN0011", r".{10}",
+               "the 10-character profile ID after * in the .SOL file")
+    if has_map:
+        mp = str(ps["map"]).lower()
+        vector = mp.endswith((".shp", ".gpkg", ".geojson", ".json", ".parquet", ".fgb", ".gdb", ".kml"))
+        if vector and not ps.get("id_column"):
+            c.bad(f"{key}.id_column", "a vector soil map needs id_column: the column holding the profile ID.",
+                  "id_column: SOIL_ID")
+        if not vector and not ps.get("classes"):
+            c.bad(f"{key}.classes", "a raster soil map needs classes: a CSV with columns code and soil_id.",
+                  'classes: "{inputs}/soilmap/codes.csv"')
+    elif any(ps.get(k) is not None for k in ("classes", "id_column", "layer")):
+        c.bad(key, "classes, id_column and layer go with map.")
+
+
+def _check_prepare_crop_mask(c: _Checker, pc):
+    key = "prepare.crop_mask"
+    ex = "crop_mask: {name: cropland_java, files: ..., values: classes, classes: [40], aggregate: 10}"
+    if not isinstance(pc, dict):
+        c.bad(key, "should hold name, files and values indented below it, or be null.", ex)
+        return
+    c.unknown(key, pc, list(PREPARE_CROP_KEYS))
+    for k, e in (("name", "name: cropland_java"), ("files", 'files: "{inputs}/worldcover/*_Map.tif"'),
+                 ("values", "values: classes")):
+        if k not in pc:
+            c.bad(key, f"needs {k}.", e)
+    if "name" in pc:
+        c.text(f"{key}.name", pc["name"], "name: cropland_java", r"[A-Za-z0-9_.-]{1,60}",
+               "letters, digits, '.', '_' or '-'")
+    if "files" in pc:
+        c.text(f"{key}.files", pc["files"], 'files: "{inputs}/worldcover/*_Map.tif"',
+               what="a file path or pattern (* for several tiles; {inputs} etc. are the paths section)")
+    v = pc.get("values")
+    if v is not None and v not in CROP_VALUES:
+        c.bad(f"{key}.values", f"{v!r} should be one of {', '.join(CROP_VALUES)}: classes for a land-cover map, "
+                               "fraction or percent for a crop share, ha, m2 or km2 for a crop area per pixel, "
+                               "polygons for a vector file of fields.", "values: classes")
+    cls = pc.get("classes")
+    if v == "classes":
+        if not isinstance(cls, list) or not cls or not all(isinstance(x, int) and not isinstance(x, bool)
+                                                           for x in cls):
+            c.bad(f"{key}.classes", "values: classes needs the list of crop class codes of the map, e.g. "
+                                    "[40] for ESA WorldCover Cropland or [12, 14] for MODIS MCD12Q1 IGBP.",
+                  "classes: [40]")
+    elif cls:
+        c.bad(f"{key}.classes", f"classes is used only with values: classes (here values is {v!r}).")
+    for k in ("aggregate", "split"):
+        if pc.get(k) is not None:
+            c.number(f"{key}.{k}", pc[k], 1, 1000, integer=True, example=f"{k}: 10")
+    if (pc.get("aggregate") or 1) > 1 and (pc.get("split") or 1) > 1:
+        c.bad(f"{key}.split", "use aggregate (sum source pixels into larger ones) or split (cut each source "
+                              "pixel into smaller ones), not both.")
+    if v == "polygons" and (pc.get("aggregate") or pc.get("split")):
+        c.bad(key, "aggregate and split are for rasters; for polygons set pixel_m (the output pixel size).")
+    if v != "polygons":
+        for k in ("layer", "class_column", "select", "pixel_m", "subpixels"):
+            if pc.get(k) is not None:
+                c.bad(f"{key}.{k}", f"{k} is used only with values: polygons.")
+    if pc.get("pixel_m") is not None:
+        c.number(f"{key}.pixel_m", pc["pixel_m"], 5, 10000, example="pixel_m: 100")
+    if pc.get("subpixels") is not None:
+        c.number(f"{key}.subpixels", pc["subpixels"], 2, 20, integer=True, example="subpixels: 5")
+    if pc.get("select") is not None and not isinstance(pc["select"], dict):
+        c.bad(f"{key}.select", "should map a column to the values to keep.", "select: {landuse: [sawah]}")
+    if pc.get("box") is not None:
+        b = pc["box"]
+        if (not isinstance(b, list) or len(b) != 4
+                or not all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in b)
+                or not (b[0] < b[2] and b[1] < b[3])):
+            c.bad(f"{key}.box", f"{b!r} should be [west, south, east, north] in degrees, or null for "
+                                "aoi > bbox.", "box: [105.0, -9.0, 114.7, -5.0]")
+
+
+def _check_prepare_weather(c: _Checker, pw):
+    key = "prepare.weather"
+    ex = "weather: {name: era5land_java, variables: {TMAX: {files: ..., variable: ...}, ...}}"
+    if not isinstance(pw, dict):
+        c.bad(key, "should hold name and variables indented below it, or be null.", ex)
+        return
+    c.unknown(key, pw, list(PREPARE_WEATHER_KEYS))
+    if "name" not in pw:
+        c.bad(key, "needs a name: the name of the weather dataset to make (then use it in inputs > weather).",
+              "name: era5land_java")
+    else:
+        c.text(f"{key}.name", pw["name"], "name: era5land_java", r"[A-Za-z0-9_.-]{1,60}",
+               "letters, digits, '.', '_' or '-'")
+    if pw.get("box") is not None:
+        b = pw["box"]
+        if (not isinstance(b, list) or len(b) != 4
+                or not all(isinstance(x, (int, float)) and not isinstance(x, bool) for x in b)
+                or not (b[0] < b[2] and b[1] < b[3])):
+            c.bad(f"{key}.box", f"{b!r} should be [west, south, east, north] in degrees, or null for "
+                                "aoi > bbox.", "box: [105.0, -9.0, 114.7, -5.0]")
+    if pw.get("grid_step") is not None:
+        c.number(f"{key}.grid_step", pw["grid_step"], 0, 5, example="grid_step: 0.1", open_lo=True)
+    if pw.get("years") is not None:
+        c.year_pair(f"{key}.years", pw["years"], "years: [1990, 2021]")
+    if "station_code" in pw:
+        c.text(f"{key}.station_code", pw["station_code"], "station_code: XDWX", r"[A-Za-z0-9]{4}",
+               "4 letters or digits (the institute code in the weather files)")
+    if "temperature_height_m" in pw:
+        c.number(f"{key}.temperature_height_m", pw["temperature_height_m"], 0, 100,
+                 example="temperature_height_m: 2", open_lo=True)
+    if pw.get("utc_offset_hours") is not None:
+        c.number(f"{key}.utc_offset_hours", pw["utc_offset_hours"], -12, 14, example="utc_offset_hours: 7")
+    if pw.get("wind_height_m") is not None:
+        c.number(f"{key}.wind_height_m", pw["wind_height_m"], 0, 100, example="wind_height_m: 2", open_lo=True)
+    if pw.get("points") is not None:
+        if pw.get("variables"):
+            c.bad(key, "give either variables (gridded files) or points (stations, NASA POWER points), not both.")
+        if not pw.get("grid_step"):
+            c.bad(f"{key}.grid_step", "points need grid_step: the cell size of the weather grid the points "
+                                      "are spread on.", "grid_step: 0.1")
+        pts = pw["points"]
+        exp_ = '- {file: "<folder>/station.WTH"}'
+        if not isinstance(pts, list) or not pts:
+            c.bad(f"{key}.points", "should be a list of point sources, each with file.", exp_)
+            return
+        for i, q in enumerate(pts, 1):
+            k = f"{key}.points.{i}"
+            if not isinstance(q, dict) or "file" not in q:
+                c.bad(k, "each point needs file: a DSSAT .WTH file or a CSV table.", exp_)
+                continue
+            c.unknown(k, q, list(POINT_KEYS))
+            c.text(f"{k}.file", q["file"], exp_, what="a file name")
+            if "lat" in q:
+                c.number(f"{k}.lat", q["lat"], -90, 90, example="lat: -6.9")
+            if "lon" in q:
+                c.number(f"{k}.lon", q["lon"], -180, 180, example="lon: 107.6")
+            for d in ("columns", "units"):
+                if q.get(d) is not None:
+                    if not isinstance(q[d], dict):
+                        c.bad(f"{k}.{d}", f"{d} should map a DSSAT variable to a "
+                                          f"{'column name' if d == 'columns' else 'unit'}.",
+                              f"{d}: {{TMAX: tmax}}" if d == "columns" else f'{d}: {{SRAD: "MJ m-2"}}')
+                    else:
+                        c.unknown(f"{k}.{d}", q[d], ["SRAD", "TMAX", "TMIN", "RAIN", "DEWP", "WIND"])
+        return
+    vs = pw.get("variables")
+    if not isinstance(vs, dict) or not vs:
+        c.bad(f"{key}.variables", "should list where each weather variable comes from: SRAD, TMAX, TMIN and "
+                                  "RAIN are needed, DEWP and WIND are optional (or give points).",
+              "TMAX: {files: \"<folder>/tmax_{year}.nc\", variable: t2m}")
+        return
+    known = ("SRAD", "TMAX", "TMIN", "RAIN", "DEWP", "WIND")
+    c.unknown(f"{key}.variables", vs, list(known))
+    for need in ("SRAD", "TMAX", "TMIN", "RAIN"):
+        if need not in vs:
+            c.bad(f"{key}.variables", f"{need} is missing; a run needs SRAD, TMAX, TMIN and RAIN.",
+                  f"{need}: {{files: ..., variable: ...}}")
+    for var, src in vs.items():
+        k = f"{key}.variables.{var}"
+        if var not in known:
+            continue
+        exs = f"{var}: {{files: \"<folder>/{var.lower()}_{{year}}.nc\", variable: {var.lower()}}}"
+        if not isinstance(src, dict):
+            c.bad(k, "should hold files and variable.", exs)
+            continue
+        c.unknown(k, src, list(SOURCE_KEYS))
+        if "files" not in src or "variable" not in src:
+            c.bad(k, "needs files (a file name, with {year} where the year goes if there is one file per "
+                     "year) and variable (its name inside the file; see prepare_weather.py --inspect).", exs)
+            continue
+        c.text(f"{k}.files", src["files"], exs, what="a file name pattern")
+        v = src["variable"]
+        if var == "WIND" and isinstance(v, list):
+            if len(v) != 2 or not all(isinstance(x, str) for x in v):
+                c.bad(f"{k}.variable", "for wind components give two names, [u, v].", "variable: [u10, v10]")
+        elif not isinstance(v, str) or not v:
+            c.bad(f"{k}.variable", f"{v!r} should be the variable's name inside the file"
+                                   + (" (or [u, v] for wind components)" if var == "WIND" else "") + ".", exs)
+        if src.get("units") is not None:
+            c.text(f"{k}.units", src["units"], 'units: "K"', what="the unit of the values in the file")
+        if src.get("regrid") is not None and src["regrid"] not in REGRID:
+            c.bad(f"{k}.regrid", f"{src['regrid']!r} is not a method; use one of {', '.join(REGRID)}, or "
+                                 "leave it out for the default.", "regrid: mean")
+        if "height_m" in src:
+            c.number(f"{k}.height_m", src["height_m"], 0, 100, example="height_m: 10", open_lo=True)
+        if src.get("daily") is not None and src["daily"] not in DAILY_HOW:
+            c.bad(f"{k}.daily", f"{src['daily']!r} should be one of {', '.join(DAILY_HOW)}: how the sub-daily "
+                                "values make a day (max for TMAX, min for TMIN, mean for DEWP and WIND, sum "
+                                "or accumulated for RAIN and SRAD).", "daily: max")
 
 
 def _check_scenario(c: _Checker, i: int, s, names: list):
@@ -730,7 +1098,7 @@ def _check_scenario(c: _Checker, i: int, s, names: list):
         if s.get(k) is not None:
             c.number(f"{key}.{k}", s[k], 0, 1, example=f"{k}: 0.76", open_lo=True)
     if s.get("slpf_table") is not None:
-        c.text(f"{key}.slpf_table", s["slpf_table"], "slpf_table: E:/temp/xdssat/checks/slpf_table.csv",
+        c.text(f"{key}.slpf_table", s["slpf_table"], "slpf_table: <cache>/checks/districts/slpf_table.csv",
                what="a CSV file with columns iy, ix, water, slpf")
         if s.get("slpf") not in (None, 1, 1.0) or s.get("slpf_rainfed") is not None:
             c.bad(f"{key}.slpf_table", "slpf_table gives SLPF per stratum and replaces slpf and "
@@ -801,6 +1169,11 @@ def check_files(exp: Experiment) -> list[str]:
     zt = exp.data["seasons"]["zone_table"]
     if isinstance(zt, str) and not Path(zt).is_file():
         c.bad("seasons.zone_table", f"{zt} does not exist.")
+    try:
+        import inputs
+        c.problems += inputs.check(exp)
+    except ImportError:
+        pass
     return c.problems
 
 

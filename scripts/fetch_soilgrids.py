@@ -1,12 +1,15 @@
 """Download SoilGrids 2.0 tiles that a local mirror's .vrt files reference but lack.
 
-    python scripts/fetch_soilgrids.py --dry-run          # count what is missing
-    python scripts/fetch_soilgrids.py                    # fetch it (Indonesia, mean layers)
+    python scripts/fetch_soilgrids.py --aoi luzon --dry-run   # count what the experiment's area lacks
+    python scripts/fetch_soilgrids.py --aoi luzon             # fetch it
+    python scripts/fetch_soilgrids.py --dry-run               # the original: AgERA5 region idn
 
-The local mirror (XDSSAT_SOILGRIDS, default E:/temp/soilgrids) has the layout of
+The local mirror (paths > soilgrids) has the layout of
 https://files.isric.org/soilgrids/latest/data/: ``<prop>/<prop>_<depth>_mean.vrt``
-plus a folder of GeoTIFF tiles. Only tiles under the land cells of an AgERA5
-region are considered (cell centre and corners), so sea tiles are skipped.
+plus a folder of GeoTIFF tiles. Only tiles under land cells are considered (cell
+centre and corners), so sea tiles are skipped: with --aoi, the land cells of the
+experiment's weather input (inputs > weather) inside aoi > bbox; without, those
+of the AgERA5 cache --region.
 
 Each tile is written to ``.part`` and renamed only after it opens with rasterio
 and its size and data type match the .vrt entry. Re-running skips tiles that
@@ -94,15 +97,29 @@ def fetch(prop, rel, width, height, dtype, mirror: Path, retries=3, timeout=120)
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--mirror", type=Path, default=config.SOILGRIDS_DIR)
-    ap.add_argument("--region", default="idn")
+    ap.add_argument("--mirror", type=Path, help="the SoilGrids mirror (default: paths > soilgrids)")
+    ap.add_argument("--config", type=Path, help="experiment file (default: configs/xdssat.yml)")
+    ap.add_argument("--aoi", help="aoi > name of the experiment file: its weather input's land cells in aoi > bbox")
+    ap.add_argument("--region", default="idn", help="without --aoi: the AgERA5 cache region (default idn)")
     ap.add_argument("--props", nargs="+", default=PROPS)
     ap.add_argument("--depths", nargs="+", default=DEPTHS)
     ap.add_argument("--workers", type=int, default=12)
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
 
-    plon, plat = region_points(a.region)
+    if a.aoi:
+        import inputs
+        import soils
+        exp = config.use(config.load(a.config))
+        if a.aoi != exp.aoi:
+            raise SystemExit(f"--aoi {a.aoi}: the experiment file's aoi is '{exp.aoi}' ({exp.where('aoi.name')})")
+        w = inputs.open_dataset("weather", exp.data["inputs"]["weather"], exp.path("cache"))
+        plon, plat = soils.area_points(*w.grid(), bbox=exp.bbox, centres=True)
+        where = f"the land cells of weather '{w.name}' in aoi '{a.aoi}'"
+    else:
+        plon, plat = region_points(a.region)
+        where = f"region {a.region}"
+    a.mirror = a.mirror or config.SOILGRIDS_DIR
     x, y = pyproj.Transformer.from_crs("EPSG:4326", HOMOLOSINE, always_xy=True).transform(plon, plat)
     x, y = np.asarray(x), np.asarray(y)
     jobs = []
@@ -112,7 +129,7 @@ def main():
             if not vrt.exists():
                 raise FileNotFoundError(vrt)
             jobs += [(p, *m) for m in missing_tiles(vrt, x, y)]
-    print(f"{len(jobs)} missing tiles under region {a.region}", flush=True)
+    print(f"{len(jobs)} missing tiles under {where}", flush=True)
     if a.dry_run or not jobs:
         return
     t0, nbytes, failed = time.time(), 0, []

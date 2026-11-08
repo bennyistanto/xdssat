@@ -53,7 +53,7 @@ matures, and how much grain it yields.
 That "one field" is both its strength and its limit. DSSAT was designed around field experiments: one plot,
 one weather station, one soil profile, a handful of treatments. Indonesia's rice is not one field. It is a
 mosaic of about 7.4 million hectares of paddies (7,392,188 ha in the national 100 m raster built from the
-ATR/BPN 2024 rice-field map, `temp/inputs-detail.md`), from irrigated lowlands on the north coast of Java to
+ATR/BPN 2024 rice-field map), from irrigated lowlands on the north coast of Java to
 rain-fed terraces in the hills, with planting dates that follow the monsoon.
 
 ## What xdssat does
@@ -129,7 +129,7 @@ calendar year of harvest, weighted by the rice area of each cell in each distric
 model's dry matter to the dry milled-grain basis (*gabah kering giling*, GKG) of the statistics. Details are on
 the [Scientific method](science.qmd) page.
 
-## What the Java results show so far
+## What the Java results show
 
 ### The level: calibrated
 
@@ -175,7 +175,7 @@ Ministry of Agriculture BDSP portal [@bdsp], cleaned by `scripts/clean_bdsp.py`.
 (14% grain moisture, an assumption; see [Scientific method](science.qmd#gkg)).
 :::
 
-### The map: better, not yet right
+### The map: the spatial pattern
 
 Getting the Java average right is the easy part; one factor can do it. Getting the *pattern* right is harder.
 The map shows simulated over observed yield for each district; switch runs to see how the calibration steps
@@ -290,7 +290,7 @@ calRows = districts.filter(d => d.run === calRun)
 rLenSimCal = pearson(calRows.map(d => d.season_len), calRows.map(d => d.sim_mean))
 ```
 
-## The honest gaps
+## Known limits
 
 ::: {.gap-box}
 **The spatial pattern is partly fitted, not simulated.** Both the rain-fed SLPF and its temperature slope are
@@ -308,8 +308,7 @@ observed yield of a district over the years is ${fmt.d2(cal.r_detrended_median)}
 with ${fmt.pct(cal.r_detrended_pos)} of districts above zero; against a 5-year running mean instead of a
 linear trend, the median is ${fmt.d2(cal.r_highpass_median)} with ${fmt.pct(cal.r_highpass_pos)} above zero. The model's year-to-year swings follow solar
 radiation; the observed ones come partly in multi-year blocks that look non-weather (programmes, statistical
-methods), and a water-shortage explanation was tested and not supported (`HANDOFF.md`, findings of
-2026-11-06).
+methods); a water-shortage explanation was tested and not supported by the runs.
 :::
 
 ::: {.gap-box}
@@ -321,8 +320,8 @@ years, so technology change is outside the model.
 ::: {.gap-box}
 **Assumptions still standing.** Planting dates come from a rainfall-onset rule with placeholder offsets
 (transplanting 20 days after onset, dry season 120 days after the wet season); the GKG moisture of 14% is
-assumed, not taken from a BPS definition; the older uniform and by-zone calendar runs predate a bug fix and are
-stale; ${calendarReruns}.
+assumed, not taken from a BPS definition; the uniform and by-zone calendar runs were made before a correction
+of the initial soil nitrogen and are kept for comparison only; ${calendarReruns}.
 
 ```{ojs}
 calendarReruns = {
@@ -335,6 +334,8 @@ calendarReruns = {
 ## Where to go next
 
 - [Data, AOI and variety](data.qmd): what goes in, and how much of Java it covers.
+- [Alternative input data](alternatives.qmd): the results with global datasets in place of the national maps.
+- [Input data](../xdssat/data.qmd): what each input must be, and how to prepare your own.
 - [How xdssat differs](../xdssat/gridding.qmd) from the usual way of running DSSAT.
 - [Scientific method](science.qmd): the reason for each step, with references.
 - [Implementation](../xdssat/implementation.qmd): which script does what, and the settings that change the results.

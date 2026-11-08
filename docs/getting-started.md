@@ -119,7 +119,7 @@ other systems). The script copies the files itself.
 
 ### Case B: DSSAT 4.8 is already installed on Windows
 
-**Not tested: there was no installed DSSAT on the reference machine.** The
+**This route is untested** (no installed DSSAT on the reference machine). The
 steps below follow from what xdssat needs (list above) and from how the engine
 finds its path profile: it looks in the current folder, then the executable's
 folder, then `%DSSAT_HOME%`, then `C:\DSSAT48\` (`InputModule/PATH.for:144-166`
@@ -175,6 +175,7 @@ Edit the copy in any text editor. The sections:
 | Section | What it sets |
 |---|---|
 | `paths` | engine, work root, AgERA5, SoilGrids, source maps, cache folder, admin boundaries |
+| `inputs` | which prepared dataset of each kind the run reads: weather, crop mask, soil, water regime, region, zones (section 6) |
 | `aoi` | name, box and region of the area of interest |
 | `template` | the DSSAT experiment (FileX) every season copies, and the crop model |
 | `cultivars` | the varieties to run, as name: cultivar code (INGENO) |
@@ -243,12 +244,14 @@ python -m pytest tests
 
 The checker first reads the experiment file and reports any problem in it,
 then runs one rice experiment (`IRMZ8601.RIX`, 10 treatments) in the work
-root. The test suite (122 tests, about 2 min on the reference machine with the
-engine and the prepared caches present, measured 2026-11-07) needs
-`dssat-csm-data`; tests that need the engine or the prepared caches are
-skipped when those are absent.
+root. The test suite (188 tests, about 2.5 minutes on the reference machine
+with the engine and the prepared caches present) needs `dssat-csm-data`; tests
+that need the engine or the prepared caches are skipped when those are absent.
 
-## 5. Source data
+## 5. Source data of the Java case study
+
+The Java case study is built from these files. For another area, use your own
+data or the alternatives in [Input data](xdssat/data.qmd).
 
 | Data | Expected location | Notes |
 |---|---|---|
@@ -261,8 +264,23 @@ skipped when those are absent.
 
 ## 6. Prepare the inputs
 
-Run in this order. Every script is resumable or cheap to rerun, and writes into
-the cache folder (`paths > cache`). Times are from the reference machine.
+A run reads six kinds of prepared input: weather, crop mask and soil
+(required), water regime, region and zones (optional). Each is a dataset in a
+standard form in `<paths > cache>/inputs/<kind>/<name>/`, and the `inputs`
+section of the experiment file names which dataset of each kind a run uses.
+[Input data](xdssat/data.qmd) describes each kind: what it is used for, the form
+it must have, how to prepare it from your own files, and the global datasets to
+use when you have none.
+
+```bash
+python scripts/register_inputs.py --list   # the prepared datasets, and whether the experiment's choice passes
+```
+
+### The Java case study's inputs
+
+The Java case study's inputs are made from the source data of section 5. Run
+in this order. Every script is resumable or cheap to rerun, and writes into the
+cache folder (`paths > cache`). Times are from the reference machine.
 
 | Step | Command | Time | Output |
 |---|---|---|---|
@@ -280,6 +298,9 @@ Notes:
   missing. Re-running skips tiles already present.
 - Step 5 without `--aoi` builds profiles for all of Indonesia. `--aoi` takes the
   `aoi > name` of the experiment file (add `--config <file>` for another file).
+- Each script registers what it made as a prepared input at the end, under the
+  names `configs/rice-java.yml` uses. For a cache made before that, run
+  `python scripts/register_inputs.py` once.
 - What each step does and why is in the module docstrings:
   [`agera5.py`](../src/agera5.py), [`rasters.py`](../src/rasters.py),
   [`soils.py`](../src/soils.py).
@@ -332,9 +353,10 @@ scenarios:
 - **N rates** must be fertilizer levels of the template
   (`treatments > nitrogen_levels`, default 0, 35, 70, 105, 140 kg N as urea,
   2/3 at 18 and 1/3 at 41 days after transplanting).
-- **Water regimes** come from the MoA irrigation class of each field
-  (`treatments > water_regimes`): by default classes 1-3 run the template's
-  flooded level, class 4 its rainfed bunded level.
+- **Water regimes** come from the water regime input
+  (`treatments > water_regimes`). In the Java case study the Ministry of
+  Agriculture classes 1-3 run the template's flooded level and class 4 its
+  rainfed bunded level; crop without a class takes `treatments > default_regime`.
 - **Scenarios** change the weather for the whole season through the FileX
   ENVIRONMENT MODIFICATIONS section (daylength, radiation, tmax, tmin, rain,
   co2, dewpoint, wind; add, subtract, multiply or replace), cultivar file
@@ -342,8 +364,7 @@ scenarios:
   fertility factor (`slpf`, `slpf_rainfed`, `slpf_table`).
 - **Folder names** are `<aoi>_<mode>_<first>-<last>` plus a tag for anything
   that is not the default: `_ir64_n105` for cultivar and N, `_slpf0.76_rf0.58`,
-  `_tcldf19`, and the scenario name unless it is `baseline`. These are the
-  names the flag-only runner used, so earlier runs keep their names.
+  `_tcldf19`, and the scenario name unless it is `baseline`.
 
 ### Several areas
 
@@ -355,21 +376,21 @@ python scripts/prepare_soils.py --config configs/westjava.yml --aoi westjava
 python scripts/run_aoi.py --config configs/westjava.yml
 ```
 
-The irrigation classes come from the Ministry of Agriculture map, which covers
-Java only, so for now an area has to lie in Java (a province, say); rice
-without an irrigation class stops the run with a message.
+Each area needs its own inputs. The Ministry of Agriculture irrigation map
+covers Java only: elsewhere, use another water regime map, or none with
+`treatments > default_regime` ([Input data](xdssat/data.qmd#water-regime)).
 
 ### Management modes
 
 `seasons > mode` (or `--mode`) picks one of three ways to set planting dates
 ([`management.py`](../src/management.py)):
 
-- **Strata**: one per weather cell and water regime (irrigated or rainfed,
-  from the Ministry of Agriculture classes), carrying its rice area in ha.
+- **Strata**: one per weather cell and water regime (irrigated or rainfed, from
+  the water regime input), carrying its crop area in ha.
 - **uniform**: the dates of `seasons > calendar`; by default wet season 15 Nov
   for all rice, dry season 1 Apr for irrigated rice. These dates are
   placeholders.
-- **per_cell**: wet-season onset per cell from AgERA5 rain with the BMKG
+- **per_cell**: wet-season onset per cell from the weather input's rain with the BMKG
   dasarian rule (`seasons > onset`; default a dasarian of at least 50 mm
   followed by two more), median over the years; transplanting 20 days after
   onset, the next season 120 days later.
@@ -437,7 +458,7 @@ stratum and its `ha`), `failed.csv`, `run_info.json`, and `onset.csv` /
 `zone_table.csv` where used.
 
 The run also writes `<aoi>_<mode>_<years>.nc`, a CF netCDF of the seasonal
-results on the AgERA5 0.1 degree grid ([`outputs.py`](../src/outputs.py)). To
+results on the weather grid ([`outputs.py`](../src/outputs.py)). To
 rebuild it from an existing run folder:
 
 ```bash
@@ -490,7 +511,7 @@ district and simulated vs reported harvested area. The admin2 boundaries
 (`--adm2`) are the latest BPS-coded districts; `clean_bdsp.py` moves old Papua
 and Papua Barat codes to the new provinces.
 
-The older 40-cell check is `spikes/java_engine_check.py`.
+A smaller check on 40 cells: `spikes/java_engine_check.py`.
 
 ## Troubleshooting
 
@@ -503,5 +524,5 @@ The older 40-cell check is `spikes/java_engine_check.py`.
 | `run_aoi.py` or `check_setup.py` prints `PROBLEM` with a line number | the experiment file has a mistake on that line; the message names the setting and shows a valid example. Compare the line with the same line of `configs/rice-java.yml` |
 | `The folder 'paths > ...' is not set` | that folder has no value on this computer: fill the line it names in `configs/xdssat.yml`, or set the environment variable it names |
 | A run is missing some treatments | the engine stopped on a bad input (`STOP 99`). The runner reruns the others and lists the culprit with its error in `failed` |
-| Reading SoilGrids reports missing tiles | run `scripts/fetch_soilgrids.py`, then `build_soilgrids_cache.py` |
+| Reading SoilGrids reports missing tiles | run `python scripts/fetch_soilgrids.py --aoi <aoi>`; `build_soilgrids_cache.py --aoi <aoi>` makes reading faster |
 | Git: `.git` folder grows large in OneDrive | OneDrive locks interrupt git's repacking. Run `git config gc.auto 0` in the repository and pause OneDrive before a manual `git gc` |

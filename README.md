@@ -4,7 +4,9 @@ Gridded crop simulation with the DSSAT-CSM engine, driven from Python and xarray
 
 xdssat is a bridge between DSSAT and Python. It does not reimplement DSSAT: it writes the engine's own input
 files for every grid cell and season, runs the unmodified `dscsm048` engine in parallel, and collects the
-results into one CF netCDF file. Weather comes from AgERA5 (0.1°), soils from SoilGrids 2.0.
+results into one CF netCDF file. The inputs (weather, crop mask, soil, water regime) come from your own data or
+from global datasets such as AgERA5, ERA5-Land, NASA POWER, SoilGrids, WorldCover and LGRIP30; see
+[Input data](https://bennyistanto.github.io/xdssat/xdssat/data.html).
 
 **Documentation: [bennyistanto.github.io/xdssat](https://bennyistanto.github.io/xdssat/)**, with the getting-started
 guide, a case study (rice in Java, Indonesia) and a six-module DSSAT training with notebooks.
@@ -44,7 +46,11 @@ python scripts/run_aoi.py          # runs every cultivar x N rate x scenario of 
 ```
 
 xdssat has no built-in folders: each computer sets its own in `configs/xdssat.yml` (or with
-`XDSSAT_*` environment variables). For further studies keep one file per study in `configs/`,
+`XDSSAT_*` environment variables). A run reads its data (weather, crop mask, soil, water regime,
+region, zones) as prepared datasets in a standard form, whatever the source;
+[Input data](https://bennyistanto.github.io/xdssat/xdssat/data.html) lists what each must be and
+how to prepare it, and `python scripts/register_inputs.py --list` shows what you have. For further
+studies keep one file per study in `configs/`,
 for example `configs/co2-java.yml`, and run it with
 `python scripts/run_aoi.py --config configs/co2-java.yml`. Command-line flags
 (`--sample 30 --years 2015 2016` for a quick test) win over the file. The tests:
@@ -57,7 +63,8 @@ The full setup, from an empty machine to a run, is in the
 ## Not an official DSSAT product, and experimental
 
 xdssat is an independent project, not developed or endorsed by the DSSAT Foundation. It is also experimental:
-so far it has been tested on one case (rice in Java) and the training examples. Use it at your own risk, and
+it is tested on one case study (rice in Java), short runs in Sumatra and the Philippines, and the training
+examples. Use it at your own risk, and
 check its results against your own data before relying on them. If you publish results made
 with it, please cite DSSAT as the DSSAT Foundation asks; see
 [Acknowledgements and how to cite](https://bennyistanto.github.io/xdssat/acknowledgements.html).

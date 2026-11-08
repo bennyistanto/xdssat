@@ -16,20 +16,22 @@ The [DSSAT training](../learn/index.qmd) modules use the same building blocks on
 
 | Module (`src/`) | Role |
 |---|---|
-| `config.py` | All locations: engine, work root, source data, cache (`XDSSAT_*` variables) |
+| `config.py` | The experiment file: every setting, folder and check (`configs/*.yml`, `XDSSAT_*` variables) |
+| `inputs.py` | The prepared inputs (weather, crop mask, soil, water regime, region, zones): reading and checks |
+| `weatherprep.py`, `cropprep.py`, `soilprep.py`, `layerprep.py` | Prepared inputs from your own files ([Input data](data.qmd)) |
 | `wth.py` | Read and write daily weather files (`.WTH`) |
 | `sol.py` | Read and write soil profiles (`.SOL`) |
 | `filex.py` | Build one FileX per chunk from a template experiment: one treatment per cell-season, all dates shifted with planting |
 | `genotype.py` | Cultivar files written into each run folder, with coefficient overrides |
 | `runner.py` | Run chunks in parallel, isolate cells that crash the engine, read outputs |
 | `outputs.py` | Gridded CF netCDF of a run's seasonal results |
-| `agera5.py`, `rasters.py`, `soils.py`, `management.py` | Weather cache, 100 m rasters, soil profiles from SoilGrids, strata and planting calendars |
+| `agera5.py`, `rasters.py`, `soils.py`, `management.py` | AgERA5 cache, crop and class rasters on any grid, soil profiles from SoilGrids, strata and planting calendars |
 
 ::: {.source-note}
 From the repository README; the module docstrings hold the details and the measured facts.
 :::
 
-## Runs so far
+## Runs of the case study
 
 Every run folder in the cache, with its size and wall time (the case study's runs):
 
@@ -51,3 +53,4 @@ The current run simulated ${fmt.int(cur.seasons)} seasons with ${fmt.int(cur.fai
 - [How xdssat differs from common DSSAT use](gridding.qmd): gridding, data preparation, chunked runs, netCDF.
 - [Implementation](implementation.qmd): each script, the settings that change its result, and its outputs.
 - [Getting started](../getting-started.md): setup from an empty machine.
+- [Input data](data.qmd): what each input must be, how to prepare your own, and the alternatives.

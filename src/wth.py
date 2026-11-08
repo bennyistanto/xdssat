@@ -176,7 +176,7 @@ def read_wth(path) -> tuple[dict, pd.DataFrame]:
         d = int(ln[:n])
         if n == 5:
             yy, doy = divmod(d, 1000)
-            year = 1900 + yy if yy >= 30 else 2000 + yy  # test helper only
+            year = 2000 + yy if yy <= 40 else 1900 + yy  # the engine's rule (DATES.for:84-87)
         else:
             year, doy = divmod(d, 1000)
         dates.append(pd.Timestamp(year=year, month=1, day=1) + pd.Timedelta(days=doy - 1))

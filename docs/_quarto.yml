@@ -8,9 +8,11 @@ project:
     - xdssat/index.qmd
     - xdssat/gridding.qmd
     - xdssat/implementation.qmd
+    - xdssat/data.qmd
     - getting-started.md
     - java/index.qmd
     - java/data.qmd
+    - java/alternatives.qmd
     - java/science.qmd
     - learn/index.qmd
     - learn/module1.qmd
@@ -66,12 +68,16 @@ website:
             text: Implementation
           - href: getting-started.md
             text: Getting started
+          - href: xdssat/data.qmd
+            text: Input data
       - text: "Case study: rice in Java"
         menu:
           - href: java/index.qmd
             text: Story
           - href: java/data.qmd
             text: Data, AOI, variety
+          - href: java/alternatives.qmd
+            text: Alternative input data
           - href: java/science.qmd
             text: Scientific method
       - text: "DSSAT training"
@@ -135,6 +141,8 @@ website:
               text: Implementation
             - href: getting-started.md
               text: Getting started
+            - href: xdssat/data.qmd
+              text: Input data
     - id: java
       style: docked
       contents:
@@ -143,6 +151,8 @@ website:
           contents:
             - href: java/data.qmd
               text: Data, AOI, variety
+            - href: java/alternatives.qmd
+              text: Alternative input data
             - href: java/science.qmd
               text: Scientific method
     - id: training

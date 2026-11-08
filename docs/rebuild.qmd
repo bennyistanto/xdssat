@@ -48,6 +48,24 @@ machine; the extracts total about 2 MB.
 | `cultivars.csv` | IR 58 and IR 64 coefficients and their definitions |
 | `settings.csv`, `cli/*.txt` | `config.SETTINGS` and every script's `--help` |
 
+## 1a. The alternative input data page
+
+[Alternative input data](java/alternatives.qmd) reads `docs/java/data/alternatives/`, made by two scripts.
+The first runs every comparison (one input changed per run; the prepared inputs each needs are listed by
+`--list`), the second writes the extracts:
+
+```bash
+conda run --no-capture-output -n climate python docs/scripts/run_alternatives.py
+conda run --no-capture-output -n climate python docs/scripts/export_alternatives.py
+```
+
+| File | Content |
+|---|---|
+| `alternatives/runs.csv` | one row per run: what it changes, areas, seasons, production per year, change from the national run |
+| `alternatives/years.csv` | production, harvested area and yield per run, agricultural year and season |
+| `alternatives/cells.csv` | per run and weather cell: rice area, irrigated area, production, difference from the national run |
+| `alternatives/water_maps.csv` | rice area of the ATR/BPN map by Ministry of Agriculture class and by class of LGRIP30 and MapSPAM |
+
 ## 1b. Re-run a training notebook
 
 Each module's notebook (`notebooks/module1.ipynb` ... `module6.ipynb`) runs the DSSAT engine on example

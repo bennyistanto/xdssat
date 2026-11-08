@@ -254,6 +254,19 @@ def main():
         for what, p, fix in steps:
             line("OK" if p.exists() else "MISSING", what, str(p), fix)
 
+    section("Prepared inputs (the inputs section of the experiment file; src/inputs.py)")
+    if c is not None:
+        import inputs
+        for kind, name in EXP.data["inputs"].items():
+            if not name:
+                line("OK", kind, "not used (null)")
+                continue
+            ok = inputs.manifest_path(kind, name, c).is_file()
+            line("OK" if ok else "MISSING", ("" if kind in inputs.OPTIONAL else "*") + kind, name,
+                 "python scripts/register_inputs.py registers files made by the original scripts; "
+                 f"datasets of this kind: {', '.join(inputs.available(kind, c)) or 'none'}")
+        print("  (whether they meet the requirements is checked with the experiment file above)")
+
     print(f"\n{'Engine ready.' if failures == 0 else f'{failures} required item(s) missing or wrong.'}")
     sys.exit(1 if failures else 0)
 

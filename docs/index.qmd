@@ -56,7 +56,7 @@ netCDF and GeoTIFF, chunked parallel runs of the stock engine, and gridded outpu
 ### 2. [A real case: rice in Java](java/index.qmd)
 
 xdssat applied to an island: ${fmt.int(cur.seasons)} simulated rice seasons over Java for 1991-2020, checked
-against district statistics. What fits, what does not yet, and how it was calibrated.
+against district statistics. What fits, what does not, and how it was calibrated.
 :::
 
 ::: {.g-col-12 .g-col-md-4 .track-card}

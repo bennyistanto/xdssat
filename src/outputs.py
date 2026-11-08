@@ -40,6 +40,7 @@ import xarray as xr
 from pyproj import CRS
 
 import agera5
+import rasters
 import management as mg
 
 FILL = np.float32(1.0e20)
@@ -170,7 +171,7 @@ def seasonal_dataset(summary: pd.DataFrame, strata: pd.DataFrame, lat: np.ndarra
 
     t0 = [mg.anchor_date(y) for y in years]
     t1 = [mg.anchor_date(y + 1) for y in years]
-    half = agera5.RES / 2
+    half = rasters.weather_step(lat, lon) / 2
     coords = {
         "system": ("system", np.array([f"{a}_{b}" for a, b in sy], dtype=object),
                    {"long_name": "cropping system: season and water regime"}),
@@ -288,8 +289,13 @@ def run_attrs(run_dir: Path, info: dict) -> dict:
     }
 
 
-def write_run(run_dir: Path, region: str = "idn", path: Path | None = None) -> Path:
-    """Read a run folder (summary.csv, strata.csv, run_info.json) and write its netCDF."""
+def write_run(run_dir: Path, region: str = "idn", path: Path | None = None, lat_lon=None) -> Path:
+    """Read a run folder (summary.csv, strata.csv, run_info.json) and write its netCDF.
+
+    The grid is ``lat_lon`` (lat, lon) when given; otherwise that of the weather
+    input named in the folder's experiment.yml; for runs made before input
+    datasets existed, the AgERA5 cache of ``region``.
+    """
     run_dir = Path(run_dir)
     summary = pd.read_csv(run_dir / "summary.csv", low_memory=False)
     strata = pd.read_csv(run_dir / "strata.csv")
@@ -298,6 +304,12 @@ def write_run(run_dir: Path, region: str = "idn", path: Path | None = None) -> P
     if "years" in info.get("args", {}):
         y0, y1 = json.loads(info["args"]["years"])
         years = range(y0, y1 + 1)
-    lat, lon, _ = agera5.grid(region)
+    if lat_lon is None and (run_dir / "experiment.yml").is_file():
+        import config
+        import inputs
+        exp = config.load(run_dir / "experiment.yml")
+        if "inputs" in config.read_yaml(run_dir / "experiment.yml")[0]:
+            lat_lon = inputs.open_dataset("weather", exp.data["inputs"]["weather"], exp.path("cache")).grid()[:2]
+    lat, lon = lat_lon if lat_lon is not None else agera5.grid(region)[:2]
     ds = seasonal_dataset(summary, strata, lat, lon, years=years, attrs=run_attrs(run_dir, info))
     return write(ds, path or run_dir / f"{run_dir.name}.nc")

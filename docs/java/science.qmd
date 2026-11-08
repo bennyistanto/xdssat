@@ -51,8 +51,9 @@ the paper). Code: `soils.saxton_rawls`.
 is what a global grid provides, and the coefficients were checked against USDA-ARS WEPP `saxpar.for`
 (`src/soils.py` docstring).
 
-**Why scale organic carbon.** At 26 WISE sites on Java, SoilGrids organic carbon is about twice the measured
-value (median 3.67 vs 1.70% at 0-30 cm; `temp/inputs-detail.md`). xdssat multiplies SoilGrids organic carbon
+**Why scale organic carbon.** At the 15 WISE sites on Java (18 profiles), SoilGrids organic carbon is 1.8
+times the measured value at 0-30 cm (median 3.67 against 2.03%, 35 layers;
+`scripts/fit_soc_scale.py --country Indonesia --bbox 105 -9 114.7 -5`). xdssat multiplies SoilGrids organic carbon
 by the median WISE/SoilGrids ratio over 78 Indonesian WISE profiles [@romero2012]: 0.70 (0-30 cm), 0.63
 (30-100 cm), 0.47 (100-200 cm), `soils.SOC_SCALE`. The scaled value also enters the pedotransfer.
 
@@ -168,8 +169,10 @@ so SLPF scales the day's growth after the most limiting stress, by the same frac
 overshoots the district statistics by a factor of ${fmt.d2(summary.districts[Object.keys(summary.districts).find(k => summary.districts[k].slpf == null)]?.level_area_weighted)}.
 The losses it does not simulate (pests, diseases, weeds, uneven water, management) act on growth, which is
 what SLPF scales. Nitrogen rate and cultivar alone do not close the gap (see
-[Data, AOI and variety](data.qmd#variety-ir-58-and-ir-64)). `SLNF` was considered and rejected: DSSAT 4.8
-reads it but does not use it in the crop model (`HANDOFF.md`).
+[Data, AOI and variety](data.qmd#variety-ir-58-and-ir-64)). The soil file's other factor, `SLNF`, does not
+act on growth: in DSSAT 4.8 it reaches the CERES soil organic matter module as `DMOD`
+(`optempy2k.for:520`, `SOILDYN.for:276-277`), where it scales the mineralisation of stable organic matter
+(`SoilOrg.for:673`); the CENTURY module does not use it.
 
 **How strongly.** Yield falls faster than SLPF; the reason has not been traced in the source here. The sweep
 on the 40-cell sample:
@@ -218,7 +221,7 @@ tcldfStatus = cur.tcldf && cur.tcldf !== "None"
 ```
 
 **The problem it should address.** Simulated district yields rise with season length, and the long seasons are
-in the cool highlands; observed yields do not show this (see the [Story](index.qmd#the-map-better-not-yet-right)).
+in the cool highlands; observed yields do not show this (see the [Story](index.qmd#the-map-the-spatial-pattern)).
 
 **What the coefficient does.** `TCLDF` is a cultivar coefficient: the critical low temperature (°C) for
 spikelet sterility (the CUL file's definition is in the table on the [Data](data.qmd) page). In the phase that
