@@ -11,13 +11,11 @@ from global datasets such as AgERA5, ERA5-Land, NASA POWER, SoilGrids, WorldCove
 **Documentation: [bennyistanto.github.io/xdssat](https://bennyistanto.github.io/xdssat/)**, with the getting-started
 guide, a case study (rice in Java, Indonesia) and a six-module DSSAT training with notebooks.
 
-![Mean simulated yield of irrigated wet-season rice per 0.1° cell of Java, 1991-2020](docs/assets/java/index/xdssat-java-mean-yield-wet_irrigated.png)
+![How xdssat works: your data, the prepare scripts, the DSSAT engine run on every cell in parallel, gridded results](docs/assets/readme/xdssat-how-it-works.svg)
 
-*Case study: mean simulated yield of irrigated wet-season rice per 0.1° cell of Java, 1991-2020.*
+![Rice in Java: mean simulated yield per 0.1° cell, simulated against observed yield, and the change in production when global datasets replace the national maps](docs/assets/readme/xdssat-java-overview.png)
 
-![Simulated and observed rice yield for Java by harvest year, 1992-2020](docs/assets/xdssat/home/xdssat-home-java-yield.png)
-
-*Simulated against observed (BDSP/BPS) rice yield for the whole of Java.*
+*Case study, rice in Java: mean simulated yield of irrigated wet-season rice per 0.1° cell (1991-2020), simulated against observed (BDSP/BPS) yield for the whole of Java, and the change in simulated production when global datasets replace the national inputs (2011-2020, see [Alternative input data](https://bennyistanto.github.io/xdssat/java/alternatives.html)).*
 
 ## What is in this repository
 
