@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo/logo-dark-256.png">
+    <img src="docs/assets/logo/logo-light-256.png" alt="xdssat logo" width="160">
+  </picture>
+</p>
+
 # xdssat
 
 Gridded crop simulation with the DSSAT-CSM engine, driven from Python and xarray.
