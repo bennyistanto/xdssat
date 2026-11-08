@@ -198,12 +198,12 @@ ratioMap = {
             label: "Simulated / observed yield, district mean", domain: [center - half, center + half], clamp: true},
     marks: [
       Plot.geo(districtsGeo.features.filter(f => f.properties.java), {fill: "#e4e4e4", stroke: "none"}),
-      Plot.geo(districtsGeo.features.filter(f => by.has(f.properties.code)), {
-        fill: f => by.get(f.properties.code).ratio, stroke: "#666", strokeWidth: 0.4,
-        title: f => { const d = by.get(f.properties.code); return `${d.name} (${d.province})\nobs ${fmt.d1(d.obs_mean)} / sim ${fmt.d1(d.sim_mean)} ku/ha\nratio ${fmt.d2(d.ratio)}, ${d.years} years`; }}),
+      Plot.geo(districtsGeo.features.filter(f => by.has(f.properties.code)), Plot.centroid({
+        fill: f => by.get(f.properties.code).ratio, stroke: "#666", strokeWidth: 0.4, tip: true,
+        title: f => { const d = by.get(f.properties.code); return `${d.name} (${d.province})\nobs ${fmt.d1(d.obs_mean)} / sim ${fmt.d1(d.sim_mean)} ku/ha\nratio ${fmt.d2(d.ratio)}, ${d.years} years`; }})),
       ...adminMarks(Plot, provinces, districtsGeo)
     ]
-  }), `xdssat-district-ratio-${ratioRun}`, "Grey: fewer than 1,000 ha of simulated rice or fewer than 5 observed years.");
+  }), `xdssat-district-ratio-${ratioRun}`, "Hover a district for its values. Grey: fewer than 1,000 ha of simulated rice or fewer than 5 observed years.");
 }
 ```
 
@@ -289,6 +289,190 @@ slpfText = fit.temp
 calRows = districts.filter(d => d.run === calRun)
 rLenSimCal = pearson(calRows.map(d => d.season_len), calRows.map(d => d.sim_mean))
 ```
+
+## Explore the results by year, province and district {#explore}
+
+The run gives a yield for every weather cell, water regime and season of 1991-2020, and the district
+comparison sums those seasons into every district and harvest year. Choose a province, a district and a
+year: the time series, the two maps and the table below all follow the choice. "All years" shows the mean
+over the years.
+
+```{ojs}
+districtYears = FileAttachment("data/district_years.csv").csv({typed: true})
+gridYearly = FileAttachment("data/grid_yearly.json").json()
+exFeatures = districtsGeo.features.filter(f => f.properties.java)
+exProvinces = [...new Set(exFeatures.map(f => f.properties.province))].sort()
+exYears = d3.range(d3.min([...gridYearly.years, ...districtYears.map(d => d.year)]),
+                   d3.max([...gridYearly.years, ...districtYears.map(d => d.year)]) + 1)
+```
+
+```{ojs}
+viewof exProv = Inputs.select(["All Java", ...exProvinces], {label: "Province"})
+```
+
+```{ojs}
+viewof exDist = {
+  const fs = exFeatures.filter(f => exProv === "All Java" || f.properties.province === exProv)
+    .sort((a, b) => a.properties.name.localeCompare(b.properties.name));
+  return Inputs.select(new Map([["All districts", null],
+    ...fs.map(f => [exProv === "All Java" ? `${f.properties.name} (${f.properties.province})` : f.properties.name, f.properties.code])]),
+    {label: "District"});
+}
+```
+
+```{ojs}
+viewof exYear = Inputs.select(new Map([["All years (mean)", null], ...exYears.map(y => [String(y), y])]), {label: "Year"})
+viewof exRun = Inputs.select(runOptions, {value: calRun, label: "Run", width: 460})
+```
+
+```{ojs}
+exSelFeatures = exDist ? exFeatures.filter(f => f.properties.code === exDist)
+  : exProv === "All Java" ? exFeatures : exFeatures.filter(f => f.properties.province === exProv)
+exCodes = new Set(exSelFeatures.map(f => f.properties.code))
+exName = exDist ? `${exSelFeatures[0].properties.name} (${exSelFeatures[0].properties.province})` : exProv === "All Java" ? "Java" : exProv
+exDomain = exProv === "All Java" && !exDist ? outline : {type: "FeatureCollection", features: exSelFeatures}
+exRows = districtYears.filter(d => d.run === exRun && exCodes.has(String(d.code)))
+// rice-area weighted mean per harvest year; simulated over the districts observed that year, as in the Java chart
+exSeries = d3.groups(exRows, d => d.year).map(([year, rs]) => {
+  const ok = v => v != null && isFinite(v);
+  const o = rs.filter(d => ok(d.obs_ku_ha) && ok(d.sim_ku_ha) && d.rice_ha > 0);
+  const s = o.length ? o : rs.filter(d => ok(d.sim_ku_ha) && d.rice_ha > 0);
+  const w = (xs, k) => xs.length ? d3.sum(xs, d => d[k] * d.rice_ha) / d3.sum(xs, d => d.rice_ha) : null;
+  return {year, sim: w(s, "sim_ku_ha"), obs: w(o, "obs_ku_ha"), districts: o.length};
+}).sort((a, b) => a.year - b.year)
+```
+
+```{ojs}
+exChart = {
+  const rows = exSeries.flatMap(d => [
+    {year: d.year, series: "Simulated", value: d.sim},
+    {year: d.year, series: "Observed (BDSP/BPS)", value: d.obs, districts: d.districts}]).filter(d => d.value != null);
+  return withDownload(Plot.plot({
+    width: Math.min(width, 900), height: 320, marginLeft: 50,
+    caption: `${exName}: rice yield by harvest year`,
+    y: {label: "Rice yield, ku/ha GKG", grid: true, zero: false},
+    x: {label: "Harvest year", tickFormat: d => String(d)},
+    color: {legend: true, domain: ["Simulated", "Observed (BDSP/BPS)"], range: ["#2a7f62", "#d9822b"]},
+    marks: [
+      exYear ? Plot.ruleX([exYear], {stroke: "#999", strokeDasharray: "4,3"}) : null,
+      Plot.lineY(rows, {x: "year", y: "value", stroke: "series", strokeWidth: 2}),
+      Plot.dot(rows, {x: "year", y: "value", fill: "series", r: 3, tip: true, channels: {Districts: "districts"}})
+    ]
+  }), `xdssat-yield-series-${exName}-${exRun}`);
+}
+```
+
+```{ojs}
+viewof exMetric = Inputs.radio(["Simulated", "Observed", "Simulated / observed"], {value: "Simulated / observed", label: "District map"})
+```
+
+```{ojs}
+exDistrictValues = {
+  const ok = v => v != null && isFinite(v);
+  const rows = districtYears.filter(d => d.run === exRun && (exYear == null || d.year === exYear));
+  return new Map(d3.groups(rows, d => String(d.code)).map(([code, rs]) => {
+    const both = rs.filter(d => ok(d.obs_ku_ha) && ok(d.sim_ku_ha));
+    const sim = d3.mean(both.length ? both : rs.filter(d => ok(d.sim_ku_ha)), d => d.sim_ku_ha);
+    const obs = d3.mean(both, d => d.obs_ku_ha);
+    return [code, {code, sim, obs, ratio: both.length ? d3.mean(both, d => d.sim_ku_ha) / obs : null,
+                   years: both.length, rice_ha: rs[0].rice_ha}];
+  }));
+}
+```
+
+```{ojs}
+exDistrictMap = {
+  const w = Math.min(width, 960);
+  const key = {"Simulated": "sim", "Observed": "obs", "Simulated / observed": "ratio"}[exMetric];
+  const vals = [...exDistrictValues.values()].filter(d => d[key] != null && isFinite(d[key]));
+  const color = key === "ratio"
+    ? {type: "diverging", scheme: "PuOr", pivot: 1, reverse: true, legend: true, clamp: true,
+       domain: [1 - Math.max(0.45, d3.max(vals, d => Math.abs(d.ratio - 1))), 1 + Math.max(0.45, d3.max(vals, d => Math.abs(d.ratio - 1)))],
+       label: "Simulated / observed yield"}
+    : {type: "linear", scheme: "YlGn", legend: true, clamp: true,
+       domain: d3.extent([...exDistrictValues.values()].flatMap(d => [d.sim, d.obs]).filter(v => v != null && isFinite(v))),
+       label: `${exMetric} yield, ku/ha GKG`};
+  const has = f => { const d = exDistrictValues.get(f.properties.code); return d && d[key] != null && isFinite(d[key]); };
+  return withDownload(Plot.plot({
+    width: w, height: Math.round(w * (exDomain === outline ? 0.42 : 0.6)),
+    caption: `${exName}, ${exYear ?? "all years"}: ${exMetric.toLowerCase()} yield by district`,
+    projection: {type: "mercator", domain: exDomain},
+    color,
+    marks: [
+      Plot.geo(exFeatures, {fill: "#e4e4e4", stroke: "none", clip: true}),
+      Plot.geo(exFeatures.filter(has), Plot.centroid({
+        fill: f => exDistrictValues.get(f.properties.code)[key], stroke: "#666", strokeWidth: 0.4, clip: true, tip: true,
+        title: f => { const d = exDistrictValues.get(f.properties.code);
+          return `${f.properties.name} (${f.properties.province})\nsim ${fmt.d1(d.sim)} / obs ${d.obs != null ? fmt.d1(d.obs) : "n/a"} ku/ha` +
+                 (d.ratio != null ? `\nratio ${fmt.d2(d.ratio)}, ${d.years} year(s)` : ""); }})),
+      ...adminMarks(Plot, provinces, districtsGeo),
+      Plot.geo(exSelFeatures, {stroke: "#000", strokeWidth: 1.6, fill: "none", clip: true})
+    ]
+  }), `xdssat-district-${key}-${exName}-${exYear ?? "all"}-${exRun}`, "Hover a district for its values. Grey: no simulated rice or no observed yield for the choice.");
+}
+```
+
+```{ojs}
+viewof exSys = Inputs.radio(new Map([["Wet, irrigated", "wet_irrigated"], ["Wet, rain-fed", "wet_rainfed"], ["Dry, irrigated", "dry_irrigated"]]), {value: "wet_irrigated", label: "Cell map"})
+```
+
+```{ojs}
+// district of each weather cell (cell centre), computed once
+exCellCode = {
+  const boxes = exFeatures.map(f => [f, d3.geoBounds(f)]);
+  return gridYearly.lat.map((lat, i) => {
+    const p = [gridYearly.lon[i], lat];
+    const hit = boxes.find(([f, b]) => p[0] >= b[0][0] && p[0] <= b[1][0] && p[1] >= b[0][1] && p[1] <= b[1][1] && d3.geoContains(f, p));
+    return hit ? hit[0].properties.code : null;
+  });
+}
+```
+
+```{ojs}
+exCellMap = {
+  const w = Math.min(width, 960);
+  const yi = exYear == null ? null : gridYearly.years.indexOf(exYear);
+  const series = gridYearly.systems[exSys];
+  const all = series.flat().filter(v => v != null);
+  const rows = gridYearly.lat.map((lat, i) => {
+    const s = series.map(yr => yr[i]).filter(v => v != null);   // series is [year][cell]
+    const v = yi == null ? (s.length ? d3.mean(s) : null) : (yi >= 0 ? series[yi][i] : null);
+    return {lat, lon: gridYearly.lon[i], v, code: exCellCode[i]};
+  }).filter(d => d.v != null && (exProv === "All Java" && !exDist ? true : exCodes.has(d.code)));
+  return withDownload(Plot.plot({
+    width: w, height: Math.round(w * (exDomain === outline ? 0.42 : 0.6)),
+    caption: `${exName}, ${yi == null ? "all season years" : `season year ${exYear}`}: simulated yield per 0.1° cell`,
+    projection: {type: "mercator", domain: exDomain},
+    color: {type: "linear", scheme: "YlGn", legend: true, clamp: true,
+            domain: [d3.quantile(all, 0.02), d3.quantile(all, 0.98)], label: "Simulated yield, kg/ha dry matter"},
+    marks: [
+      Plot.geo(outline, {fill: "#f1f1f1", stroke: "none"}),
+      Plot.geo(cellFeatures(rows).features, Plot.centroid({fill: d => d.properties.v, stroke: null, clip: true, tip: true,
+        title: d => `${d.properties.lat.toFixed(2)}, ${d.properties.lon.toFixed(2)}\n${fmt.int(d.properties.v)} kg/ha`})),
+      ...adminMarks(Plot, provinces, districtsGeo),
+      Plot.geo(exSelFeatures, {stroke: "#000", strokeWidth: 1.6, fill: "none", clip: true})
+    ]
+  }), `xdssat-cells-${exSys}-${exName}-${exYear ?? "all"}`, (yi != null && yi < 0) ? `No simulated seasons for season year ${exYear}.` : "Hover a cell for its value.");
+}
+```
+
+```{ojs}
+exTable = Inputs.table(
+  exSelFeatures.map(f => ({f, d: exDistrictValues.get(f.properties.code)})).filter(x => x.d).map(({f, d}) => ({
+    District: f.properties.name, Province: f.properties.province, "Rice ha": d.rice_ha,
+    "Simulated, ku/ha": d.sim, "Observed, ku/ha": d.obs, "Sim / obs": d.ratio, "Years compared": d.years})),
+  {sort: "Rice ha", reverse: true, layout: "auto",
+   format: {"Rice ha": fmt.int, "Simulated, ku/ha": v => v == null || !isFinite(v) ? "" : fmt.d1(v), "Observed, ku/ha": v => v == null ? "" : fmt.d1(v), "Sim / obs": v => v == null ? "" : fmt.d2(v)}})
+```
+
+::: {.source-note}
+Time series, district map and table: `data/district_years.csv`, seasons moved to the calendar year of their
+harvest ([harvest years](science.qmd#harvest-year)), in ku/ha GKG. The province and Java series are means
+weighted by each district's rice area, over the districts with an observed yield that year (all districts in
+years without observations). Cell map: `data/grid_yearly.json`, the current run ${gridYearly.run}, in kg/ha dry
+matter per season year (seasons from 1 August of that year), so the run selector does not change it and its
+years are season years, not harvest years. A cell belongs to the district that contains its centre.
+:::
 
 ## Known limits
 
