@@ -56,7 +56,7 @@ website:
     logo: assets/logo/logo-light-64.png
     logo-alt: "xdssat logo"
     left:
-      - text: "xdssat"
+      - text: "Guide"
         menu:
           - href: index.qmd
             text: Home
@@ -130,7 +130,7 @@ website:
       style: docked
       collapse-level: 2
       contents:
-        - section: "xdssat"
+        - section: "Guide"
           href: index.qmd
           contents:
             - href: xdssat/index.qmd
