@@ -56,7 +56,8 @@ engine, `XDSSAT_WORK`, `dssat-csm-data` next to this repository and `xlrd`), sav
 
 ## Publishing
 
-`.github/workflows/quarto-publish.yml` renders this folder with Quarto 1.8.27 and deploys `_site/` to GitHub
+`.github/workflows/quarto-publish.yml` renders this folder with Quarto 1.11.9 (the version used locally; change
+both together) and deploys `_site/` to GitHub
 Pages on every push to `main` that touches `docs/` (or by hand from the Actions tab). It runs nothing else: the
 data files and notebook outputs it shows must be committed, so refresh them locally (see Rebuild) and commit
 before pushing. One-time setup in the repository: Settings, Pages, Source: "GitHub Actions".
