@@ -77,7 +77,7 @@ def main():
         name = p["name"]
     else:
         manifest, name = soilgrids(exp, p, a, log)
-    s = inputs.open_dataset("soil", name, config.CACHE_DIR)
+    s = inputs.open_dataset("soil", name, config.DATASETS_DIR)
     m = s.soil_map()
     log(f"registered as the soil input '{name}' ({manifest.parent}): {s.meta.get('profiles', len(set(m.soil_id)))} "
         f"profile(s) for {len(m):,} weather cells, {(time.time() - t0) / 60:.1f} min")
@@ -87,8 +87,8 @@ def main():
 
 
 def soilgrids(exp, p, a, log):
-    weather = inputs.open_dataset("weather", a.weather, config.CACHE_DIR)
-    crop = inputs.open_dataset("crop_mask", a.crop_mask, config.CACHE_DIR)
+    weather = inputs.open_dataset("weather", a.weather, config.DATASETS_DIR)
+    crop = inputs.open_dataset("crop_mask", a.crop_mask, config.DATASETS_DIR)
     a.rice = a.rice or crop.file()
     scale = None if a.no_soc_scale else soilprep.soc_scale(p["soc_scale"])
     if p["soc_scale"] == "wise_indonesia" and not a.no_soc_scale:
@@ -102,7 +102,7 @@ def soilgrids(exp, p, a, log):
         name = exp.aoi
     lat, lon, valid = weather.grid()
     if p["name"]:
-        dataset, out_dir = p["name"], inputs.root(config.CACHE_DIR) / "soil" / p["name"]
+        dataset, out_dir = p["name"], inputs.root(config.DATASETS_DIR) / "soil" / p["name"]
         if (out_dir / "soil.SOL").exists() and not a.overwrite:
             raise SystemExit(f"the soil input '{dataset}' exists already ({out_dir}); use --overwrite to make "
                              "it again, or another name.")
@@ -153,7 +153,7 @@ def soilgrids(exp, p, a, log):
     smap["ha"], smap["share"] = props["ha"], 1.0
     smap["filled_from"] = props["filled_from"] if "filled_from" in props else ""
     smap.to_csv(map_csv, index=False)
-    rel = lambda q: q.relative_to(config.CACHE_DIR).as_posix() if q.is_relative_to(config.CACHE_DIR) else str(q)  # noqa: E731
+    rel = lambda q: q.relative_to(config.DATASETS_DIR).as_posix() if q.is_relative_to(config.DATASETS_DIR) else str(q)  # noqa: E731
     log(f"{len(profs)} profiles, {n_missing} filled from the nearest cell")
     return inputs.write_manifest("soil", dataset, {
         "description": p["description"] or f"one profile per weather cell with crop, {name}, from SoilGrids 2.0",
@@ -162,7 +162,7 @@ def soilgrids(exp, p, a, log):
         "method": "soilgrids", "soc_scale": None if scale is None else scale,
         "file": rel(sol), "map": rel(map_csv), "weather": a.weather, "crop_mask": a.crop_mask,
         "cell_id": "XS{iy:04d}{ix:04d}", "profiles": len(profs), "cells": len(profs),
-        "sub_points": rasters.subdivision(grid)}, config.CACHE_DIR), dataset
+        "sub_points": rasters.subdivision(grid)}, config.DATASETS_DIR), dataset
 
 
 if __name__ == "__main__":

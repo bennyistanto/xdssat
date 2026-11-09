@@ -1,4 +1,4 @@
-"""Run rice seasons for every rice stratum of an area of interest.
+"""Run the seasons of every crop stratum of an area of interest (rice, maize, any template crop).
 
     python scripts/run_aoi.py                                   # everything from configs/xdssat.yml
     python scripts/run_aoi.py --config configs/co2-java.yml     # another experiment file
@@ -11,7 +11,7 @@ explains every setting). Flags given here win over the file. The run covers
 every cultivar x N rate x scenario of the file, one run folder each.
 
 Needs the AgERA5 cache, the rasters (with the filled irrigation layer) and the
-soil profiles of the AOI (docs/getting-started.md). Strata, modes and calendars
+soil profiles of the AOI (docs/xdssat/getting-started.md). Strata, modes and calendars
 are described in src/management.py.
 
 Modes (seasons > mode):
@@ -28,9 +28,10 @@ Modes (seasons > mode):
 
 Writes one folder per combination, in run > output_folder (default
 <cache>/runs), named <aoi>_<mode>_<y0>-<y1> plus tags for the cultivar, N rate
-and scenario (--out: that exact folder, for an experiment with one combination):
+and scenario, and _<regime> with --regime (--out: that exact folder, for an
+experiment with one combination):
     experiment.yml the resolved settings of this run (re-run it with --config)
-    strata.csv     one row per weather cell and water regime, with rice ha
+    strata.csv     one row per weather cell and water regime, with crop ha
     units.csv      one row per simulated season
     summary.csv    DSSAT seasonal summary joined to the units (HWAH, MDAT ...)
     failed.csv     seasons the engine rejected, with its error message
@@ -107,10 +108,24 @@ def build_strata(aoi=None, sample=None, seed=1, exp=None, ins=None):
                          f"'{wr.name if wr is not None else None}'") from None
     st["soil_id"] = ins["soil"].ids(st.iy, st.ix)
     if sample:
-        cells = st.groupby("cell").ha.sum()
-        keep = cells.sample(sample, weights=cells, random_state=seed).index
-        st = st[st.cell.isin(keep)].reset_index(drop=True)
+        st = st[st.cell.isin(sample_cells(st.groupby("cell").ha.sum(), sample, seed))].reset_index(drop=True)
     return st
+
+
+def sample_cells(area: pd.Series, n: int, seed: int) -> pd.Index:
+    """``n`` cells drawn without replacement, weighted by crop area (``area`` indexed by cell).
+
+    pandas refuses when one cell holds more than 1/n of the total area (a concentrated
+    crop or a coarse crop mask such as MapSPAM); then numpy draws the cells one after
+    another, each in proportion to the area left. Samples pandas can draw are unchanged.
+    """
+    n = min(n, int((area > 0).sum()))
+    try:
+        return area.sample(n, weights=area, random_state=seed).index
+    except ValueError:
+        rng = np.random.default_rng(seed)
+        pick = rng.choice(len(area), size=n, replace=False, p=(area / area.sum()).to_numpy())
+        return area.index[np.sort(pick)]
 
 
 def onset_days(st, years, threshold=50.0, n=3, weather=None):
@@ -144,22 +159,25 @@ def parse_args(argv=None):
     g.add_argument("--zone-table", type=Path, help="seasons > zone_table: by_zone CSV zone,season,month_day")
     g.add_argument("--onset-years", nargs=2, type=int, metavar=("FIRST", "LAST"),
                    help="seasons > onset > years: years for the onset climatology (default: years)")
-    g.add_argument("--sample", type=int, help="run > sample: run only this many cells (sampled by rice area)")
+    g.add_argument("--sample", type=int, help="run > sample: run only this many cells (sampled by crop area)")
     g.add_argument("--seed", type=int, help="run > seed")
     g.add_argument("--block", type=int, help="run > years_per_batch: agricultural years per batch")
     g.add_argument("--chunk-size", type=int, help="run > chunk_size")
     g.add_argument("--workers", type=int, help="run > workers")
     g.add_argument("--cultivar", help="run only this cultivar: a name under cultivars, or one the template lists")
     g.add_argument("--n", type=int,
-                   help="treatments > nitrogen_kg: run only this kg N/ha (urea, 2/3 at 18 and 1/3 at 41 "
-                        "days after transplanting)")
+                   help="treatments > nitrogen_kg: run only this kg N/ha, one of treatments > nitrogen_levels "
+                        "(the template's fertilizer level of that rate decides its timing)")
     g.add_argument("--out", type=Path, help="exact run folder (experiments with one combination only)")
+    g.add_argument("--regime", help="run all crop under this water regime (a name under treatments > "
+                   "water_regimes), ignoring inputs > water_regime; the run folders get _<regime>")
     g.add_argument("--tcldf", type=float,
-                   help="every scenario: cold sterility threshold (C) of the cultivar: canopy temperature below "
-                        "it during heading reduces spikelet fertility (RI_Phenol.for:600-648)")
+                   help="every scenario, CERES-Rice only: cold sterility threshold (C) of the cultivar: canopy "
+                        "temperature below it during heading reduces spikelet fertility (RI_Phenol.for:600-648)")
     g.add_argument("--slpf", type=float,
                    help="every scenario: soil fertility factor (0-1], multiplies daily crop carbohydrate in "
-                        "CERES-Rice (RI_Grosub.for:648-649); the yield-gap calibration factor")
+                        "CERES-Rice (RI_Grosub.for:648-649) and CERES-Maize (MZ_GROSUB.for:1192-1193); the "
+                        "yield-gap calibration factor")
     g.add_argument("--slpf-rainfed", type=float,
                    help="every scenario: SLPF for rainfed strata (default: --slpf); rainfed strata then get "
                         "their own copies of the cell profiles, ID XR<iy><ix>")
@@ -200,6 +218,12 @@ def experiment_from_args(a) -> config.Experiment:
         o["cultivars"] = {a.cultivar: cvs[a.cultivar]}
     if a.n is not None:
         o.setdefault("treatments", {})["nitrogen_kg"] = [a.n]
+    if a.regime:
+        known = base.data["treatments"]["water_regimes"]
+        if a.regime not in known:
+            raise SystemExit(f"--regime {a.regime!r}: not under treatments > water_regimes; known: {', '.join(known)}")
+        o.setdefault("treatments", {})["default_regime"] = a.regime
+        o["inputs"] = {**base.data["inputs"], "water_regime": None}
     if any(v is not None for v in (a.tcldf, a.slpf, a.slpf_rainfed, a.slpf_table)):
         scs = copy.deepcopy(base.data["scenarios"])
         for s in scs:
@@ -235,7 +259,12 @@ def scenario_settings(sc: dict) -> dict:
     rf = sc.get("slpf_rainfed")
     rf = None if rf is None or float(rf) == slpf else float(rf)
     table = Path(sc["slpf_table"]) if sc.get("slpf_table") else None
-    return dict(slpf=slpf, slpf_rainfed=rf, slpf_table=table, coefficients=sc.get("cultivar_coefficients") or {})
+    sim = {k: (float(v) if config.SIMULATION_FIELDS[k] is None else config._code(v))
+           for k, v in (sc.get("simulation") or {}).items()}
+    man = {k: (config._code(v) if isinstance(v, (str, bool)) else float(v))
+           for k, v in (sc.get("management") or {}).items()}
+    return dict(slpf=slpf, slpf_rainfed=rf, slpf_table=table, coefficients=sc.get("cultivar_coefficients") or {},
+                simulation=sim, management=man, offset=int(sc.get("planting_offset_days") or 0))
 
 
 def run_tag(cultivar: str, n: int, sc: dict) -> str:
@@ -288,6 +317,8 @@ def legacy_args(exp, cultivar, n, sc, out) -> dict:
         chunk_size=rn["chunk_size"], workers=rn["workers"], cultivar=cultivar, n=n, out=out,
         tcldf=None if tcldf is None else float(tcldf), slpf=s["slpf"], slpf_rainfed=s["slpf_rainfed"],
         slpf_table=s["slpf_table"], scenario=sc["name"], environment=sc.get("environment"),
+        simulation=s["simulation"] or None, management=s["management"] or None,
+        planting_offset_days=s["offset"] or None,
         config=exp.file).items()}
 
 
@@ -298,6 +329,153 @@ def one_combination(exp, cultivar, n, sc) -> config.Experiment:
     d["treatments"]["nitrogen_kg"] = [n]
     d["scenarios"] = [copy.deepcopy(sc)]
     return config.Experiment(d, exp.file, exp.lines, exp.sources)
+
+
+def run_sequences(exp, st, ins, combos, folders, t0):
+    """Crop sequences (template .SQX): every stratum runs its whole sequence for all years in
+    one engine call (mode Q, src/sequence.py). The water regime picks the sequence treatment
+    (treatments > water_regimes > template_level); the first calendar date is the first crop's
+    planting; the years are the cycles. Cultivars and N rates come from the template."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    import inputs
+    import management as mg
+    import outputs
+    import sequence as sq
+    from filex import FileX, with_environment
+    from genotype import crop_info, write_cultivar_files
+    from sol import write_sol
+    from wth import tav_amp, write_wth
+
+    d, rn = exp.data, exp.data["run"]
+    weather, years = ins["weather"], exp.years
+    base = FileX.read(exp.template_file)
+    trt_of = {w: exp.water_level(w) for w in sorted(set(st.water))}
+    offs = {}                                               # water -> crop order R -> days after the first crop
+    for w, t in trt_of.items():
+        comp = sq.components(base, t)                       # raises if the sequence is missing
+        d0 = base.planting_date(int(comp.MP[0]))
+        offs[w] = {int(c.R): (base.planting_date(int(c.MP)) - d0).days for c in comp.itertuples()}
+    first_date = d["seasons"]["calendar"][0]["date"]
+    first, last = weather.first_common_date(), weather.last_common_date()
+    crop = d["template"]["crop_model"]
+    work_root = exp.path("work") / f"p{os.getpid()}"
+    for (cv, n, sc), out in zip(combos, folders):
+        s = scenario_settings(sc)
+        if s["slpf_table"]:
+            raise SystemExit("slpf_table is not supported for crop sequences; use slpf / slpf_rainfed")
+        p0 = mg.date_in_year(years[0], first_date) + pd.Timedelta(days=s["offset"])
+        start = p0 - pd.Timedelta(days=40)
+        # the engine starts one more first crop after the last cycle (CSM.for:368-375; dropped from
+        # the results) and stops with "Missing required data" if the weather ends before that crop
+        # does, which loses the whole sequence: its weather has to be there too. The weather file
+        # gets every day there is (a slow crop can outlast season_days); at least season_days of it
+        p_extra = mg.date_in_year(years[-1] + 1, first_date) + pd.Timedelta(days=s["offset"])
+        end = p_extra + pd.Timedelta(days=rn["season_days"])
+        if start < first:
+            raise SystemExit(f"the first sowing ({p0:%Y-%m-%d}) needs weather from {start:%Y-%m-%d}; "
+                             f"the weather starts on {first:%Y-%m-%d}")
+        if end > last:
+            raise SystemExit(f"a crop sequence over {years[0]}-{years[-1]} needs weather until {end:%Y-%m-%d}: "
+                             f"after the last cycle the engine starts one more first crop ({p_extra:%Y-%m-%d}, "
+                             f"left out of the results) and runs it for up to run > season_days "
+                             f"({rn['season_days']}). The weather ends on {last:%Y-%m-%d}; run one cycle fewer "
+                             f"(years: [{years[0]}, {years[-1] - 1}]) or extend the weather.")
+        cells = st.drop_duplicates("cell")[["cell", "iy", "ix"]].reset_index(drop=True)
+        dates, w = weather.series(cells.iy, cells.ix, start, last)
+        col = dict(zip(cells.cell, range(len(cells))))
+        profiles = {k: v for k, v in ins["soil"].profiles().items() if k in set(st.soil_id)}
+        env = environment_changes(sc)
+        template = with_environment(base, env, sc["name"]) if env else base
+        cul = cultivar_overrides(exp, cv, sc)
+
+        def one(k_row):
+            k, r = k_row
+            rd = work_root / f"s{k:05d}"
+            if rd.exists():
+                shutil.rmtree(rd)
+            rd.mkdir(parents=True)
+            df = inputs.cell_frame(dates, w, col[r.cell])
+            tav, amp = tav_amp(df.TMAX, df.TMIN, df.index)
+            write_wth(rd / f"{r.wsta}.WTH", df, weather.station_code, r.lat, r.lon, tav=tav, amp=amp,
+                      refht=weather.temperature_height, wndht=weather.wind_height,
+                      title=f"{weather.name} cell {r.iy},{r.ix}")
+            prof = copy.deepcopy(profiles[r.soil_id])
+            prof.surface["SLPF"] = s["slpf_rainfed"] if (r.water == "rainfed" and s["slpf_rainfed"]) else s["slpf"]
+            write_sol(rd / "SOIL.SOL", [prof])
+            write_cultivar_files(rd, cul, crop)
+            built = sq.build_sequence(template, trt_of[r.water], r.wsta, r.soil_id, r.lat, r.lon, pdate=p0,
+                                      nyears=len(years), soils={r.soil_id: prof},
+                                      ic_water=d["treatments"]["initial_soil_water"],
+                                      simulation_overrides=s["simulation"] or None,
+                                      overrides=s["management"] or None, exp_code=f"XQ{k:06d}")
+            (rd / f"XQ{k:06d}.SQX").write_text(built.text, encoding="latin-1")
+            res = sq.run_sequence(rd, f"XQ{k:06d}.SQX", len(built.components))
+            shutil.rmtree(rd, ignore_errors=True)
+            if res.returncode != 0 or res.summary.empty:
+                return None, dict(stratum=r.stratum, cell=r.cell, water=r.water,
+                                  error=(res.error_out or res.stdout)[-300:].strip())
+            sm = sq.label_seasons(res.summary, built.components)
+            # Label each crop by its sowing date, not its place in the run: when a crop is still in
+            # the field on the next crop's date, DSSAT sows that crop on the same date a year later,
+            # and every later crop slips with it. A crop belongs to the latest cycle whose nominal
+            # date for it is not after its sowing; planting_delay_days is how late it was sown.
+            pdat = pd.to_datetime(pd.to_numeric(sm.PDAT, errors="coerce").astype("Int64").astype(str),
+                                  format="%Y%j", errors="coerce")
+            cyc = np.arange(years[0] - 1, years[-1] + 3)
+            nominal = np.array([[mg.date_in_year(y, first_date) + pd.Timedelta(days=s["offset"] + offs[r.water][o])
+                                 for y in cyc] for o in sm.crop_order]).astype("datetime64[ns]")
+            # DSSAT repeats a crop's day of year in later cycles, so across 29 February the nominal
+            # date (calendar days after the first crop) can be a day off: a few days of tolerance
+            ok = nominal <= (pdat + pd.Timedelta(days=3)).to_numpy()[:, None]
+            last_ok = np.where(ok.any(axis=1), ok.shape[1] - 1 - np.argmax(ok[:, ::-1], axis=1), 0)
+            sm["season_year"] = cyc[last_ok]
+            sm["planting_delay_days"] = (pdat.to_numpy() - nominal[np.arange(len(sm)), last_ok]) // np.timedelta64(1, "D")
+            # the engine runs on until NYERS years after the first sowing, which can start one
+            # more first crop (CSM.for:368-375); only the requested cycles are kept
+            sm = sm[pdat.notna().to_numpy() & (sm.season_year <= years[-1]).to_numpy()].copy()
+            keys = {c: getattr(r, c) for c in ("stratum", "cell", "iy", "ix", "lat", "lon", "water", "ha",
+                                               "wsta", "soil_id")}
+            sm = pd.concat([sm, pd.DataFrame({
+                "season": [f"{o}_{c.strip()}" for o, c in zip(sm.crop_order, sm.CR)],
+                **{c: v for c, v in keys.items()}, "cultivar": cv, "n_kg": n, "sequence": trt_of[r.water],
+            }, index=sm.index)], axis=1)
+            return sm, None
+
+        tb = time.time()
+        with ThreadPoolExecutor(max_workers=rn["workers"]) as ex:
+            res = list(ex.map(one, st.iterrows()))
+        summary = pd.concat([r for r, _ in res if r is not None], ignore_index=True) if any(
+            r is not None for r, _ in res) else pd.DataFrame()
+        failed = pd.DataFrame([f for _, f in res if f is not None])
+        st.to_csv(out / "strata.csv", index=False)
+        st.assign(sequence=st.water.map(trt_of), pdate=p0).to_csv(out / "units.csv", index=False)
+        header = ("# Resolved settings of this run folder (a crop sequence): one scenario.\n"
+                  "# configs/rice-java.yml explains every setting.\n")
+        (out / "experiment.yml").write_text(one_combination(exp, cv, n, sc).to_yaml(header), encoding="utf-8")
+        summary.to_csv(out / "summary.csv", index=False)
+        failed.to_csv(out / "failed.csv", index=False)
+        log(f"{out.name}: {len(st)} sequences x {len(years)} cycles, {len(summary)} crop seasons, "
+            f"{len(failed)} sequences failed, {time.time() - tb:.0f} s")
+        if len(summary):
+            hw = pd.to_numeric(summary.HWAH, errors="coerce").where(lambda v: v >= 0)
+            wm = (summary.assign(w=summary.ha * hw, h=summary.ha.where(hw.notna()))
+                  .groupby(["water", "season"])[["w", "h"]].sum())
+            log("area-weighted mean yield HWAH (kg/ha) by crop of the sequence:\n"
+                + (wm.w / wm.h).round(0).to_string())
+        build = exp.path("engine") / "BUILD_INFO.txt"
+        info = dict(args=legacy_args(exp, cv, n, sc, None), crop=crop_info(crop, None, exp.path("engine")),
+                    sequence=True, strata=len(st), cells=int(st.cell.nunique()), ha=float(st.ha.sum()),
+                    seasons=len(summary), done=len(summary), failed=len(failed),
+                    minutes=round((time.time() - t0) / 60, 1), template=str(exp.template_file),
+                    engine=build.read_text().strip() if build.exists() else str(exp.path("engine")),
+                    weather_last_day=f"{last:%Y-%m-%d}",
+                    inputs={k: v.summary() for k, v in ins.items() if v is not None})
+        (out / "run_info.json").write_text(json.dumps(info, indent=2))
+        if len(summary):
+            log(f"netCDF -> {outputs.write_run(out, lat_lon=weather.grid()[:2])}")
+    shutil.rmtree(work_root, ignore_errors=True)
+    log(f"done in {round((time.time() - t0) / 60, 1)} min")
 
 
 # ----------------------------------------------------------------------------
@@ -317,7 +495,7 @@ def main(argv=None):
     import management as mg
     import outputs
     from filex import FileX, with_environment
-    from genotype import write_cultivar_files
+    from genotype import crop_info, write_cultivar_files
     from runner import run_units
     from sol import read_sol, write_sol
     from wth import tav_amp, write_wth
@@ -330,7 +508,8 @@ def main(argv=None):
     if a.out and len(combos) > 1:
         raise SystemExit(f"--out names one run folder, but the experiment has {len(combos)} combinations "
                          "(cultivars x nitrogen_kg x scenarios); set run > output_folder instead")
-    folders = [a.out or runs_dir / f"{exp.aoi}_{mode}_{years[0]}-{years[-1]}{run_tag(cv, n, sc)}"
+    rtag = f"_{a.regime}" if getattr(a, "regime", None) else ""
+    folders = [a.out or runs_dir / f"{exp.aoi}_{mode}_{years[0]}-{years[-1]}{run_tag(cv, n, sc)}{rtag}"
                for cv, n, sc in combos]
     if len(set(folders)) != len(folders):
         raise SystemExit("two combinations would write to the same folder; give the scenarios different names")
@@ -350,6 +529,9 @@ def main(argv=None):
     st = build_strata(exp.aoi, rn["sample"], rn["seed"], exp, ins)
     log(f"{len(st)} strata in {st.cell.nunique()} cells, {st.ha.sum():,.0f} ha "
         f"({st.groupby('water').ha.sum().round(0).to_dict()})")
+    import sequence
+    if sequence.is_sequence(exp.template_file):          # a crop sequence (.SQX): mode Q per stratum
+        return run_sequences(exp, st, ins, combos, folders, t0)
 
     seasons = mg.seasons_from(exp)
     on = se["onset"]
@@ -366,7 +548,7 @@ def main(argv=None):
                 f"{int(np.isnan(cells.onset_days).sum())} cells without onset (they use the default date)")
         if mode == "per_cell":
             units = mg.per_cell(st, years, mg.planting_from_onset(
-                cells, cells.onset_days.to_numpy(), on["transplant_after_days"], on["next_season_after_days"],
+                cells, cells.onset_days.to_numpy(), on["planting_after_days"], on["next_season_after_days"],
                 seasons), seasons)
         else:
             zt = se["zone_table"]
@@ -378,7 +560,7 @@ def main(argv=None):
             else:
                 zc = se["zone_column"]
                 cz = cells.merge(st.drop_duplicates(["iy", "ix"])[["iy", "ix", zc]], on=["iy", "ix"])
-                table = mg.zone_table_from_onset(cz, zc, on["transplant_after_days"],
+                table = mg.zone_table_from_onset(cz, zc, on["planting_after_days"],
                                                  on["next_season_after_days"], seasons=seasons)
             extra["zone_table.csv"] = table
             log(f"zone calendar for {table.zone.nunique()} zones")
@@ -403,9 +585,19 @@ def main(argv=None):
 
     # one job per combination: units with their template treatment, soils, cultivar file, template
     jobs = []
+    first = weather.first_common_date()
     for (cv, n, sc), out in zip(combos, folders):
         s = scenario_settings(sc)
         u = units.copy()
+        if s["offset"]:                        # scenario > planting_offset_days: every season moves
+            u["pdate"] = u.pdate + pd.Timedelta(days=s["offset"])
+            out_of = (u.pdate - pd.Timedelta(days=40) < first) | (u.pdate + pd.Timedelta(days=season_days) > last)
+            if out_of.any():
+                log(f"scenario {sc['name']}: dropping {out_of.sum()} seasons whose moved dates fall outside the "
+                    f"weather ({first:%Y-%m-%d} to {last:%Y-%m-%d})")
+                u = u[~out_of].reset_index(drop=True)
+        for k, v in s["management"].items():  # scenario > management: e.g. MP.PPOP on every season
+            u[k] = v
         ingeno = d["cultivars"][cv]
         trno_w, over = {}, {}
         for w in sorted(set(u.water)):
@@ -459,6 +651,7 @@ def main(argv=None):
                   f"--out \"{out.as_posix()}\"\n")
         (out / "experiment.yml").write_text(one_combination(exp, cv, n, sc).to_yaml(header), encoding="utf-8")
         jobs.append(dict(cv=cv, n=n, sc=sc, out=out, units=u, profiles=profiles, template=template,
+                         simulation=s["simulation"],
                          cul_over=cultivar_overrides(exp, cv, sc), summaries=[], failures=[], t0=time.time()))
     log(f"{len(units)} seasons per run ({units.groupby(['water', 'season']).size().to_dict()})")
 
@@ -484,7 +677,7 @@ def main(argv=None):
     work_root = exp.path("work") / f"p{os.getpid()}"
     blocks = [years[i:i + rn["years_per_batch"]] for i in range(0, len(years), rn["years_per_batch"])]
     for b in blocks:
-        ub = units[units.season_year.isin(b)]
+        ub = pd.concat([j["units"][j["units"].season_year.isin(b)] for j in jobs], ignore_index=True)
         if ub.empty:
             continue
         cells = ub.drop_duplicates("cell")[["cell", "iy", "ix"]].reset_index(drop=True)
@@ -497,7 +690,12 @@ def main(argv=None):
             uj = job["units"][job["units"].season_year.isin(b)]
             res = run_units(uj, job["template"], writer(job), chunk_size=rn["chunk_size"], workers=rn["workers"],
                             soils=job["profiles"], ic_water=d["treatments"]["initial_soil_water"],
-                            work_root=work_root)
+                            work_root=work_root, simulation_overrides=job["simulation"] or None,
+                            outputs="daily" if rn["daily"] else "summary",
+                            daily_groups=tuple(rn["daily"]) if rn["daily"] else None)
+            for r in res:                          # run > daily: one table per group, all chunks
+                for g, df in r.daily.items():
+                    job.setdefault("daily", {}).setdefault(g, []).append(df)
             s = pd.concat([r.summary for r in res], ignore_index=True)
             f = pd.concat([r.failed for r in res], ignore_index=True)
             job["summaries"].append(s)
@@ -513,11 +711,15 @@ def main(argv=None):
         failed = pd.concat(job["failures"], ignore_index=True)
         summary.to_csv(out / "summary.csv", index=False)
         failed.to_csv(out / "failed.csv", index=False)
+        for g, parts in (job.get("daily") or {}).items():
+            pd.concat(parts, ignore_index=True).to_csv(out / f"daily_{g}.csv.gz", index=False)
+            log(f"{out.name}: daily {g} -> daily_{g}.csv.gz")
         hwah = pd.to_numeric(summary.HWAH, errors="coerce")
         wmean = (summary.assign(w=summary.ha * hwah).groupby(["water", "season"])
                  .apply(lambda g: g.w.sum() / g.ha[hwah[g.index].notna()].sum(), include_groups=False))
         log(f"{out.name}: area-weighted mean yield HWAH (kg/ha):\n" + wmean.round(0).to_string())
         info = dict(args=legacy_args(exp, job["cv"], job["n"], job["sc"], a.out),
+                    crop=crop_info(crop, base_template.crop_code(), exp.path("engine")),
                     strata=len(st), cells=int(st.cell.nunique()),
                     ha=float(st.ha.sum()), seasons=len(job["units"]), done=len(summary), failed=len(failed),
                     minutes=round((time.time() - t0) / 60, 1), template=str(exp.template_file),

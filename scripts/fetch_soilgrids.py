@@ -113,7 +113,7 @@ def main():
         exp = config.use(config.load(a.config))
         if a.aoi != exp.aoi:
             raise SystemExit(f"--aoi {a.aoi}: the experiment file's aoi is '{exp.aoi}' ({exp.where('aoi.name')})")
-        w = inputs.open_dataset("weather", exp.data["inputs"]["weather"], exp.path("cache"))
+        w = inputs.open_dataset("weather", exp.data["inputs"]["weather"], exp.datasets())
         plon, plat = soils.area_points(*w.grid(), bbox=exp.bbox, centres=True)
         where = f"the land cells of weather '{w.name}' in aoi '{a.aoi}'"
     else:

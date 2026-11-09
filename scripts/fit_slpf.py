@@ -27,6 +27,14 @@ Method
 5. Leave-one-province-out: refit without each province and score its districts,
    for every model, to see whether extra parameters predict or only fit.
 
+Any area and region map (not only Java): give the runs' experiment file, a region input and a
+table of observed yields (src/evaluate.py; the same tables scripts/compare_regions.py uses):
+
+    python scripts/fit_slpf.py --runs <three runs> --config <experiment.yml>         --region-input districts_kenya --obs-table yields.csv --obs-units t/ha
+
+The table has columns region, year, yield and optionally group (e.g. province), which the
+leave-one-out check leaves out in turn (each region on its own without it).
+
 Writes <XDSSAT_CACHE>/checks/districts/fit_slpf.json, fit_slpf_grid.csv and
 slpf_table.csv (iy, ix, water, tmin, slpf of the temp model, for --slpf-table).
 """
@@ -204,12 +212,28 @@ def main():
     ap.add_argument("--min-ha", type=float, default=1000.0)
     ap.add_argument("--step", type=float, default=0.005)
     ap.add_argument("--out", type=Path, default=config.CACHE_DIR / "checks" / "districts")
+    ap.add_argument("--config", type=Path, help="experiment file of the runs (with --obs-table)")
+    ap.add_argument("--region-input", help="region input whose class names are the table's regions")
+    ap.add_argument("--obs-table", type=Path, help="CSV region, year, yield [, group]: any area "
+                                                   "(default: the Java BDSP district tables in --obs)")
+    ap.add_argument("--obs-units", default="kg/ha", help="units of the table's yield: kg/ha, t/ha, ku/ha")
     a = ap.parse_args()
+    a.out.mkdir(parents=True, exist_ok=True)
 
     s, y, years = load_runs(a.runs)
-    pieces = cdm.pieces()
-    obs = cdm.obs_long(a.obs / "bdsp_rice_yield_adm2.csv", "obs_ku_ha")[["code", "year", "obs_ku_ha"]]
-    prov = pd.read_csv(a.obs / "bdsp_rice_yield_adm2.csv", dtype={"code": str}).set_index("code").province
+    if a.obs_table:                      # any area: the experiment's inputs and a plain table
+        import evaluate
+        exp = config.use(config.load(a.config or a.runs[0] / "experiment.yml"))
+        pieces = evaluate.crop_pieces(exp, a.region_input).rename(columns={"region": "code"})
+        t_obs = evaluate.read_observed(a.obs_table, a.obs_units)
+        obs = t_obs.rename(columns={"region": "code"}).assign(obs_ku_ha=lambda d: d.obs / 100.0)[
+            ["code", "year", "obs_ku_ha"]]
+        g = t_obs.drop_duplicates("region").set_index("region")
+        prov = g["group"] if "group" in g else pd.Series(g.index, index=g.index)
+    else:                                # the Java case study
+        pieces = cdm.pieces()
+        obs = cdm.obs_long(a.obs / "bdsp_rice_yield_adm2.csv", "obs_ku_ha")[["code", "year", "obs_ku_ha"]]
+        prov = pd.read_csv(a.obs / "bdsp_rice_yield_adm2.csv", dtype={"code": str}).set_index("code").province
     t = district_terms(s, y, pieces, years, obs, a.moisture, a.min_ha)
     grid = np.round(np.arange(s[0], s[-1] + 1e-9, a.step), 4)
     print(f"SLPF points {s.tolist()}, {len(y)} seasons, {len(t)} districts ({t.ha.sum():,.0f} ha), grid {grid[0]}-{grid[-1]}")

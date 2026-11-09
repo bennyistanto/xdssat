@@ -1,9 +1,10 @@
-"""Fetch district rice harvested area, production and yield from the Ministry of
-Agriculture BDSP portal (https://bdsp2.pertanian.go.id/bdsp/id/lokasi).
+"""Fetch district harvested area, production and yield of a food crop (rice by default) from the
+Ministry of Agriculture BDSP portal (https://bdsp2.pertanian.go.id/bdsp/id/lokasi).
 
     python scripts/fetch_bdsp.py                  # all provinces, three indicators
     python scripts/fetch_bdsp.py --prov 31 32 33 34 35 36
     python scripts/fetch_bdsp.py --parse-only     # rebuild the table from the saved pages
+    python scripts/fetch_bdsp.py --komoditas JAGUNG --prov 33 35   # maize, Central and East Java
 
 The portal's "Lokasi" search (Cari) posts the form to lokasi/result and returns
 an HTML table: one row per district ("<BPS code> - <name>"), one column per year,
@@ -13,10 +14,11 @@ at a time with a pause (--pause, default 3 s). Codes come from the portal's own
 lookups (komoditas/getKomBySubsektor, indikator/getIndiByKomSubsek,
 satuan/getSatuan, lokasi/getProv), saved in lookups.json.
 
-Writes to --out (default <XDSSAT_CACHE>/obs/bdsp):
+Writes to --out (default <XDSSAT_CACHE>/obs/bdsp for PADI, obs/bdsp_<komoditas> for another crop,
+so the saved pages of two crops never mix):
     raw/<indicator>_<prov>.html    each reply as received (reruns skip these)
     lookups.json
-    bdsp_padi_adm2_long.csv        indicator, unit, sheet (province), code, name,
+    bdsp_<komoditas>_adm2_long.csv indicator, unit, sheet (province), code, name,
                                    year, raw (text as shown), value (parsed; 0 -> empty)
 """
 from __future__ import annotations
@@ -36,7 +38,7 @@ import config  # noqa: E402
 
 BASE = "https://bdsp2.pertanian.go.id/bdsp/id/"
 SUBSEKTOR = ("01", "Tanaman Pangan")
-KOMODITAS = "PADI"
+KOMODITAS = "PADI"                     # default; --komoditas picks another (e.g. JAGUNG)
 STATUS = ("6", "Angka Tetap")          # the form's default status
 YEARS = (1970, 2026)
 
@@ -61,19 +63,23 @@ class Portal:
         raise RuntimeError(f"{path} failed {tries} times")
 
 
-def lookups(p: Portal, path: Path) -> dict:
+def lookups(p: Portal, path: Path, komoditas: str = KOMODITAS) -> dict:
     if path.exists():
         return json.loads(path.read_text())
     p.call("GET", "lokasi")
     kom = p.call("POST", "komoditas/getKomBySubsektor", data={"subsektorcd": SUBSEKTOR[0]}).json()
-    padi = next(k["fkomcd"] for k in kom if k["fkomnm"].strip().upper() == KOMODITAS)
+    match = [k["fkomcd"] for k in kom if k["fkomnm"].strip().upper() == komoditas]
+    if not match:
+        raise SystemExit(f"commodity {komoditas!r} not on the portal; known: "
+                         f"{', '.join(sorted(k['fkomnm'].strip().upper() for k in kom))}")
+    padi = match[0]
     ind = p.call("POST", "indikator/getIndiByKomSubsek", data={"subsektorcd": SUBSEKTOR[0], "komcd": padi}).json()
     for i in ind:
         sat = p.call("POST", "satuan/getSatuan",
                      data={"indikatorcd": i["findicd"], "subsektorcd": SUBSEKTOR[0], "komcd": padi}).json()
         i["satuan"] = sat[0]
     prov = p.call("GET", "lokasi/getProv").json()
-    out = dict(komoditas=padi, indikator=ind, prov=prov)
+    out = dict(komoditas=padi, komoditasnm=komoditas, indikator=ind, prov=prov)
     path.write_text(json.dumps(out, indent=1))
     return out
 
@@ -84,7 +90,7 @@ def form(lk: dict, ind: dict, prov: dict) -> dict:
                 satuan=ind["satuan"]["fkeyid"], satuannm=ind["satuan"]["fsatuan"],
                 sts_angka=STATUS[0], sts_angkanm=STATUS[1],
                 tahunAwal=str(YEARS[0]), tahunAkhir=str(YEARS[1]),
-                komoditas=lk["komoditas"], komoditasnm=KOMODITAS,
+                komoditas=lk["komoditas"], komoditasnm=lk.get("komoditasnm", KOMODITAS),
                 indikator=ind["findicd"], indikatornm=ind["findinm"])
 
 
@@ -128,15 +134,20 @@ def to_long(raw_dir: Path, lk: dict) -> pd.DataFrame:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", type=Path, default=config.CACHE_DIR / "obs" / "bdsp")
+    ap.add_argument("--komoditas", default=KOMODITAS, help="commodity name as on the portal (PADI, JAGUNG ...)")
+    ap.add_argument("--out", type=Path, help="default <cache>/obs/bdsp (PADI) or obs/bdsp_<komoditas>")
     ap.add_argument("--prov", nargs="+", help="province codes (default all)")
     ap.add_argument("--pause", type=float, default=3.0, help="seconds between requests")
     ap.add_argument("--parse-only", action="store_true")
     a = ap.parse_args()
+    kom = a.komoditas.strip().upper()
+    a.out = a.out or config.CACHE_DIR / "obs" / ("bdsp" if kom == KOMODITAS else f"bdsp_{kom.lower()}")
     raw = a.out / "raw"
     raw.mkdir(parents=True, exist_ok=True)
     p = Portal(a.pause)
-    lk = lookups(p, a.out / "lookups.json")
+    lk = lookups(p, a.out / "lookups.json", kom)
+    if lk.get("komoditasnm", KOMODITAS) != kom:
+        raise SystemExit(f"{a.out / 'lookups.json'} is for {lk.get('komoditasnm', KOMODITAS)}, not {kom}; use another --out")
 
     if not a.parse_only:
         provs = [x for x in lk["prov"] if not a.prov or x["fkode_prop"] in a.prov]
@@ -153,10 +164,11 @@ def main():
                   f"{time.time() - t0:.0f} s", flush=True)
 
     d = to_long(raw, lk)
-    d.to_csv(a.out / "bdsp_padi_adm2_long.csv", index=False)
+    name = f"bdsp_{kom.lower()}_adm2_long.csv"
+    d.to_csv(a.out / name, index=False)
     print(f"parsed {d.groupby('indicator').code.nunique().to_dict()} districts, "
           f"{d[d.value.notna()].groupby('indicator').size().to_dict()} non-zero values -> "
-          f"{a.out / 'bdsp_padi_adm2_long.csv'}")
+          f"{a.out / name}")
 
 
 if __name__ == "__main__":

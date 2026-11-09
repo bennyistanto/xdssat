@@ -34,7 +34,7 @@ def main():
         exp = config.use(config.load(a.config))
         if a.aoi != exp.aoi:
             raise SystemExit(f"--aoi {a.aoi}: the experiment file's aoi is '{exp.aoi}' ({exp.where('aoi.name')})")
-        w = inputs.open_dataset("weather", exp.data["inputs"]["weather"], exp.path("cache"))
+        w = inputs.open_dataset("weather", exp.data["inputs"]["weather"], exp.datasets())
         soils.build_region_cache(a.aoi, points=soils.area_points(*w.grid(), bbox=exp.bbox), log=log)
     else:
         soils.build_region_cache(a.region, log=log)

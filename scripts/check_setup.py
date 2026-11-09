@@ -10,7 +10,7 @@ configs/rice-java.yml explains every setting) and lists every folder with where
 its value came from and the line of the file that sets it. Then prints one line
 per item: OK, WARN or MISSING, with the command, or the line of the experiment
 file, that fixes it. Exit code 1 if anything required for running the engine is
-missing or the experiment file has problems. See docs/getting-started.md.
+missing or the experiment file has problems. See docs/xdssat/getting-started.md.
 """
 import argparse
 import importlib

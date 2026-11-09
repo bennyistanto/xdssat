@@ -50,13 +50,13 @@ def main():
     log = lambda m: print(f"{time.strftime('%H:%M:%S')} {m}", flush=True)  # noqa: E731
     manifest = cropprep.prepare(exp, overwrite=a.overwrite, workers=a.workers, log=log)
     name = exp.data["prepare"]["crop_mask"]["name"]
-    c = inputs.open_dataset("crop_mask", name, exp.path("cache"))
+    c = inputs.open_dataset("crop_mask", name, exp.datasets())
     m = c.meta
     log(f"wrote {manifest.parent} in {(time.time() - t0) / 60:.1f} min: {m['total_ha']:,.0f} ha of crop in "
         f"{m['pixels_with_crop']:,} pixels of {m['pixel'][0]:.6g} x {m['pixel'][1]:.6g} ({m['crs']})")
     # the runner reads a coarse pixel as at most 10 x 10 sub-points; beyond that they are coarse too
     try:
-        w = inputs.open_dataset("weather", exp.data["inputs"]["weather"], exp.path("cache"))
+        w = inputs.open_dataset("weather", exp.data["inputs"]["weather"], exp.datasets())
         size = m["pixel"][0] if "degree" in _unit(m["crs"]) else m["pixel"][0] / 111_320
         if size / 10 > w.step / 4:
             log(f"note: pixels of about {size:.3g} degree are read as 10 x 10 sub-points of {size / 10:.3g} "

@@ -53,7 +53,7 @@ def main():
     log(f"wrote {manifest.parent} in {(time.time() - t0) / 60:.1f} min")
     # check the new dataset as the run would use it
     over = dict(exp.data["inputs"], weather=name)
-    w = inputs.open_dataset("weather", name, exp.path("cache"))
+    w = inputs.open_dataset("weather", name, exp.datasets())
     lat, lon, valid = w.grid()
     log(f"grid {len(lat)} x {len(lon)} cells of {w.step:g} degree, {int(valid.sum())} with data; "
         f"variables {', '.join(w.variables)}; last common day {w.last_common_date():%Y-%m-%d}")
