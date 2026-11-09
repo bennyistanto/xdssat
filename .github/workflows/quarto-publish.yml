@@ -2,8 +2,10 @@ name: Publish documentation site
 
 # Renders the Quarto site in docs/ and deploys it to GitHub Pages.
 #
-# Nothing is computed here. The pages read CSV and JSON files that are committed
-# (docs/java/data/, docs/learn/data/), the notebooks are shown with their stored
+# Nothing is computed here. The pages read CSV, JSON and GeoJSON files that are
+# committed (docs/java/data/, docs/learn/data/, docs/cases/data/; written locally by
+# docs/scripts/export_data.py, export_cases.py and export_boundaries.py and by the
+# training notebooks), the notebooks are shown with their stored
 # outputs (Quarto does not execute .ipynb files by default), and no page has a
 # Python or R code cell. So the runner needs only Quarto: no DSSAT engine, no
 # conda environment, no data downloads. Observable JS runs in the reader's browser.
@@ -41,8 +43,9 @@ jobs:
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
         with:
-          # the version the site is built and checked with locally
-          version: "1.8.27"
+          # the version the site is built and checked with locally (stable release of
+          # 2026-10-30); change both together
+          version: "1.11.9"
 
       - name: Render Quarto site
         uses: quarto-dev/quarto-actions/render@v2
