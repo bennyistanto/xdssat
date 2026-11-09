@@ -131,8 +131,10 @@ a CSV table; every cell of the grid takes the series of its nearest point.
 
 | Dataset | Grid | Period | Notes |
 |---|---|---|---|
-| [AgERA5](https://doi.org/10.24381/cds.6c68c9bb) | 0.1°, daily | 1979 to present | all six variables; agrometeorological indicators derived from ERA5; Copernicus licence |
-| [ERA5-Land](https://doi.org/10.24381/cds.e2161bac) | 0.1°, hourly | 1950 to present | use `daily:` per variable; precipitation and radiation are accumulated since 00 UTC |
+| [AgERA5](https://doi.org/10.24381/cds.6c68c9bb) | 0.1°, daily | 1979 to present | all six variables; agrometeorological indicators derived from ERA5; CC BY 4.0 (Climate Data Store record) |
+| [ERA5-Land](https://doi.org/10.24381/cds.e2161bac) | 0.1°, hourly | 1950 to present | use `daily:` per variable; precipitation and radiation are accumulated since 00 UTC; CC BY 4.0 (Climate Data Store record) |
+| [W5E5 v2.0](https://doi.org/10.48364/ISIMIP.342217) | 0.5°, daily | 1979 to 2019 | WFDE5 over land merged with ERA5 over the ocean, the ISIMIP3 reference climate; all six variables; CC0 (DataCite record) |
+| [MSWEP v2.8](https://www.gloh2o.org/mswep/) | 0.1°, 3-hourly | 1979 to present | rain only, merged gauge, satellite and reanalysis; CC BY-NC 4.0 (stated by the [ICDC Hamburg mirror](https://www.cen.uni-hamburg.de/en/icdc/data/atmosphere/mswep-precipitation-amount.html), not checked at GloH2O); use `daily: sum` |
 | [NASA POWER](https://power.larc.nasa.gov/docs/services/api/temporal/daily/) | point or region | see the POWER documentation | daily; meteorology from MERRA-2 (0.5° x 0.625°), radiation from CERES; free download per point (CSV) |
 | [CHIRPS 2.0](https://doi.org/10.1038/sdata.2015.66) | 0.05°, daily | 1981 to present | rain only, 50°S-50°N; combine with temperature and radiation from another source |
 
@@ -204,7 +206,8 @@ Java) is the best crop mask. Without one:
 |---|---|---|---|---|
 | [ESA WorldCover 2021 v200](https://esa-worldcover.org) | 10 m | cropland (class 40) | `values: classes`, `classes: [40]`, `aggregate: 10` | CC BY 4.0 |
 | [GFSAD LGRIP30](https://doi.org/10.5067/Community/LGRIP/LGRIP30.001) | 30 m | irrigated (2) and rainfed (3) cropland, nominal 2015 | `classes: [2, 3]` | NASA LP DAAC, Earthdata login |
-| [MapSPAM 2020 v2r2](https://doi.org/10.7910/DVN/SWPENT) | 5 arc-min (about 9 km) | physical area of 46 crops, by technology | `values: ha`, file `..._A_RICE_A.tif` for rice | see the Dataverse record |
+| [MapSPAM 2020 v2r2](https://doi.org/10.7910/DVN/SWPENT) | 5 arc-min (about 9 km) | physical area of 46 crops, by technology | `values: ha`, file `..._A_RICE_A.tif` for rice | CC BY 4.0 (IFPRI terms of the Dataverse record) |
+| [C3S / ESA CCI land cover](https://doi.org/10.24381/cds.006f2c9a) | 300 m, yearly, 1992 to present | rainfed cropland (10, 11, 12), irrigated or post-flooding cropland (20), cropland mosaic (30) | `values: classes`, `classes: [10, 11, 12, 20]` | ESA CCI licence (1992-2015), VITO licence or CC BY by version (Climate Data Store record) |
 | [MODIS MCD12Q1 v061](https://lpdaac.usgs.gov/documents/1409/MCD12_User_Guide_V61.pdf) | 500 m | IGBP croplands (12), cropland mosaics (14) | `classes: [12, 14]` | NASA LP DAAC |
 
 A general cropland class does not say which crop grows there: with it, the crop
@@ -285,6 +288,7 @@ carry over to another.
 | [SoilGrids 2.0](https://doi.org/10.5194/soil-7-217-2021) | 250 m, six depths to 200 cm: texture, organic carbon, bulk density, coarse fragments, nitrogen, pH, CEC | `method: soilgrids`; CC BY 4.0 |
 | HC27 generic profiles | 27 profiles by texture, rooting depth and organic carbon (HarvestChoice), in DSSAT's `HC.SOL` | `method: sol` with one `profile:`; the file's header explains how to choose one |
 | WISE 1.1 profiles | 3,404 measured profiles worldwide, in DSSAT's `WI.SOL` | `method: sol`, or to fit `soc_scale` |
+| [HWSD v2.0](https://doi.org/10.4060/cc3823en) | about 1 km soil mapping units with seven depths to 200 cm (FAO and IIASA, 2023) | xdssat has no reader for it: turn its units into profiles of a `.SOL` file, then `method: sol` with `map:`; the FAO metadata states no licence, so check the terms of the download |
 
 ### What the checks refuse
 
@@ -357,6 +361,7 @@ best water regime. Without one:
 |---|---|---|---|
 | [GFSAD LGRIP30](https://doi.org/10.5067/Community/LGRIP/LGRIP30.001) | 30 m classes, nominal 2015: 0 water, 1 non-cropland, 2 irrigated, 3 rainfed; 10° x 10° tiles | `values: classes`, `files: "{inputs}/lgrip30/LGRIP30_2015_*.tif"`; irrigated `[2]`, rainfed `[3]`, `default_regime: rainfed` | overall 86.5% globally, 79.2% in Southeast Asia ([user guide](https://lpdaac.usgs.gov/documents/1619/LGRIP30_User_Guide_v1.pdf)) |
 | [MapSPAM 2020 v2r2](https://doi.org/10.7910/DVN/SWPENT) | irrigated physical area of a crop over all its physical area, 5 arc-min | `values: ratio`, `irrigated: ..._A_RICE_I.tif`, `total: ..._A_RICE_A.tif` | not given per pixel |
+| [FAO GMIA v5](https://www.fao.org/aquastat/en/geospatial-information/global-maps-irrigated-areas/latest-version) | area equipped for irrigation around 2005, in percent of each 5 arc-min cell, all crops [@siebert2013] | `values: percent` | not given per pixel; no licence stated on the download page |
 
 LGRIP30 calls a cropland irrigated when it has "at least one artificial
 irrigation during the crop growing period", and its cropland includes
@@ -384,3 +389,21 @@ Both: section `prepare > region` or `prepare > zones` with `values: classes`
 burned on an equal-area grid of `pixel_m` metres (default 100), every touched
 pixel counted. Administrative boundaries of the country, or an agro-ecological
 zone map, are the usual sources.
+
+## Planting dates
+
+Planting dates are not an input kind: `seasons` sets them, as one calendar
+(`mode: uniform`), one date per zone (`mode: by_zone` with a `zone_table`), or
+from the rainfall onset of each weather cell (`mode: per_cell`). A gridded crop
+calendar can set them by zone: classify its planting dates into a class map,
+make it the `zones` input (`prepare_layers.py`), and give each class its date in
+`seasons > zone_table`.
+
+| Dataset | Content | Licence |
+|---|---|---|
+| [GGCMI phase 3 crop calendar](https://doi.org/10.5281/zenodo.5062513) | 0.5°, planting and maturity day of 18 crops, rainfed and irrigated, multi-year mean; two seasons for rice and wheat [@jagermeyr2021] | CC BY 4.0 (Zenodo record) |
+| [MIRCA2000](https://doi.org/10.5281/zenodo.7422506) | 5 arc-min, monthly irrigated and rainfed growing area of 26 crops around 2000, with cropping calendars [@portmann2010] | CC BY 4.0 (Zenodo record) |
+| [SAGE crop calendar](https://sage.nelson.wisc.edu/data-and-models/datasets/crop-calendar-dataset) | 5 arc-min and 0.5°, planting and harvest dates of 19 crops [@sacks2010] | no licence stated; the site asks users to tell the author of a download |
+
+Licences above were read from each dataset's own record on 9 November 2026.
+

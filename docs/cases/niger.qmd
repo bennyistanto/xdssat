@@ -1,0 +1,307 @@
+---
+title: "Niger - Millet: the date is the decision"
+subtitle: "Thirty-three rainy seasons around Niamey and Sadoré, eight sowing dates: when pearl millet goes into the ground matters more than whether it gets fertiliser"
+---
+
+```{ojs}
+import {withDownload, cellFeatures, fmt, locatorMap, placeMarks, boxPolygon} from "../assets/js/dl.js"
+S = FileAttachment("data/niger/summary.json").json()
+B = FileAttachment("data/niger/boundaries.json").json()
+countries = FileAttachment("data/niger/countries.geojson").json()
+adm1 = FileAttachment("data/niger/adm1.geojson").json()
+adm2 = FileAttachment("data/niger/adm2.geojson").json()
+dates = FileAttachment("data/niger/dates.csv").csv({typed: true})
+years = FileAttachment("data/niger/years.csv").csv({typed: true})
+bestYear = FileAttachment("data/niger/best_date_per_year.csv").csv({typed: true})
+bestCell = FileAttachment("data/niger/best_date_per_cell.csv").csv({typed: true})
+sowLabel = d => new Date(2001, 5, 1 + d).toLocaleDateString("en-GB", {day: "numeric", month: "short"})
+sowDays = [...new Set(dates.map(d => d.sow_day))].sort((a, b) => a - b)
+nColor = ({domain: ["0 kg N", "45 kg N"], range: ["#c98b2b", "#2b6cb0"]})
+d45 = dates.filter(d => d.n === 45)
+d0 = dates.filter(d => d.n === 0)
+top = d45.reduce((a, b) => (b.mean > a.mean ? b : a))
+first = d45.find(d => d.sow_day === 0)
+```
+
+| Setup | |
+|---|---|
+| Area | 2.0-3.0 E, 13.0-14.0 N, around Niamey and the ICRISAT Sahelian Centre at Sadoré (13.28 N, 2.00 E in the experiment's weather file) |
+| Crop map | MapSPAM 2020 pearl millet, physical area [@spam2020] |
+| Weather, soil | AgERA5 1990-2024 [@agera5]; SoilGrids 2.0 [@poggio2021], one profile per 0.1° cell |
+| Crop, template | CERES-Millet, cultivar CIVT, 3 plants/m², from the Sadoré experiment ITSC8601 (1986) |
+| Treatments | rainfed; 0 or 45 kg N/ha (the experiment's own levels) |
+| Sowing | 1 June to 10 August, every 10 days, the same date in every cell and year |
+| Years | 1991-2023, 33 rainy seasons |
+| Boundaries | edge-matched OCHA administrative boundaries (COD-AB) from HDX: [Niger](https://data.humdata.org/dataset/cod-ab-ner) (IGNN and OCHA/ROWCA; licence listed as "other"), [Benin](https://data.humdata.org/dataset/cod-ab-ben), [Burkina Faso](https://data.humdata.org/dataset/cod-ab-bfa), [Nigeria](https://data.humdata.org/dataset/cod-ab-nga) (CC BY-IGO) |
+| Experiment file | [`configs/cases/niger-millet.yml`](https://github.com/bennyistanto/xdssat/blob/main/configs/cases/niger-millet.yml) |
+
+```{ojs}
+html`<div class="kpi-row">
+  <div class="kpi"><div class="v">${fmt.int(S.seasons_total)}</div><div class="l">millet seasons simulated (16 run folders)</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.failed_total)}</div><div class="l">seasons the engine rejected</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.cells)}</div><div class="l">0.1° weather cells with millet</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.ha)} ha</div><div class="l">of millet, MapSPAM 2020</div></div>
+  <div class="kpi"><div class="v">${fmt.d1(S.minutes_total)} min</div><div class="l">wall time, 32 engine processes</div></div>
+</div>`
+```
+
+## Where
+
+```{ojs}
+md`The study box sits in the south-west of Niger, around the capital.
+${B.box_adm1.map((u, i) => `${u.name}${i === 0 ? " region takes" : ""} ${fmt.pct(u.share_of_box)}${i === 0 ? " of it" : ""}${
+  u.share_of_unit_in_box >= 0.9 ? ` (nearly all of ${u.name} lies inside)` : ""}`).join(", ")}. Millet grows on
+${fmt.int(S.ha)} ha of it (MapSPAM 2020), in ${S.cells} of the 0.1° weather cells; the names on the right are
+departments.`
+```
+
+```{ojs}
+millet = bestCell.filter(d => d.n === 45)
+html`<div class="map-pair">
+  ${withDownload(locatorMap(Plot, countries, B, {width: 280, height: 280}), "niger_locator", "red: the study box")}
+  ${withDownload(Plot.plot({
+    width: 420, height: 420,
+    projection: {type: "equirectangular", domain: boxPolygon([B.box[0] - 0.05, B.box[1] - 0.05, B.box[2] + 0.05, B.box[3] + 0.05])},
+    color: {scheme: "YlOrBr", legend: true, label: "Millet in the cell (ha, MapSPAM 2020)"},
+    marks: [
+      Plot.geo(cellFeatures(millet), {fill: d => d.properties.ha, stroke: "white", strokeWidth: 0.3}),
+      ...placeMarks(Plot, adm1, adm2, {labels: "adm2"}),
+      Plot.geo(boxPolygon(B.box), {stroke: "#d0021b", strokeWidth: 1.5, fill: "none"}),
+      Plot.tip(millet, Plot.pointer({x: "lon", y: "lat",
+        title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E\nmillet ${fmt.int(d.ha)} ha`})),
+      Plot.frame({stroke: "#bbb"})
+    ]
+  }), "niger_millet_area", "0.1° cells; bold: regions, thin: departments")}
+</div>`
+```
+
+## Eight dates, one crop
+
+In the Sahel the rains set the season, and one decision is left to whoever farms the field: the day to sow.
+This page asks the crop model a single question. The same pearl millet, in the same fields, with the same
+soil and the same fertiliser, is sown on eight different days. How much does the date alone change the
+harvest? The switch below sets the nitrogen rate for every chart on the page.
+
+```{ojs}
+viewof nPick = Inputs.radio(new Map([["0 kg N/ha", 0], ["45 kg N/ha", 45]]), {value: 45, label: "Nitrogen"})
+dN = dates.filter(d => d.n === nPick)
+topN = dN.reduce((a, b) => (b.mean > a.mean ? b : a))
+firstN = dN.find(d => d.sow_day === 0)
+```
+
+```{ojs}
+md`Averaged over 33 seasons, millet sown on **${sowLabel(topN.sow_day)}** gives the most grain:
+**${fmt.int(topN.mean)} kg/ha** with ${nPick} kg N. Sown on **1 June** the same crop gives **${fmt.int(firstN.mean)} kg/ha**,
+${fmt.d1(topN.mean / firstN.mean)} times less. The band shows the spread over the years: in nine years out of ten the
+yield of a date lies above its lower edge, in one out of ten above its upper edge.`
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 340, marginLeft: 60,
+  x: {label: "Sowing date", tickFormat: sowLabel, ticks: sowDays},
+  y: {label: "Grain yield, kg/ha (area-weighted, dry matter)", grid: true},
+  color: {legend: true, ...nColor},
+  marks: [
+    Plot.areaY(dN, {x: "sow_day", y1: "p10", y2: "p90", fill: nPick === 45 ? "#2b6cb0" : "#c98b2b", fillOpacity: 0.15}),
+    Plot.areaY(dN, {x: "sow_day", y1: "p25", y2: "p75", fill: nPick === 45 ? "#2b6cb0" : "#c98b2b", fillOpacity: 0.2}),
+    Plot.line(d45, {x: "sow_day", y: "mean", stroke: () => "45 kg N", strokeWidth: nPick === 45 ? 2.5 : 1.2}),
+    Plot.line(d0, {x: "sow_day", y: "mean", stroke: () => "0 kg N", strokeWidth: nPick === 0 ? 2.5 : 1.2, strokeDasharray: "4,3"}),
+    Plot.dot(dN, {x: "sow_day", y: "mean", fill: nPick === 45 ? "#2b6cb0" : "#c98b2b", r: 4}),
+    Plot.ruleX(dN, Plot.pointerX({x: "sow_day", stroke: "#999", strokeDasharray: "2,2"})),
+    Plot.tip(dN, Plot.pointerX({x: "sow_day", y: "mean",
+      title: d => `Sown ${sowLabel(d.sow_day)}, ${d.n} kg N\nmean ${fmt.int(d.mean)} kg/ha\nmedian ${fmt.int(d.p50)}\n` +
+        `10th-90th percentile ${fmt.int(d.p10)}-${fmt.int(d.p90)}\nseason rain ${fmt.int(d.rain_mean)} mm`})),
+    Plot.ruleY([0])
+  ]
+}), "niger_yield_by_sowing_date", "line: mean of 33 seasons; bands: 25th-75th and 10th-90th percentile of the chosen N rate")
+```
+
+## A June shower is a trap
+
+Why does an early crop fail? Not because it dies. Every one of the 69,696 simulated seasons ends with a crop
+"harvested at maturity" (the engine's crop status 1); none fails to germinate, none is killed by drought.
+The early crop fails slowly. Pearl millet develops on heat: its clock runs on temperature, not on water.
+Sown on 1 June it emerges in about five days, flowers after about 33 and is mature after about 75, as a July
+crop would. But it lives those days before the rains have settled. It catches a median 147 mm of rain from
+sowing to harvest, against 233 mm for a crop sown on 11 July, builds almost no leaf (a largest leaf area
+index of 0.0, against 2.1) and only 95 kg/ha of biomass (45 kg N).
+
+A drier start does not save it. CERES-Millet holds a seed back only while the soil at seed depth is at its
+lower limit of plant-available water (`ML_PHENOL.for:415-421`, DSSAT-CSM 4.8). This case starts every season
+at 30% of the available water, so seeds germinate at once. **Tested** on 20 cells, 1991-2023, 45 kg N: with
+the soil at its lower limit at the start, a 1 June seed waits a median 7 days (90th percentile 21, longest
+52) and emerges around 8 June, on the first shower that wets the seed layer, then grows into the dry spells
+that follow. Yield: 63 kg/ha (1 June) and 822 kg/ha (11 July), against 74 and 973 kg/ha with the moister
+start. The early shower is a false start.
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 260, marginLeft: 60,
+  x: {label: "Sowing date", tickFormat: sowLabel, type: "band"},
+  y: {label: "Rain, sowing to harvest (mm)", grid: true},
+  marks: [
+    Plot.barY(dN, {x: "sow_day", y: "rain_mean", fill: "#4a90a4", inset: 6, tip: true,
+      title: d => `Sown ${sowLabel(d.sow_day)}\nmean season rain ${fmt.int(d.rain_mean)} mm\nmean yield ${fmt.int(d.mean)} kg/ha`}),
+    Plot.ruleY([0])
+  ]
+}), "niger_rain_by_sowing_date", "mean over 33 seasons and all cells, area-weighted")
+```
+
+## Every year draws its own best date
+
+```{ojs}
+bestN = bestYear.filter(d => d.n === nPick)
+bestCounts = d3.rollups(bestN, v => v.length, d => d.sow_day).sort((a, b) => a[0] - b[0])
+md`The best date is not the same every year. Over the 33 seasons the best of the eight dates (${nPick} kg N) was
+${bestCounts.map(([d, k]) => `**${sowLabel(d)}** in ${k} year${k > 1 ? "s" : ""}`).join(", ")}.
+Each row below is one rainy season; the darker a square, the more grain that date gave that year, and the dot
+marks the year's best date. Pick a year to see its curve against the 33-season mean.`
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 620, marginLeft: 45, padding: 0,
+  x: {label: "Sowing date", tickFormat: sowLabel, type: "band"},
+  y: {label: null, type: "band", reverse: true, tickFormat: String},
+  color: {scheme: "YlGnBu", legend: true, label: `Grain yield, kg/ha (${nPick} kg N)`},
+  marks: [
+    Plot.cell(years.filter(d => d.n === nPick), {x: "sow_day", y: "year", fill: "yield", inset: 0.5, tip: true,
+      title: d => `${d.year}, sown ${sowLabel(d.sow_day)}\n${fmt.int(d.yield)} kg/ha\n${fmt.int(d.rain)} mm rain, sowing to harvest`}),
+    Plot.dot(bestN, {x: "sow_day", y: "year", fill: "white", stroke: "#222", r: 3.5}),
+    Plot.cell(years.filter(d => d.n === nPick && d.year === yearPick), {x: "sow_day", y: "year", fill: "none",
+      stroke: "#d0021b", strokeWidth: 2})
+  ]
+}), "niger_years_by_date", "area-weighted mean of 132 cells per season; dot: best date of the year; red: the picked year")
+```
+
+```{ojs}
+viewof yearPick = Inputs.select([...new Set(years.map(d => d.year))].sort(), {value: 1998, label: "Year", format: String})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 260, marginLeft: 60,
+  x: {label: "Sowing date", tickFormat: sowLabel, ticks: sowDays},
+  y: {label: "Grain yield, kg/ha", grid: true},
+  color: {legend: true, domain: [String(yearPick), "mean of 33 seasons"], range: ["#d0021b", "#888"]},
+  marks: [
+    Plot.line(dN, {x: "sow_day", y: "mean", stroke: () => "mean of 33 seasons", strokeDasharray: "4,3"}),
+    Plot.line(years.filter(d => d.n === nPick && d.year === yearPick), {x: "sow_day", y: "yield", stroke: () => String(yearPick), strokeWidth: 2.5}),
+    Plot.dot(years.filter(d => d.n === nPick && d.year === yearPick), {x: "sow_day", y: "yield", fill: "#d0021b", tip: true,
+      title: d => `${d.year}, sown ${sowLabel(d.sow_day)}\n${fmt.int(d.yield)} kg/ha, ${fmt.int(d.rain)} mm rain`}),
+    Plot.ruleY([0])
+  ]
+}), `niger_year_${yearPick}`, `one season (${nPick} kg N) against the 33-season mean`)
+```
+
+## The cost of a wrong date is a bad year
+
+The mean hides the risk. A field is harvested one season at a time, not on average. The share of seasons in
+which a date gives less than a threshold tells the risk of each date; move the threshold to see how the
+ranking holds.
+
+```{ojs}
+viewof poor = Inputs.range([100, 1000], {value: 300, step: 50, label: "A poor season gives less than (kg/ha)"})
+shareBelow = d3.rollups(years, v => d3.mean(v, d => d.yield < poor ? 1 : 0), d => d.n, d => d.sow_day)
+  .flatMap(([n, rows]) => rows.map(([sow_day, share]) => ({n, sow_day, share, label: `${n} kg N`})))
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 280, marginLeft: 60,
+  x: {label: "Sowing date", tickFormat: sowLabel, type: "band"},
+  y: {label: `Share of seasons below ${poor} kg/ha`, tickFormat: "%", domain: [0, 1], grid: true},
+  fx: {label: null, tickFormat: d => `${d} kg N/ha`},
+  color: {legend: true, ...nColor},
+  marks: [
+    Plot.barY(shareBelow, {x: "sow_day", y: "share", fill: "label", fx: "n", inset: 4, tip: true,
+      title: d => `Sown ${sowLabel(d.sow_day)}, ${d.n} kg N\n${fmt.pct(d.share)} of 33 seasons below ${poor} kg/ha`})
+  ]
+}), "niger_poor_years_by_date", "33 seasons per date; area-weighted mean of 132 cells")
+```
+
+## Where the date matters most
+
+```{ojs}
+cellsN = bestCell.filter(d => d.n === nPick).map(d => ({...d, gain: d.mean - d.mean_jun01}))
+modal = d3.rollups(cellsN, v => v.length, d => d.sow_day).sort((a, b) => b[1] - a[1])[0]
+md`The best fixed date hardly changes across the area: **${sowLabel(modal[0])}** gives the best mean yield
+over the 33 seasons in **${modal[1]} of ${cellsN.length}** weather cells (${nPick} kg N). What changes from cell to
+cell is how much the date is worth. Moving from 1 June to the cell's best date adds between
+**${fmt.int(d3.min(cellsN, d => d.gain))}** and **${fmt.int(d3.max(cellsN, d => d.gain))} kg/ha**, a median of
+**${fmt.int(d3.median(cellsN, d => d.gain))} kg/ha**.`
+```
+
+```{ojs}
+viewof mapMetric = Inputs.radio(new Map([
+  ["Gain: best date minus 1 June", "gain"], ["Yield at the best date", "mean"], ["Yield sown on 1 June", "mean_jun01"]]),
+  {value: "gain", label: "Map"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 460, aspectRatio: 1,
+  projection: {type: "equirectangular", domain: cellFeatures(cellsN)},
+  color: {scheme: mapMetric === "gain" ? "Greens" : "YlGnBu", legend: true,
+          label: {gain: "Grain gained by the best date (kg/ha)", mean: "Mean yield at the best date (kg/ha)",
+                  mean_jun01: "Mean yield sown on 1 June (kg/ha)"}[mapMetric]},
+  marks: [
+    Plot.geo(cellFeatures(cellsN), {fill: d => d.properties[mapMetric], stroke: "white", strokeWidth: 0.4}),
+    ...placeMarks(Plot, adm1, adm2, {labels: "adm2", fontSize: 9}),
+    Plot.tip(cellsN, Plot.pointer({x: "lon", y: "lat",
+      title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E\nbest date ${sowLabel(d.sow_day)}: ${fmt.int(d.mean)} kg/ha\n` +
+        `sown 1 June: ${fmt.int(d.mean_jun01)} kg/ha\ngain ${fmt.int(d.gain)} kg/ha\nmillet ${fmt.int(d.ha)} ha`})),
+    Plot.frame()
+  ]
+}), "niger_cell_map", `0.1° AgERA5 cells with millet in MapSPAM 2020; mean of 33 seasons, ${nPick} kg N`)
+```
+
+## Fertiliser comes second
+
+```{ojs}
+gain = d45.map(d => ({sow_day: d.sow_day, gain: d.mean - d0.find(e => e.sow_day === d.sow_day).mean,
+                      y0: d0.find(e => e.sow_day === d.sow_day).mean, y45: d.mean}))
+gTop = gain.reduce((a, b) => (b.gain > a.gain ? b : a))
+md`Forty-five kilograms of nitrogen add **${fmt.int(gTop.gain)} kg/ha** when millet is sown on
+${sowLabel(gTop.sow_day)}, and **${fmt.int(gain[0].gain)} kg/ha** when it is sown on 1 June. Nitrogen helps a crop
+that has water; it cannot help one that has none. In this model the date sets the ceiling, and fertiliser
+only decides how close to it the crop gets.`
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 240, marginLeft: 60,
+  x: {label: "Sowing date", tickFormat: sowLabel, type: "band"},
+  y: {label: "Grain from 45 kg N (kg/ha)", grid: true},
+  marks: [Plot.barY(gain, {x: "sow_day", y: "gain", fill: "#2b6cb0", inset: 6, tip: true,
+            title: d => `Sown ${sowLabel(d.sow_day)}\n0 kg N: ${fmt.int(d.y0)} kg/ha\n45 kg N: ${fmt.int(d.y45)} kg/ha\n` +
+              `gain ${fmt.int(d.gain)} kg/ha`}), Plot.ruleY([0])]
+}), "niger_n_response_by_date", "mean of 33 seasons: 45 kg N minus 0 kg N")
+```
+
+## What this does not say
+
+- **Uncalibrated.** CIVT is the cultivar of a 1986 experiment, at 3 plants/m² and without pests or
+  weeds. The level is not a forecast of farm yields: at its best date the simulation gives about twice
+  FAOSTAT's national millet yield for Niger, 0.48-0.55 t/ha in 2018-2020 [@faostat_qcl]. The ranking of the
+  dates is the result, not the kilograms.
+- **No re-sowing.** The model keeps the first crop after a false start; it does not sow again.
+- **One date for everyone.** Every cell sows on the same day. A rule that waits for the rains in each cell
+  (the onset mode of xdssat, `seasons > mode: per_cell`) is the natural next experiment.
+- **Rain from a reanalysis.** AgERA5 June-September rain in these cells was a median 265-307 mm in
+  2018-2020; the Sadoré station file of the 1986 experiment has 546 mm for June-September 1986, a different
+  year. Station or satellite rain (CHIRPS) is an input away ([Input data](../xdssat/data.qmd)).
+
+## Run it yourself
+
+```bash
+python scripts/prepare_weather.py   --config configs/cases/niger-millet.yml
+python scripts/prepare_crop_mask.py --config configs/cases/niger-millet.yml
+python scripts/prepare_soils.py     --config configs/cases/niger-millet.yml --aoi niger_millet
+python scripts/run_aoi.py           --config configs/cases/niger-millet.yml
+python docs/scripts/export_cases.py niger
+```
+
+The three-year version of this area ships with xdssat: `example-inputs/niger_millet/`
+([Examples](../xdssat/examples.qmd)).

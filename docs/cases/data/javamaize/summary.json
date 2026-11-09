@@ -1,0 +1,50 @@
+{
+ "generated": "2026-11-10",
+ "cells": 123,
+ "ha": 353231.7,
+ "cycles": [
+  1991,
+  2022
+ ],
+ "observed": {
+  "source": "BDSP (Ministry of Agriculture), maize (JAGUNG), districts of Central and East Java; BPS as source on the portal",
+  "years": [
+   1992,
+   2022
+  ],
+  "districts": 16,
+  "obs_mean": 4455.0,
+  "r_detrended": {
+   "maize_alone": -0.08,
+   "maize_flooded": -0.12,
+   "maize_rainfed": -0.11
+  },
+  "r_raw": {
+   "maize_alone": -0.07,
+   "maize_flooded": -0.34,
+   "maize_rainfed": -0.31
+  }
+ },
+ "crop_seasons_total": 19249,
+ "sequences": {
+  "irrigated": {
+   "strata": 123,
+   "failed": 0
+  },
+  "rainfed": {
+   "strata": 123,
+   "failed": 0
+  },
+  "alone": {
+   "strata": 123,
+   "failed": 0
+  }
+ },
+ "minutes_total": 6.0,
+ "faostat_indonesia_maize_t_ha": {
+  "2018": 5.307,
+  "2019": 6.144,
+  "2020": 5.53
+ },
+ "template": "XDRM8601.SQX (rice then maize); XDMZ8201.MZX (maize alone)"
+}

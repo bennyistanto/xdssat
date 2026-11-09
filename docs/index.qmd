@@ -49,20 +49,22 @@ simulations at once, inputs prepared from gridded data, and every step written d
 
 How a field-scale model becomes a map: one simulation per weather cell and water regime, inputs prepared from
 netCDF and GeoTIFF, chunked parallel runs of the stock engine, and gridded output. With the
-[implementation](xdssat/implementation.qmd) of every script and a [setup guide](getting-started.md).
+[implementation](xdssat/implementation.qmd) of every script and a [setup guide](xdssat/getting-started.md).
 :::
 
 ::: {.g-col-12 .g-col-md-4 .track-card}
 ### 2. [A real case: rice in Java](java/index.qmd)
 
 xdssat applied to an island: ${fmt.int(cur.seasons)} simulated rice seasons over Java for 1991-2020, checked
-against district statistics. What fits, what does not, and how it was calibrated.
+against district statistics. What fits, what does not, and how it was calibrated. Five more case studies,
+maize after rice in East Java, millet in Niger, maize in Kenya and rice in the Mekong Delta and northern
+Luzon, each ask a question of their own.
 :::
 
 ::: {.g-col-12 .g-col-md-4 .track-card}
 ### 3. [DSSAT itself, through xdssat](learn/index.qmd)
 
-The case study uses a small part of DSSAT. Six training modules, adapted from the International Training
+The case studies use a small part of DSSAT. Six training modules, adapted from the International Training
 Program on DSSAT, explore the rest: phenology, growth, weather and soils, calibration, water and nitrogen,
 seasonal risk and crop rotations. Each has a reading page and a [notebook](notebooks/index.qmd) that runs the
 real engine.
@@ -70,7 +72,7 @@ real engine.
 
 :::
 
-## The case study in one chart
+## The Java case study in one chart
 
 Simulated and observed rice yield for Java, current calibrated run (${summary.current_run}), weighted by
 district rice area:
@@ -92,13 +94,13 @@ Level ${fmt.d2(cal.level_area_weighted)} (simulated over observed), spatial corr
 
 ## Rebuilding
 
-Numbers on the pages are read from small data files, never typed in. The [rebuild notes](rebuild.qmd) say
+Numbers on the pages are read from small data files, never typed in. The [rebuild notes](about/rebuild.qmd) say
 how to refresh them after a new run or a rerun notebook.
 
 ## Author
 
 xdssat and this site are made by [Benny Istanto](https://benny.istan.to/about), as a casual-weekend project
-built on DSSAT ([acknowledgements and how to cite](acknowledgements.qmd)). Questions, corrections and ideas are
+built on DSSAT ([acknowledgements and how to cite](about/acknowledgements.qmd)). Questions, corrections and ideas are
 welcome in the [issue tracker](https://github.com/bennyistanto/xdssat/issues).
 
 ## References {.unnumbered}

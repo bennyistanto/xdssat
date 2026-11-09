@@ -1,0 +1,278 @@
+---
+title: "Java - Maize: the second crop"
+nocite: |
+  @faostat_qcl
+subtitle: "Rice in the wet season, maize after it on the same field, 32 years in East Java as one DSSAT crop sequence: what the rice leaves to the maize, and what two crops a year do to the soil"
+---
+
+```{ojs}
+import {withDownload, cellFeatures, fmt, locatorMap, placeMarks, boxPolygon, pearson} from "../assets/js/dl.js"
+S = FileAttachment("data/javamaize/summary.json").json()
+B = FileAttachment("data/javamaize/boundaries.json").json()
+countries = FileAttachment("data/javamaize/countries.geojson").json()
+adm1 = FileAttachment("data/javamaize/adm1.geojson").json()
+adm2 = FileAttachment("data/javamaize/adm2.geojson").json()
+years = FileAttachment("data/javamaize/years.csv").csv({typed: true})
+cells = FileAttachment("data/javamaize/cells.csv").csv({typed: true})
+seasons = FileAttachment("data/javamaize/seasons.csv").csv({typed: true})
+wmean = (rows, k) => { const r = rows.filter(d => d[k] != null && !Number.isNaN(d[k])); return d3.sum(r, d => d[k] * d.ha) / d3.sum(r, d => d.ha) }
+```
+
+| Setup | |
+|---|---|
+| Area | 111.4-112.4 E, 8.0-7.0 S, East Java, on the rice fields of MapSPAM 2020 [@spam2020] |
+| Weather, soil | AgERA5 1990-2024 [@agera5]; SoilGrids 2.0 [@poggio2021], one profile per 0.1° cell |
+| The sequence | one DSSAT crop sequence per cell (mode Q, template `XDRM8601.SQX`): IR 58 rice, 140 kg N/ha, transplanted on 15 November, then McCurdy 84aa maize, 120 kg N/ha, rainfed, sown on 15 March; the soil's water, nitrogen and organic matter pass from crop to crop. Two sequences: flooded rice, or rainfed rice behind a bund |
+| The comparison | the same maize alone (template `XDMZ8201.MZX`), on the same cells and dates, each season starting from the soil profile at half its plant-available water |
+| Years | 32 cycles, rice of 1991-2022 and maize of 1992-2023 |
+| Boundaries | the Java case's province and district boundaries (BPS codes; see [Data, AOI, variety](../java/data.qmd)) |
+| Experiment files | [`configs/cases/java-maize.yml`](https://github.com/bennyistanto/xdssat/blob/main/configs/cases/java-maize.yml), [`java-maize-alone.yml`](https://github.com/bennyistanto/xdssat/blob/main/configs/cases/java-maize-alone.yml) |
+
+```{ojs}
+html`<div class="kpi-row">
+  <div class="kpi"><div class="v">${fmt.int(S.crop_seasons_total)}</div><div class="l">crop seasons simulated (3 run folders)</div></div>
+  <div class="kpi"><div class="v">${S.sequences.irrigated.failed + S.sequences.rainfed.failed}</div><div class="l">sequences the engine rejected</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.cells)}</div><div class="l">0.1° weather cells with rice</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.ha)} ha</div><div class="l">of rice fields, MapSPAM 2020</div></div>
+  <div class="kpi"><div class="v">${S.cycles[1] - S.cycles[0] + 1}</div><div class="l">rice-then-maize cycles per cell</div></div>
+</div>`
+```
+
+## Where
+
+```{ojs}
+md`The study box sits in East Java, the same island as the [main case study](../java/index.qmd).
+${B.box_adm1.map((u, i) => `${u.name}${i === 0 ? " takes" : ""} ${fmt.pct(u.share_of_box)}${i === 0 ? " of it" : ""}`).join(", ")}.
+Rice grows on ${fmt.int(S.ha)} ha of it (MapSPAM 2020), in ${S.cells} of the 0.1° weather cells: the fields where a
+maize crop can follow the rice.`
+```
+
+```{ojs}
+place = cells
+html`<div class="map-pair">
+  ${withDownload(locatorMap(Plot, countries, B, {width: 280, height: 280}), "javamaize_locator", "red: the study box")}
+  ${withDownload(Plot.plot({
+    width: 420, height: 420,
+    projection: {type: "equirectangular", domain: boxPolygon([B.box[0] - 0.05, B.box[1] - 0.05, B.box[2] + 0.05, B.box[3] + 0.05])},
+    color: {scheme: "YlGn", legend: true, label: "Rice in the cell (ha, MapSPAM 2020)"},
+    marks: [
+      Plot.geo(cellFeatures(place), {fill: d => d.properties.ha, stroke: "white", strokeWidth: 0.3}),
+      ...placeMarks(Plot, adm1, adm2, {labels: "adm2"}),
+      Plot.geo(boxPolygon(B.box), {stroke: "#d0021b", strokeWidth: 1.5, fill: "none"}),
+      Plot.tip(place, Plot.pointer({x: "lon", y: "lat",
+        title: d => `${Math.abs(d.lat).toFixed(2)} S, ${d.lon.toFixed(2)} E\nrice ${fmt.int(d.ha)} ha`})),
+      Plot.frame({stroke: "#bbb"})
+    ]
+  }), "javamaize_rice_area", "0.1° cells; bold: provinces, thin: districts")}
+</div>`
+```
+
+## Two crops, one field
+
+A single season, as DSSAT is usually run, starts from a soil the modeller describes: so much water, so much
+nitrogen. A crop sequence starts only once. Every later crop inherits the soil the one before it left. DSSAT
+does not carry the standing water: it sets the flood to zero at the start of every season
+(`Paddy_Mgmt.for`, DSSAT-CSM 4.8). What carries is the soil itself.
+
+The switch below picks the rice before the maize, for every chart on the page.
+
+```{ojs}
+viewof seq = Inputs.radio(new Map([["Flooded rice", "flooded"], ["Rainfed rice (bunded)", "rainfed"]]), {value: "flooded", label: "Rice"})
+```
+
+```{ojs}
+md`Over the 32 cycles the ${seq} rice yields **${fmt.int(wmean(cells, `rice_${seq}`))} kg/ha** and is harvested a
+median of ${fmt.int(d3.median(cells, d => d[`rice_days_${seq}`]))} days after transplanting, in February; at harvest its soil
+holds **${fmt.int(wmean(cells, `rice_end_sw_${seq}`))} mm** of water the roots can still take up and
+${fmt.int(wmean(cells, `rice_end_n_${seq}`))} kg/ha of mineral nitrogen. The maize sown on 15 March after it yields
+**${fmt.int(wmean(cells, `maize_${seq}`))} kg/ha**; the same maize alone, starting from half the soil's available water,
+**${fmt.int(wmean(cells, "maize_alone"))} kg/ha**. FAOSTAT puts Indonesia's national maize yield at 5.3-6.1 t/ha in
+2018-2020 (<a href="#ref-faostat_qcl">FAO 2025</a>): the model's levels are higher; the comparison is the result.`
+```
+
+## The rice as insurance
+
+```{ojs}
+viewof dry = Inputs.range([250, 700], {value: 350, step: 10, label: "A dry maize season has less rain than (mm)"})
+```
+
+```{ojs}
+yr = years.map(d => ({...d, gain: d[`gain_${seq}`], after: d[`maize_${seq}`], dryYear: d.rain < dry}))
+dryRows = yr.filter(d => d.dryYear)
+wetRows = yr.filter(d => !d.dryYear)
+md`The gain is not spread evenly. In the **${dryRows.length}** seasons with less than ${dry} mm of rain between maize
+sowing and maturity (area-weighted over the box), the maize after rice yields
+**${fmt.int(d3.mean(dryRows, d => d.gain))} kg/ha** more than the maize alone; in the other ${wetRows.length} seasons,
+**${fmt.int(d3.mean(wetRows, d => d.gain))} kg/ha** more. Across the years the gain falls as the rain rises
+(correlation ${fmt.d2(pearson(yr.map(d => d.rain), yr.map(d => d.gain)))}). The water the rice leaves in
+the soil is worth little when the maize gets rain of its own, and most when it does not: the first crop insures
+the second.`
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 320, marginLeft: 60,
+  x: {label: "Rain from maize sowing to maturity (mm, area-weighted)", grid: true},
+  y: {label: "Maize after rice minus maize alone (kg/ha)", grid: true},
+  color: {legend: true, domain: ["dry season", "other season"], range: ["#c0392b", "#2b6cb0"]},
+  marks: [
+    Plot.ruleX([dry], {stroke: "#c0392b", strokeDasharray: "4,3"}),
+    Plot.ruleY([0]),
+    Plot.dot(yr, {x: "rain", y: "gain", r: 5, fill: d => d.dryYear ? "dry season" : "other season", tip: true,
+      title: d => `maize of ${d.season_year + 1} (after the rice of ${d.season_year})\nrain ${fmt.int(d.rain)} mm\n` +
+        `alone ${fmt.int(d.maize_alone)}, after rice ${fmt.int(d.after)} kg/ha\ngain ${fmt.int(d.gain)} kg/ha`}),
+    Plot.text(yr.filter(d => d.gain > 1500), {x: "rain", y: "gain", text: d => String(d.season_year + 1), dx: 18, fontSize: 10})
+  ]
+}), `javamaize_gain_vs_rain_${seq}`, "one dot per maize season, area-weighted over the box")
+```
+
+```{ojs}
+barRows = yr.flatMap(d => [{year: d.season_year + 1, kind: "maize alone", kg: d.maize_alone, rain: d.rain},
+                           {year: d.season_year + 1, kind: "maize after rice", kg: d.after, rain: d.rain}])
+withDownload(Plot.plot({
+  height: 300, marginLeft: 60,
+  x: {label: null, tickFormat: d => String(d), ticks: 8},
+  y: {label: "Maize yield (kg/ha)", grid: true},
+  color: {legend: true, domain: ["maize alone", "maize after rice"], range: ["#c98b2b", "#2b8a3e"]},
+  marks: [
+    Plot.line(barRows, {x: "year", y: "kg", stroke: "kind", strokeWidth: 2}),
+    Plot.dot(barRows, {x: "year", y: "kg", fill: "kind", r: 3, tip: true,
+      title: d => `${d.year}, ${d.kind}\n${fmt.int(d.kg)} kg/ha\nmaize-season rain ${fmt.int(d.rain)} mm`}),
+    Plot.ruleY([0])
+  ]
+}), `javamaize_maize_by_year_${seq}`, "maize sown on 15 March of each year; area-weighted over the box")
+```
+
+## What the sequence remembers
+
+```{ojs}
+soil = years.map(d => ({year: d.season_year, on: d[`soil_on_${seq}`], oc: d[`soil_oc_${seq}`], rice: d[`rice_${seq}`],
+                        n: d[`rice_end_n_${seq}`]}))
+s0 = soil[0]
+s1 = soil[soil.length - 1]
+md`A season run on its own forgets. A sequence does not, and over 32 cycles the model's field changes. With ${seq} rice,
+the soil's organic nitrogen at rice harvest goes from **${fmt.int(s0.on)}** to **${fmt.int(s1.on)} kg/ha**
+(${fmt.pct(s1.on / s0.on - 1)}), its organic carbon from ${fmt.int(s0.oc)} to ${fmt.int(s1.oc)} t/ha, and the rice yield
+from ${fmt.int(d3.mean(soil.slice(0, 5), d => d.rice))} kg/ha in the first five cycles to
+${fmt.int(d3.mean(soil.slice(-5), d => d.rice))} kg/ha in the last five, at the same 140 kg N. Two crops a year draw on
+the soil's organic matter faster than the model returns it. A single-season run, which starts every year from
+the same soil, cannot show this.`
+```
+
+```{ojs}
+soilRows = soil.flatMap(d => [{year: d.year, what: "soil organic N (% of the first cycle)", v: d.on / s0.on, raw: `${fmt.int(d.on)} kg/ha`},
+                              {year: d.year, what: "rice yield (% of the first cycle)", v: d.rice / s0.rice, raw: `${fmt.int(d.rice)} kg/ha`}])
+withDownload(Plot.plot({
+  height: 280, marginLeft: 60,
+  x: {label: "Rice of", tickFormat: d => String(d), ticks: 8},
+  y: {label: "Relative to the first cycle", tickFormat: "%", grid: true, domain: [0.4, 1.2]},
+  color: {legend: true, domain: ["soil organic N (% of the first cycle)", "rice yield (% of the first cycle)"], range: ["#8c6d31", "#2b8a3e"]},
+  marks: [
+    Plot.ruleY([1], {stroke: "#999"}),
+    Plot.line(soilRows, {x: "year", y: "v", stroke: "what", strokeWidth: 2}),
+    Plot.dot(soilRows, {x: "year", y: "v", fill: "what", r: 2.5, tip: true, title: d => `${d.year}\n${d.what.split(" (")[0]}: ${d.raw}`})
+  ]
+}), `javamaize_soil_memory_${seq}`, "at rice harvest, area-weighted over the box")
+```
+
+## Cell by cell
+
+```{ojs}
+late = cells.filter(d => d[`rice_late_${seq}`] > 0)
+md`In ${late.length} cell${late.length === 1 ? "" : "s"}, the ${seq} rice is still in the field on 15 March in at least one cycle
+${late.length ? `(in ${late.filter(d => d[`rice_late_${seq}`] >= 0.99).length} of them every cycle)` : ""}. DSSAT then sows the maize
+on the next 15 March, a year late, and the sequence slips. xdssat labels each crop by its sowing date, so those
+maize seasons are left out of the comparison rather than paired with the wrong rice.`
+```
+
+```{ojs}
+viewof mapMetric = Inputs.radio(new Map([["Gain of maize after rice", `gain_${seq}`], ["Maize alone", "maize_alone"],
+  ["Maize after rice", `maize_${seq}`], ["Years with a gain", "share_gain"], ["Rice still in the field on 15 March", `rice_late_${seq}`]]),
+  {value: `gain_${seq}`, label: "Map"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 460, aspectRatio: 1,
+  projection: {type: "equirectangular", domain: cellFeatures(cells)},
+  color: {scheme: mapMetric.startsWith("gain") ? "Greens" : mapMetric.startsWith("rice_late") ? "Reds" : "YlGn", legend: true,
+          tickFormat: (mapMetric === "share_gain" || mapMetric.startsWith("rice_late")) ? "%" : undefined,
+          label: mapMetric.startsWith("gain") ? "Maize after rice minus alone (kg/ha)" : mapMetric === "share_gain" ?
+                 "Share of seasons with a gain (flooded rice)" : mapMetric.startsWith("rice_late") ? "Share of cycles" : "Maize yield (kg/ha)"},
+  marks: [
+    Plot.geo(cellFeatures(cells), {fill: d => d.properties[mapMetric], stroke: "white", strokeWidth: 0.4}),
+    ...placeMarks(Plot, adm1, adm2, {labels: "adm2", fontSize: 9}),
+    Plot.tip(cells, Plot.pointer({x: "lon", y: "lat",
+      title: d => `${Math.abs(d.lat).toFixed(2)} S, ${d.lon.toFixed(2)} E\nmaize alone ${fmt.int(d.maize_alone)}, after ${seq} rice ` +
+        `${fmt.int(d[`maize_${seq}`])} kg/ha\nrice ${fmt.int(d[`rice_${seq}`])} kg/ha, harvested after ${fmt.int(d[`rice_days_${seq}`])} days\n` +
+        `rice ${fmt.int(d.ha)} ha`})),
+    Plot.frame()
+  ]
+}), `javamaize_cell_map_${seq}`, "mean of 32 cycles per 0.1° cell")
+```
+
+## Checked against district statistics
+
+The Ministry of Agriculture's statistics portal (BDSP) gives every district's maize harvested area,
+production and yield each year [@bdsp_jagung], as it does for the rice of the
+[main case study](../java/index.qmd). Every weather cell goes to the district that holds its centre.
+
+```{ojs}
+obs = FileAttachment("data/javamaize/observed.csv").csv({typed: true})
+obsD = FileAttachment("data/javamaize/observed_districts.csv").csv({typed: true})
+O = S.observed
+md`Over ${O.years[0]}-${O.years[1]} the ${O.districts} districts of the box harvested a mean
+**${fmt.int(d3.mean(obs, d => d.obs))} kg/ha** of maize (production over harvested area, as reported); the model's maize
+after ${seq} rice gives **${fmt.int(d3.mean(obs, d => d[`maize_${seq}`]))} kg/ha**, ${fmt.d1(d3.mean(obs, d => d[`maize_${seq}`]) / d3.mean(obs, d => d.obs))}
+times as much. The years do not agree either: after removing each series' trend, their correlation is
+**${fmt.d2(O.r_detrended[`maize_${seq}`])}** (maize alone: ${fmt.d2(O.r_detrended.maize_alone)}). The statistics count all of a district's maize, in every season and on every field; the model grows
+one dry-season crop on the rice fields, uncalibrated. The dry years in which the rice
+insures the maize in the model leave no mark in the district totals. Before the model's numbers say anything
+about a real harvest, it needs maize statistics of the dry season on rice fields, or field trials, to be
+calibrated against.`
+```
+
+```{ojs}
+obsRows = obs.flatMap(d => [{year: d.year, kind: "district statistics (BDSP)", kg: d.obs},
+                            {year: d.year, kind: `model, maize after ${seq} rice`, kg: d[`maize_${seq}`]},
+                            {year: d.year, kind: "model, maize alone", kg: d.maize_alone}])
+withDownload(Plot.plot({
+  height: 300, marginLeft: 60,
+  x: {label: "Harvest year", tickFormat: d => String(d), ticks: 8},
+  y: {label: "Maize yield (kg/ha)", grid: true, domain: [0, d3.max(obsRows, d => d.kg) * 1.05]},
+  color: {legend: true, domain: ["district statistics (BDSP)", `model, maize after ${seq} rice`, "model, maize alone"],
+          range: ["#222", "#2b8a3e", "#c98b2b"]},
+  marks: [
+    Plot.line(obsRows, {x: "year", y: "kg", stroke: "kind", strokeWidth: 2}),
+    Plot.dot(obsRows, {x: "year", y: "kg", fill: "kind", r: 2.5, tip: true,
+      title: d => `${d.year}\n${d.kind}: ${fmt.int(d.kg)} kg/ha`}),
+    Plot.ruleY([0])
+  ]
+}), `javamaize_observed_${seq}`, "statistics: total production over total harvested area of the districts; model: rice-area-weighted over their cells")
+```
+
+## What this does not say
+
+- **Uncalibrated, and borrowed cultivars.** IR 58 comes from the IRRI experiment behind the rice template and
+  McCurdy 84aa from the Florida experiment behind the maize template, with DSSAT's own coefficients and
+  without pests, diseases or weeds. Neither is an East Javan variety.
+- **Fixed dates.** The rice is transplanted on 15 November and the maize sown on 15 March in every cell and
+  year, whatever the rain or the rice harvest; farmers decide each season.
+- **The comparison's starting point.** "Maize alone" starts at half the soil's available water, an assumption.
+  Another starting point would move its yield, and so the gain; the sequence needs no such assumption.
+- **The soil's slow change** depends on what the template returns to the field after each harvest and on the
+  SoilGrids organic carbon the run starts from; it is the model's trend, not a measured one.
+
+## Run it yourself
+
+```bash
+python scripts/prepare_weather.py   --config configs/cases/java-maize.yml
+python scripts/prepare_crop_mask.py --config configs/cases/java-maize.yml
+python scripts/prepare_soils.py     --config configs/cases/java-maize.yml --aoi java_maize_case
+python scripts/run_aoi.py --config configs/cases/java-maize.yml --regime irrigated
+python scripts/run_aoi.py --config configs/cases/java-maize.yml --regime rainfed
+python scripts/run_aoi.py --config configs/cases/java-maize-alone.yml
+python scripts/fetch_bdsp.py --komoditas JAGUNG --prov 33 35        # district maize statistics
+python docs/scripts/export_cases.py javamaize
+python docs/scripts/export_boundaries.py javamaize
+```

@@ -212,6 +212,62 @@ export function adminMarks(Plot, provinces, districts, {labels = false} = {}) {
   return marks;
 }
 
+// ---- Location maps of the case-study pages ------------------------------------------------
+// Boundaries come from docs/scripts/export_boundaries.py: countries.geojson (country and
+// neighbours), adm1.geojson / adm2.geojson (name, lon, lat label point), boundaries.json (box).
+
+// A lon/lat rectangle as a GeoJSON polygon (clockwise ring, as d3-geo wants).
+export function boxPolygon([w, s, e, n]) {
+  return {type: "Feature", properties: {},
+          geometry: {type: "Polygon", coordinates: [[[w, n], [e, n], [e, s], [w, s], [w, n]]]}};
+}
+
+// Country with its neighbours, the study box in red. info = boundaries.json.
+export function locatorMap(Plot, countries, info, {width = 300, height = 300} = {}) {
+  const [cw, cs, ce, cn] = info.country_bounds;
+  const pad = 0.04 * Math.max(ce - cw, cn - cs);
+  // Neighbour labels sit at the most interior point of the part shown in the frame
+  // (export_boundaries.py); a neighbour that barely enters the frame has no label point.
+  const own = countries.features.filter(d => d.properties.iso3 === info.iso3);
+  const others = countries.features.filter(d => d.properties.iso3 !== info.iso3 && d.properties.lon != null);
+  // the country's own name moves clear of the study box when its label point falls next to it
+  const W = ce - cw + 2 * pad, H = cn - cs + 2 * pad;
+  const bx = (info.box[0] + info.box[2]) / 2, by = (info.box[1] + info.box[3]) / 2;
+  const near = own.some(d => Math.abs(d.properties.lon - bx) < 0.15 * W && Math.abs(d.properties.lat - by) < 0.1 * H);
+  const ownDy = near ? (by > cs - pad + H / 2 ? 28 : -28) : 0;
+  return Plot.plot({
+    width, height, margin: 2,
+    projection: {type: "equirectangular", domain: boxPolygon([cw - pad, cs - pad, ce + pad, cn + pad])},
+    marks: [
+      Plot.geo(countries, {fill: d => (d.properties.iso3 === info.iso3 ? "#efe3c8" : "#f4f4f4"),
+                           stroke: "#8a8a8a", strokeWidth: 0.6, clip: true}),
+      Plot.geo(boxPolygon(info.box), {fill: "#d0021b", fillOpacity: 0.3, stroke: "#d0021b", strokeWidth: 1.5}),
+      Plot.dot([[(info.box[0] + info.box[2]) / 2, (info.box[1] + info.box[3]) / 2]],
+               {x: d => d[0], y: d => d[1], r: 13, stroke: "#d0021b", strokeWidth: 1.2, fill: "none"}),
+      Plot.text(others, {x: d => d.properties.lon, y: d => d.properties.lat, text: d => d.properties.name,
+                         fontSize: 9, fill: "#888", clip: true, lineWidth: 8}),
+      Plot.text(own, {x: d => d.properties.lon, y: d => d.properties.lat, text: d => d.properties.name,
+                      fontSize: 13, fontWeight: 700, fill: "#222", dy: ownDy}),
+      Plot.frame({stroke: "#bbb"})
+    ]
+  });
+}
+
+// Admin lines (level 2 thin, level 1 bold) and name labels, clipped to the map frame.
+// labels: "adm1", "adm2" or null.
+export function placeMarks(Plot, adm1, adm2, {labels = "adm1", fontSize = 10} = {}) {
+  const marks = [
+    Plot.geo(adm2, {stroke: "#666", strokeWidth: 0.4, strokeOpacity: 0.8, fill: "none", clip: true}),
+    Plot.geo(adm1, {stroke: "#111", strokeWidth: 1.2, fill: "none", clip: true})
+  ];
+  const lab = labels === "adm1" ? adm1 : labels === "adm2" ? adm2 : null;
+  if (lab) {
+    marks.push(Plot.text(lab.features, {x: d => d.properties.lon, y: d => d.properties.lat,
+      text: d => d.properties.name, fontSize, fill: "#111", stroke: "white", strokeWidth: 3, clip: true}));
+  }
+  return marks;
+}
+
 // Number formatting used in the prose.
 export const fmt = {
   int: (v) => (v == null || !isFinite(v) ? "n/a" : Math.round(v).toLocaleString("en-US")),

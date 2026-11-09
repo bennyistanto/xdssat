@@ -7,10 +7,10 @@ subtitle: "Six training modules, adapted from the International Training Program
 import {withDownload} from "../assets/js/dl.js"
 ```
 
-## From the case study to the whole model
+## From the case studies to the whole model
 
-The [rice case study](../java/index.qmd) uses a narrow slice of DSSAT: one crop model, two water regimes, one
-cultivar and a calibration of a single soil fertility factor. DSSAT does far more: its engine carries cultivar
+The case studies use a narrow slice of DSSAT. The [Java rice case study](../java/index.qmd), for one, runs one crop
+model, two water regimes, one cultivar and a calibration of a single soil fertility factor. DSSAT does far more: its engine carries cultivar
 files for 48 crop codes (59 files in the engine's `Genotype` folder), and it simulates phenology and growth, the water and nitrogen balance of the soil, the effect of management, and
 seasons, risks and rotations over many years. The bridge that xdssat builds between DSSAT and Python is just as
 useful for exploring all of that. The modules below do it with the course material of a DSSAT training, one
@@ -76,7 +76,7 @@ section. The pages never run the engine: their charts read the small CSV files t
 
 ## What you need to run the notebooks
 
-- The DSSAT engine (`dscsm048`, version 4.8), built or installed as in [Getting started](../getting-started.md).
+- The DSSAT engine (`dscsm048`, version 4.8), built or installed as in [Getting started](../xdssat/getting-started.md).
 - A short work folder outside OneDrive (`XDSSAT_WORK`, default `C:/TEMP/dsn/work`); the engine keeps
   file paths in fixed-length buffers.
 - [DSSAT/dssat-csm-data](https://github.com/DSSAT/dssat-csm-data) cloned next to the xdssat folder; the

@@ -1,0 +1,43 @@
+{
+ "case": "javamaize",
+ "iso3": "IDN",
+ "country": "Java",
+ "box": [
+  111.4,
+  -8.0,
+  112.4,
+  -7.0
+ ],
+ "box_adm1": [
+  {
+   "name": "Jawa Timur",
+   "share_of_unit_in_box": 0.241,
+   "share_of_box": 0.947
+  },
+  {
+   "name": "Jawa Tengah",
+   "share_of_unit_in_box": 0.019,
+   "share_of_box": 0.053
+  }
+ ],
+ "country_bounds": [
+  105.098,
+  -8.782,
+  115.687,
+  -5.531
+ ],
+ "dataset": "The Java case's province and district boundaries (docs/java/data)",
+ "sources": {
+  "IDN": {
+   "src_name": "Indonesian province and district boundaries with BPS codes (idn_bnd_adm1, idn_bnd_adm2), as on the Java rice pages",
+   "src_lic": "not documented in this repository",
+   "src_url": "../java/data.qmd",
+   "src_update": "-"
+  }
+ },
+ "files": {
+  "countries.geojson": 6195,
+  "adm1.geojson": 16435,
+  "adm2.geojson": 78086
+ }
+}

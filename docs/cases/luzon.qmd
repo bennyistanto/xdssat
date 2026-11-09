@@ -1,0 +1,264 @@
+---
+title: "Luzon - Rice: from the plain to the terraces"
+nocite: |
+  @faostat_qcl
+subtitle: "The same flooded rice, planted from the lowlands of northern Luzon up into the Cordillera, 33 years, two seasons: what changes with height is temperature, and the model shows where heat and where cold take their share"
+---
+
+```{ojs}
+import {withDownload, cellFeatures, fmt, locatorMap, placeMarks, boxPolygon} from "../assets/js/dl.js"
+S = FileAttachment("data/luzon/summary.json").json()
+B = FileAttachment("data/luzon/boundaries.json").json()
+countries = FileAttachment("data/luzon/countries.geojson").json()
+adm1 = FileAttachment("data/luzon/adm1.geojson").json()
+adm2 = FileAttachment("data/luzon/adm2.geojson").json()
+cells = FileAttachment("data/luzon/cells.csv").csv({typed: true})
+bands = FileAttachment("data/luzon/bands.csv").csv({typed: true})
+years = FileAttachment("data/luzon/years.csv").csv({typed: true})
+SEASON = ({wet: "wet season (transplanted 1 July)", dry: "dry season (transplanted 1 December)"})
+LOSS = ({domain: ["lost to heat", "lost to cold"], range: ["#d1495b", "#3c6fb4"]})
+canopyTmin = t => (t - 0.87) / 0.92          // Tmin at which the canopy (0.87 + 0.92 Tmin) reaches t
+```
+
+| Setup | |
+|---|---|
+| Area | 120.5-121.5 E, 16.0-17.0 N, northern Luzon, from the plain into the Cordillera (regions and provinces below) |
+| Crop map | MapSPAM 2020 rice, physical area [@spam2020] |
+| Weather, soil, height | AgERA5 1990-2024 [@agera5]; SoilGrids 2.0 [@poggio2021], one profile per 0.1° cell; elevation: ETOPO1 [@amante2009], mean over each 0.1° cell |
+| Crop, template | CERES-Rice, IR 64 (DSSAT cultivar IB0015) and IR 58 (IB0012), 105 kg N/ha; template `XDRI8601.RIX`, from the IRRI experiment IRMZ8601 (Muñoz, 1986); flooded everywhere, so water plays no part |
+| Seasons | wet: transplanted on 1 July; dry: transplanted on 1 December; every year |
+| Scenarios | the baseline; the same without cold sterility (TCLDF 0); the same without heat sterility (THOT 45). The grain each stress costs is the difference with the baseline, season by season |
+| Years | 1991-2023 |
+| Boundaries | edge-matched OCHA administrative boundaries (COD-AB) from HDX: [Philippines](https://data.humdata.org/dataset/cod-ab-phl) (NAMRIA, PSA), CC BY-IGO |
+| Experiment file | [`configs/cases/luzon-rice.yml`](https://github.com/bennyistanto/xdssat/blob/main/configs/cases/luzon-rice.yml) |
+
+```{ojs}
+html`<div class="kpi-row">
+  <div class="kpi"><div class="v">${fmt.int(S.seasons_total)}</div><div class="l">rice seasons simulated (6 run folders)</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.failed_total)}</div><div class="l">seasons the engine rejected</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.cells)}</div><div class="l">0.1° weather cells with rice</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.elev_range[0])}-${fmt.int(S.elev_range[1])} m</div><div class="l">mean height of the cells</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.ha)} ha</div><div class="l">of rice, MapSPAM 2020</div></div>
+</div>`
+```
+
+## Where
+
+```{ojs}
+md`The study box sits in the north of Luzon, in the Philippines.
+${B.box_adm1.map((u, i) => `${u.name}${i === 0 ? " takes" : ""} ${fmt.pct(u.share_of_box)}${i === 0 ? " of it" : ""}${
+  u.share_of_unit_in_box >= 0.9 ? ` (nearly all of ${u.name} lies inside)` : ""}`).join(", ")}. Rice grows on
+${fmt.int(S.ha)} ha of it (MapSPAM 2020), in ${S.cells} of the 0.1° weather cells. The 0.1° cells average the
+terrain: their mean heights run from ${fmt.int(S.elev_range[0])} to ${fmt.int(S.elev_range[1])} m, and single fields
+inside a mountain cell lie higher or lower than that.`
+```
+
+```{ojs}
+viewof whereMetric = Inputs.radio(new Map([["Height of the cell", "elev"], ["Rice in the cell", "ha"]]), {value: "elev", label: "Map"})
+```
+
+```{ojs}
+place = cells.filter(d => d.cultivar === "IR 64" && d.season === "wet")
+html`<div class="map-pair">
+  ${withDownload(locatorMap(Plot, countries, B, {width: 280, height: 280}), "luzon_locator", "red: the study box")}
+  ${withDownload(Plot.plot({
+    width: 420, height: 420,
+    projection: {type: "equirectangular", domain: boxPolygon([B.box[0] - 0.05, B.box[1] - 0.05, B.box[2] + 0.05, B.box[3] + 0.05])},
+    color: whereMetric === "elev" ? {scheme: "YlOrBr", domain: [0, d3.max(place, d => d.elev)], legend: true, label: "Mean height of the cell (m, ETOPO1)"}
+                                  : {scheme: "YlGn", legend: true, label: "Rice in the cell (ha, MapSPAM 2020)"},
+    marks: [
+      Plot.geo(cellFeatures(place), {fill: d => d.properties[whereMetric], stroke: "white", strokeWidth: 0.3}),
+      ...placeMarks(Plot, adm1, adm2, {labels: "adm2"}),
+      Plot.geo(boxPolygon(B.box), {stroke: "#d0021b", strokeWidth: 1.5, fill: "none"}),
+      Plot.tip(place, Plot.pointer({x: "lon", y: "lat",
+        title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E\nheight ${fmt.int(d.elev)} m\nrice ${fmt.int(d.ha)} ha`})),
+      Plot.frame({stroke: "#bbb"})
+    ]
+  }), "luzon_place", "0.1° cells; bold: regions, thin: provinces")}
+</div>`
+```
+
+## Up the slope, the crop slows down
+
+The switches below set the cultivar and the season for every chart on the page.
+
+```{ojs}
+viewof cv = Inputs.radio(["IR 64", "IR 58"], {value: "IR 64", label: "Cultivar"})
+viewof season = Inputs.radio(new Map([["Wet season (1 July)", "wet"], ["Dry season (1 December)", "dry"]]), {value: "wet", label: "Season"})
+```
+
+```{ojs}
+sel = cells.filter(d => d.cultivar === cv && d.season === season)
+zoneOf = e => e < 300 ? "lowland" : e > 800 ? "highland" : "middle"
+zoneMean = (rows, z, k) => { const r = rows.filter(d => zoneOf(d.elev) === z); return d3.sum(r, d => d[k] * d.ha) / d3.sum(r, d => d.ha) }
+md`Every cell grows the same ${cv}, flooded and fertilised alike. In the ${SEASON[season]}, a crop below 300 m yields
+**${fmt.int(zoneMean(sel, "lowland", "hw"))} kg/ha** and needs **${fmt.int(zoneMean(sel, "lowland", "days"))} days** from
+transplanting to maturity; above 800 m it yields **${fmt.int(zoneMean(sel, "highland", "hw"))} kg/ha** in
+**${fmt.int(zoneMean(sel, "highland", "days"))} days**. Cooler air slows the crop down, and in this model a longer
+season means more time to fill grain. FAOSTAT puts the Philippines' national rice yield at 3.97-4.09 t/ha in
+2018-2020 (<a href="#ref-faostat_qcl">FAO 2025</a>): the model's levels are higher; the slope is the result.`
+```
+
+```{ojs}
+wetCv = cells.filter(d => d.cultivar === cv && d.season === "wet")
+tooLong = wetCv.filter(d => d.days > 153)
+longShare = d3.sum(tooLong, d => d.ha) / d3.sum(wetCv, d => d.ha)
+md`The longer season has a price the yield does not show. From 1 July to 1 December is 153 days. ${tooLong.length === 0 ?
+`A wet-season ${cv} crop is harvested within that everywhere in the box.` :
+`A wet-season ${cv} crop outlasts that on **${longShare < 0.01 ? "under 1%" : fmt.pct(longShare)}** of the rice area, in
+${tooLong.length} cell${tooLong.length > 1 ? "s" : ""} all above **${fmt.int(d3.min(tooLong, d => d.elev))} m**: there the wet crop is
+still standing when the dry one is due, and the two seasons of this experiment do not fit in one year. The model runs
+each season on its own, so it does not notice.`} Switch the cultivar to compare: IR 58 is the quicker of the two.`
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 320, marginLeft: 60, marginRight: 60,
+  x: {label: "Mean height of the cell (m)", grid: true},
+  y: {label: "Grain yield (kg/ha, mean of 33 seasons)", grid: true},
+  r: {range: [2, 10], label: "rice ha"},
+  color: {type: "linear", scheme: "Turbo", legend: true, label: "Days from transplanting to maturity"},
+  marks: [
+    Plot.dot(sel, {x: "elev", y: "hw", r: "ha", fill: "days", stroke: "white", strokeWidth: 0.5, tip: true,
+      title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E, ${fmt.int(d.elev)} m\n${fmt.int(d.hw)} kg/ha in ${fmt.int(d.days)} days\n` +
+        `lost to cold ${fmt.int(d.cold_loss)}, to heat ${fmt.int(d.heat_loss)} kg/ha\nrice ${fmt.int(d.ha)} ha`}),
+    Plot.linearRegressionY(sel, {x: "elev", y: "hw", stroke: "#555", strokeDasharray: "4,3"})
+  ]
+}), `luzon_yield_by_height_${season}`, "one dot per 0.1° cell, its size the rice area; dashed: linear fit")
+```
+
+## Heat at the bottom, cold at the top
+
+```{ojs}
+md`In CERES-Rice a crop loses grains when the days before heading are too hot or too cold. The model watches those days
+(\`RI_Phenol.for\`, DSSAT-CSM 4.8). It counts the cold as the degrees by which the canopy, estimated as 0.87 + 0.92 × the
+night minimum, falls below the cultivar's **TCLDF**: 15 °C for both cultivars, so nights colder than
+${fmt.d1(canopyTmin(15))} °C count. It counts the heat when the mean of 0.75 × Tmax + 0.25 × Tmin over those days
+passes **THOT**: ${fmt.d1(S.coefficients[cv].THOT)} °C for ${cv}, each degree above it costing a tenth of the grains. The
+grain number takes the worse of the two (\`RI_Grosub.for:409\`). In the two weeks before flowering, lowland cells
+average a minimum of **${fmt.d1(zoneMean(sel, "lowland", "tmin14"))} °C** and a maximum of
+**${fmt.d1(zoneMean(sel, "lowland", "tmax14"))} °C**; highland cells **${fmt.d1(zoneMean(sel, "highland", "tmin14"))}** and
+**${fmt.d1(zoneMean(sel, "highland", "tmax14"))} °C**.`
+```
+
+```{ojs}
+bandRows = bands.filter(d => d.cultivar === cv && d.season === season)
+lossRows = bandRows.flatMap(d => [
+  {band: d.band, kind: "lost to heat", kg: d.heat_loss, ha: d.ha, hw: d.hw},
+  {band: d.band, kind: "lost to cold", kg: d.cold_loss, ha: d.ha, hw: d.hw}])
+withDownload(Plot.plot({
+  height: 300, marginLeft: 60,
+  x: {label: "Height band of the cell (m)", type: "band", tickFormat: d => `${d}-${d + 200}`},
+  y: {label: "Grain lost (kg/ha, mean of 33 seasons)", grid: true},
+  color: {legend: true, ...LOSS},
+  marks: [
+    Plot.barY(lossRows, Plot.stackY({x: "band", y: "kg", fill: "kind", inset: 4, tip: true,
+      title: d => `${d.band}-${d.band + 200} m (${fmt.int(d.ha)} ha of rice)\n${d.kind}: ${fmt.int(d.kg)} kg/ha\n` +
+        `yield ${fmt.int(d.hw)} kg/ha`})),
+    Plot.ruleY([0])
+  ]
+}), `luzon_losses_by_height_${season}`, "area-weighted; loss = scenario without the stress minus the baseline")
+```
+
+```{ojs}
+wmeanOf = (rows, k) => d3.sum(rows, d => d[k] * d.ha) / d3.sum(rows, d => d.ha)
+cvRows = ["IR 64", "IR 58"].map(c => {
+  const wet = cells.filter(d => d.cultivar === c && d.season === "wet" && d.elev < 300)
+  const dry = cells.filter(d => d.cultivar === c && d.season === "dry" && d.elev > 1200)
+  return {c, heatLow: wmeanOf(wet, "heat_loss"), coldHigh: wmeanOf(dry, "cold_loss"), hwHigh: wmeanOf(dry, "hw"),
+          tminHigh: wmeanOf(dry, "tmin14")}
+})
+md`The two stresses keep to their own ends of the slope and their own seasons. Heat takes its share in the
+**wet season below 300 m**: IR 64, with a THOT of 28 °C, loses **${fmt.int(cvRows[0].heatLow)} kg/ha** there; IR 58, at
+33.9 °C, loses **${fmt.int(cvRows[1].heatLow)} kg/ha**. Cold takes its share in the **dry season above 1,200 m**, where
+the minimum in the two weeks before flowering averages ${fmt.d1(cvRows[0].tminHigh)} °C: **${fmt.int(cvRows[0].coldHigh)}** kg/ha for
+IR 64 and **${fmt.int(cvRows[1].coldHigh)} kg/ha** for IR 58, out of about ${fmt.int(cvRows[0].hwHigh)} and
+${fmt.int(cvRows[1].hwHigh)}. Both share a TCLDF of 15 °C: DSSAT's default, which the cultivar file recommends changing
+only with data from cold environments. Below 1,200 m, cold costs either cultivar little in any season.`
+```
+
+## Cold years
+
+```{ojs}
+hy = years.filter(d => d.cultivar === cv && d.season === "dry" && d.zone.startsWith("highland"))
+ly = years.filter(d => d.cultivar === cv && d.season === "wet" && d.zone.startsWith("lowland"))
+worstCold = hy.reduce((a, b) => (b.cold_loss > a.cold_loss ? b : a))
+worstHeat = ly.reduce((a, b) => (b.heat_loss > a.heat_loss ? b : a))
+md`A mean hides the bad years. Over all rice above 800 m, ${cv}'s dry-season cold loss peaks at
+**${fmt.int(worstCold.cold_loss)} kg/ha** in the season of ${worstCold.season_year}-${worstCold.season_year + 1}, when the minimum in the two
+weeks before flowering averaged ${fmt.d1(worstCold.tmin14)} °C. ${worstHeat.heat_loss < 1 ?
+`Below 300 m, ${cv} loses nothing to heat in any wet season.` :
+`Below 300 m, the wet-season heat loss peaks at **${fmt.int(worstHeat.heat_loss)} kg/ha** in ${worstHeat.season_year}, with a mean
+maximum of ${fmt.d1(worstHeat.tmax14)} °C before flowering.`} This chart follows the cultivar switch, not the season switch.`
+```
+
+```{ojs}
+yrRows = [...hy.map(d => ({...d, kind: "lost to cold", kg: d.cold_loss, where: "highland (above 800 m), dry season"})),
+          ...ly.map(d => ({...d, kind: "lost to heat", kg: d.heat_loss, where: "lowland (below 300 m), wet season"}))]
+withDownload(Plot.plot({
+  height: 280, marginLeft: 60,
+  x: {label: null, tickFormat: d => String(d), ticks: 8},
+  y: {label: "Grain lost (kg/ha)", grid: true},
+  color: {legend: true, ...LOSS},
+  marks: [
+    Plot.line(yrRows, {x: "season_year", y: "kg", stroke: "kind", strokeWidth: 1.8}),
+    Plot.dot(yrRows, {x: "season_year", y: "kg", fill: "kind", r: 3, tip: true,
+      title: d => `${d.where}, season year ${d.season_year}\n${d.kind}: ${fmt.int(d.kg)} kg/ha\n` +
+        `two weeks before flowering: Tmin ${fmt.d1(d.tmin14)} °C, Tmax ${fmt.d1(d.tmax14)} °C`}),
+    Plot.ruleY([0])
+  ]
+}), `luzon_loss_years_${cv.replace(" ", "")}`, "area-weighted over the cells of each zone; dry season: the crop transplanted on 1 December of that year")
+```
+
+## The map of the two stresses
+
+```{ojs}
+viewof mapMetric = Inputs.radio(new Map([["Lost to cold", "cold_loss"], ["Lost to heat", "heat_loss"], ["Yield", "hw"],
+  ["Days to maturity", "days"], ["Years with a cold loss above 10%", "cold_years"]]), {value: "days", label: "Map"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 460, aspectRatio: 1,
+  projection: {type: "equirectangular", domain: cellFeatures(sel)},
+  color: {scheme: {cold_loss: "Blues", heat_loss: "Reds", hw: "YlGn", days: "Purples", cold_years: "Blues"}[mapMetric],
+          legend: true, tickFormat: mapMetric === "cold_years" ? "%" : undefined,
+          label: {cold_loss: "Grain lost to cold (kg/ha)", heat_loss: "Grain lost to heat (kg/ha)", hw: "Yield (kg/ha)",
+                  days: "Days from transplanting to maturity", cold_years: "Share of seasons losing over 10% to cold"}[mapMetric]},
+  marks: [
+    Plot.geo(cellFeatures(sel), {fill: d => d.properties[mapMetric], stroke: "white", strokeWidth: 0.4}),
+    ...placeMarks(Plot, adm1, adm2, {labels: "adm2", fontSize: 9}),
+    Plot.tip(sel, Plot.pointer({x: "lon", y: "lat",
+      title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E, ${fmt.int(d.elev)} m\n${fmt.int(d.hw)} kg/ha in ${fmt.int(d.days)} days\n` +
+        `lost to cold ${fmt.int(d.cold_loss)} (${fmt.pct(d.cold_years)} of seasons over 10%)\nlost to heat ${fmt.int(d.heat_loss)} kg/ha`})),
+    Plot.frame()
+  ]
+}), `luzon_stress_map_${season}`, `${cv}, ${SEASON[season]}, mean of 33 seasons`)
+```
+
+## What this does not say
+
+- **Uncalibrated.** IR 64 and IR 58 run with DSSAT's own coefficients, flooded and at 105 kg N everywhere,
+  without pests, diseases or weeds. Their cold thresholds are DSSAT's defaults. Varieties grown in the
+  mountains, and their real tolerance of cold, are not in this experiment.
+- **Smoothed mountains.** AgERA5 and the cell heights are 0.1° averages. A terrace higher than its cell's
+  mean is colder than the model's weather for it.
+- **One date per season.** Every cell transplants on 1 July and on 1 December. A crop that takes longer in the
+  cold may not leave room for a second one; the model runs each season on its own.
+- **Losses are model experiments.** Each loss is the yield without that stress minus the baseline, so it
+  shows what the model's sterility rules cost, not a measured loss.
+
+## Run it yourself
+
+```bash
+python scripts/prepare_weather.py   --config configs/cases/luzon-rice.yml
+python scripts/prepare_crop_mask.py --config configs/cases/luzon-rice.yml
+python scripts/prepare_soils.py     --config configs/cases/luzon-rice.yml --aoi luzon_rice
+python scripts/run_aoi.py           --config configs/cases/luzon-rice.yml
+python docs/scripts/export_cases.py luzon
+python docs/scripts/export_boundaries.py luzon
+```
+
+The export reads the prepared weather (for the temperatures before flowering) and ETOPO1 for the cell
+heights (`etopo180` from [ERDDAP](https://gcoos5.geos.tamu.edu/erddap/griddap/etopo180.html), the copy used
+here; set its path in `ETOPO` in `docs/scripts/export_cases.py`).

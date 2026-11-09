@@ -1,0 +1,41 @@
+{
+ "generated": "2026-11-09",
+ "cells": 91,
+ "ha": 121730.1,
+ "zone_ha": {
+  "highland (above 800 m)": 36494.0,
+  "lowland (below 300 m)": 32761.0,
+  "middle (300-800 m)": 52475.0
+ },
+ "elev_range": [
+  21.0,
+  1683.0
+ ],
+ "runs": 6,
+ "seasons_total": 36036,
+ "failed_total": 0,
+ "minutes_total": 20.1,
+ "years": [
+  1991,
+  2023
+ ],
+ "head_days": 14,
+ "coefficients": {
+  "IR 64": {
+   "THOT": 28.0,
+   "TCLDF": 15.0,
+   "TCLDP": 15.0
+  },
+  "IR 58": {
+   "THOT": 33.9,
+   "TCLDF": 15.0,
+   "TCLDP": 15.0
+  }
+ },
+ "faostat_philippines_rice_t_ha": {
+  "2018": 3.972,
+  "2019": 4.045,
+  "2020": 4.089
+ },
+ "dem": "ETOPO1 (NOAA NGDC; Amante and Eakins 2009), mean over each 0.1-degree cell"
+}

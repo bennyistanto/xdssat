@@ -8,12 +8,19 @@ project:
     - xdssat/index.qmd
     - xdssat/gridding.qmd
     - xdssat/implementation.qmd
+    - xdssat/getting-started.md
     - xdssat/data.qmd
-    - getting-started.md
+    - xdssat/another-crop.qmd
+    - xdssat/examples.qmd
     - java/index.qmd
     - java/data.qmd
     - java/alternatives.qmd
     - java/science.qmd
+    - cases/java-maize.qmd
+    - cases/niger.qmd
+    - cases/kenya.qmd
+    - cases/mekong.qmd
+    - cases/luzon.qmd
     - learn/index.qmd
     - learn/module1.qmd
     - learn/module2.qmd
@@ -28,9 +35,9 @@ project:
     - notebooks/module4.ipynb
     - notebooks/module5.ipynb
     - notebooks/module6.ipynb
-    - rebuild.qmd
-    - faq.qmd
-    - acknowledgements.qmd
+    - about/rebuild.qmd
+    - about/faq.qmd
+    - about/acknowledgements.qmd
   resources:
     - java/data/
     - assets/
@@ -58,32 +65,48 @@ website:
     left:
       - text: "Guide"
         menu:
-          - href: index.qmd
-            text: Home
           - href: xdssat/index.qmd
             text: What xdssat is
           - href: xdssat/gridding.qmd
             text: How xdssat differs from common DSSAT use
           - href: xdssat/implementation.qmd
             text: Implementation
-          - href: getting-started.md
+          - text: "---"
+          - href: xdssat/getting-started.md
             text: Getting started
+          - href: xdssat/examples.qmd
+            text: Examples
+          - text: "---"
           - href: xdssat/data.qmd
             text: Input data
-      - text: "Case study: rice in Java"
+          - href: xdssat/another-crop.qmd
+            text: Another crop
+      - text: "Case studies"
         menu:
+          - text: "Java - Rice"
           - href: java/index.qmd
-            text: Story
+            text: "Story"
           - href: java/data.qmd
-            text: Data, AOI, variety
+            text: "Data, AOI, variety"
           - href: java/alternatives.qmd
-            text: Alternative input data
+            text: "Alternative input data"
           - href: java/science.qmd
-            text: Scientific method
+            text: "Scientific method"
+          - text: "---"
+          - href: cases/java-maize.qmd
+            text: "Java - Maize"
+          - href: cases/niger.qmd
+            text: "Niger - Millet"
+          - href: cases/kenya.qmd
+            text: "Kenya - Maize"
+          - href: cases/mekong.qmd
+            text: "Mekong - Rice"
+          - href: cases/luzon.qmd
+            text: "Luzon - Rice"
       - text: "DSSAT training"
         menu:
           - href: learn/index.qmd
-            text: "From the case study to DSSAT itself"
+            text: "From the case studies to DSSAT itself"
           - href: learn/module1.qmd
             text: "1. Running a model, phenology, potential production"
           - href: learn/module2.qmd
@@ -115,11 +138,11 @@ website:
     right:
       - text: "About"
         menu:
-          - href: faq.qmd
+          - href: about/faq.qmd
             text: FAQ
-          - href: acknowledgements.qmd
+          - href: about/acknowledgements.qmd
             text: "Acknowledgements and how to cite"
-          - href: rebuild.qmd
+          - href: about/rebuild.qmd
             text: Rebuild notes
       - icon: github
         href: https://github.com/bennyistanto/xdssat
@@ -131,30 +154,46 @@ website:
       collapse-level: 2
       contents:
         - section: "Guide"
-          href: index.qmd
+          href: xdssat/index.qmd
           contents:
-            - href: xdssat/index.qmd
-              text: What xdssat is
             - href: xdssat/gridding.qmd
               text: How xdssat differs from common DSSAT use
             - href: xdssat/implementation.qmd
               text: Implementation
-            - href: getting-started.md
+            - text: "---"
+            - href: xdssat/getting-started.md
               text: Getting started
+            - href: xdssat/examples.qmd
+              text: Examples
+            - text: "---"
             - href: xdssat/data.qmd
               text: Input data
+            - href: xdssat/another-crop.qmd
+              text: Another crop
     - id: java
       style: docked
       contents:
-        - section: "Case study: rice in Java"
-          href: java/index.qmd
+        - section: "Case studies"
           contents:
-            - href: java/data.qmd
-              text: Data, AOI, variety
-            - href: java/alternatives.qmd
-              text: Alternative input data
-            - href: java/science.qmd
-              text: Scientific method
+            - section: "Java - Rice"
+              href: java/index.qmd
+              contents:
+                - href: java/data.qmd
+                  text: "Data, AOI, variety"
+                - href: java/alternatives.qmd
+                  text: "Alternative input data"
+                - href: java/science.qmd
+                  text: "Scientific method"
+            - href: cases/java-maize.qmd
+              text: "Java - Maize"
+            - href: cases/niger.qmd
+              text: "Niger - Millet"
+            - href: cases/kenya.qmd
+              text: "Kenya - Maize"
+            - href: cases/mekong.qmd
+              text: "Mekong - Rice"
+            - href: cases/luzon.qmd
+              text: "Luzon - Rice"
     - id: training
       style: docked
       contents:
@@ -196,18 +235,18 @@ website:
       contents:
         - section: "About"
           contents:
-            - href: faq.qmd
+            - href: about/faq.qmd
               text: FAQ
-            - href: acknowledgements.qmd
+            - href: about/acknowledgements.qmd
               text: "Acknowledgements and how to cite"
-            - href: rebuild.qmd
+            - href: about/rebuild.qmd
               text: Rebuild notes
   page-footer:
     left:
       - text: "License: MPL-2.0"
         href: https://github.com/bennyistanto/xdssat/blob/main/LICENSE
       - text: "Not an official DSSAT product"
-        href: acknowledgements.qmd
+        href: about/acknowledgements.qmd
     right:
       - icon: github
         href: https://github.com/bennyistanto/xdssat

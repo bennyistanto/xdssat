@@ -39,7 +39,7 @@ kpis = html`<div class="kpi-row">
 ::: {.source-note}
 Every number on this page is read from `docs/java/data/` when the page loads; those files are exported from the
 current run, ${calRun}, exported ${summary.generated} by `docs/scripts/export_data.py`. When the
-calibration changes, the numbers change with it. See [Rebuild](../rebuild.qmd).
+calibration changes, the numbers change with it. See [Rebuild](../about/rebuild.qmd).
 :::
 
 ## A crop model built for one field
@@ -523,7 +523,7 @@ calendarReruns = {
 - [How xdssat differs](../xdssat/gridding.qmd) from the usual way of running DSSAT.
 - [Scientific method](science.qmd): the reason for each step, with references.
 - [Implementation](../xdssat/implementation.qmd): which script does what, and the settings that change the results.
-- Setup from an empty machine: [`docs/getting-started.md`](https://github.com/bennyistanto/xdssat/blob/main/docs/getting-started.md).
+- Setup from an empty machine: [`docs/xdssat/getting-started.md`](https://github.com/bennyistanto/xdssat/blob/main/docs/xdssat/getting-started.md).
 
 ## References {.unnumbered}
 

@@ -1,0 +1,269 @@
+---
+title: "Mekong - Rice: the water bill"
+nocite: |
+  @faostat_qcl
+subtitle: "Two rice crops a year in the Mekong Delta, 33 years, four ways to manage the water: which season pays for the water, what it buys, and where it goes"
+---
+
+```{ojs}
+import {withDownload, cellFeatures, fmt, locatorMap, placeMarks, boxPolygon} from "../assets/js/dl.js"
+S = FileAttachment("data/mekong/summary.json").json()
+B = FileAttachment("data/mekong/boundaries.json").json()
+countries = FileAttachment("data/mekong/countries.geojson").json()
+adm1 = FileAttachment("data/mekong/adm1.geojson").json()
+adm2 = FileAttachment("data/mekong/adm2.geojson").json()
+seasons = FileAttachment("data/mekong/seasons.csv").csv({typed: true})
+cells = FileAttachment("data/mekong/cells.csv").csv({typed: true})
+SEASON = ({dong_xuan: "Dong xuan (sown 1 Dec)", he_thu: "He thu (sown 20 Apr)"})
+SEASON_COLOR = ({domain: Object.values(SEASON), range: ["#c98b2b", "#2b8a9b"]})
+PERC = ({irrigated_perc1: 1, irrigated: 2, irrigated_perc4: 4})
+bySeason = (rows, regime, season) => rows.filter(d => d.regime === regime && d.season === season)
+mean = (rows, key) => d3.mean(rows, d => d[key])
+```
+
+| Setup | |
+|---|---|
+| Area | 105.2-106.2 E, 9.7-10.7 N, in the Mekong Delta (provinces below) |
+| Crop map | MapSPAM 2020 rice, physical area [@spam2020] |
+| Weather, soil | AgERA5 1990-2024 [@agera5]; SoilGrids 2.0 [@poggio2021], one profile per 0.1° cell |
+| Crop, template | CERES-Rice, IR 64 (DSSAT cultivar IB0015), 105 kg N/ha; template `XDRW8601.RIX`, from the transplanted IRRI experiment IRMZ8601 (Muñoz, 1986) |
+| Seasons | dong xuan transplanted on 1 December, he thu on 20 April, every year |
+| Water | four regimes, each run on every rice cell: continuous flood (bund raised to 150 mm, flood kept at 5, then 30, then 50 mm) with percolation of 1, 2 (the experiment's own) or 4 mm a day; and rainfed behind the same bund |
+| Years | 1991-2023, 33 dong xuan and 33 he thu seasons |
+| Boundaries | edge-matched OCHA administrative boundaries (COD-AB) from HDX: [Viet Nam](https://data.humdata.org/dataset/cod-ab-vnm) (Government of Viet Nam), [Cambodia](https://data.humdata.org/dataset/cod-ab-khm), CC BY-IGO |
+| Experiment file | [`configs/cases/mekong-rice.yml`](https://github.com/bennyistanto/xdssat/blob/main/configs/cases/mekong-rice.yml) |
+
+```{ojs}
+html`<div class="kpi-row">
+  <div class="kpi"><div class="v">${fmt.int(S.seasons_total)}</div><div class="l">rice seasons simulated (4 run folders)</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.failed_total)}</div><div class="l">seasons the engine rejected</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.cells)}</div><div class="l">0.1° weather cells with rice</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.ha)} ha</div><div class="l">of rice, MapSPAM 2020</div></div>
+  <div class="kpi"><div class="v">${fmt.d1(S.minutes_total)} min</div><div class="l">wall time, four runs</div></div>
+</div>`
+```
+
+## Where
+
+```{ojs}
+md`The study box sits in the Mekong Delta in the south of Viet Nam.
+${B.box_adm1.map((u, i) => `${u.name}${i === 0 ? " takes" : ""} ${fmt.pct(u.share_of_box)}${i === 0 ? " of it" : ""}${
+  u.share_of_unit_in_box >= 0.9 ? ` (nearly all of ${u.name} lies inside)` : ""}`).join(", ")}. Rice grows on
+${fmt.int(S.ha)} ha of it (MapSPAM 2020), in ${S.cells} of the 0.1° weather cells.`
+```
+
+```{ojs}
+rice = cells.filter(d => d.regime === "irrigated" && d.season === "dong_xuan")
+html`<div class="map-pair">
+  ${withDownload(locatorMap(Plot, countries, B, {width: 280, height: 280}), "mekong_locator", "red: the study box")}
+  ${withDownload(Plot.plot({
+    width: 420, height: 420,
+    projection: {type: "equirectangular", domain: boxPolygon([B.box[0] - 0.05, B.box[1] - 0.05, B.box[2] + 0.05, B.box[3] + 0.05])},
+    color: {scheme: "YlGn", legend: true, label: "Rice in the cell (ha, MapSPAM 2020)"},
+    marks: [
+      Plot.geo(cellFeatures(rice), {fill: d => d.properties.ha, stroke: "white", strokeWidth: 0.3}),
+      ...placeMarks(Plot, adm1, adm2, {labels: "adm1"}),
+      Plot.geo(boxPolygon(B.box), {stroke: "#d0021b", strokeWidth: 1.5, fill: "none"}),
+      Plot.tip(rice, Plot.pointer({x: "lon", y: "lat",
+        title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E\nrice ${fmt.int(d.ha)} ha`})),
+      Plot.frame({stroke: "#bbb"})
+    ]
+  }), "mekong_rice_area", "0.1° cells; bold: provinces, thin: districts")}
+</div>`
+```
+
+## Two seasons, two bills
+
+A flooded rice field loses water every day: the crop transpires it, the sun evaporates it from the
+water surface, and some of it seeps down through the puddled soil. To keep the flood, the farmer
+pays the difference with irrigation. The model keeps the flood of the 1986 IRRI experiment and
+counts every millimetre it has to add. One millimetre over a hectare is 10 cubic metres.
+
+How fast water seeps through a puddled field is a property of the soil and of how it was puddled.
+The experiment measured 2 mm a day; this case also runs half and double of that. The switch below sets
+it for every chart on the page.
+
+```{ojs}
+viewof perc = Inputs.radio(new Map([["1 mm a day", "irrigated_perc1"], ["2 mm a day (the experiment)", "irrigated"],
+  ["4 mm a day", "irrigated_perc4"]]), {value: "irrigated", label: "Percolation"})
+```
+
+```{ojs}
+dx = bySeason(seasons, perc, "dong_xuan")
+ht = bySeason(seasons, perc, "he_thu")
+boxCells = cells.filter(d => d.regime === perc)
+volume = s => d3.sum(boxCells.filter(d => d.season === s), d => d.IRCM * d.ha * 10) / 1e6
+md`A dong xuan crop, grown through the dry months, takes **${fmt.int(mean(dx, "IRCM"))} mm** of irrigation in an average
+year (${fmt.int(mean(dx, "IRCM") * 10)} m³ a hectare) and catches **${fmt.int(mean(dx, "PRCM"))} mm** of rain. A he thu
+crop, sown as the rains begin, takes **${fmt.int(mean(ht, "IRCM"))} mm** and catches **${fmt.int(mean(ht, "PRCM"))} mm**.
+If every rice hectare of the box grew both crops, the box would draw about **${fmt.int(volume("dong_xuan"))} million m³** of
+irrigation water in the dry season and **${fmt.int(volume("he_thu"))} million m³** in the wet one, every year.`
+```
+
+```{ojs}
+billRows = seasons.filter(d => d.regime === perc).map(d => ({...d, label: SEASON[d.season]}))
+withDownload(Plot.plot({
+  height: 300, marginLeft: 55,
+  x: {label: null, tickFormat: d => String(d), ticks: 8},
+  y: {label: "Irrigation per season (mm)", grid: true, domain: [0, d3.max(seasons, d => d.IRCM) * 1.05]},
+  color: {legend: true, ...SEASON_COLOR},
+  marks: [
+    Plot.line(billRows, {x: "season_year", y: "IRCM", stroke: "label", strokeWidth: 2}),
+    Plot.dot(billRows, {x: "season_year", y: "IRCM", fill: "label", r: 3, tip: true,
+      title: d => `${d.label}, ${d.season === "dong_xuan" ? `${d.season_year}-${d.season_year + 1}` : d.season_year + 1}\n` +
+        `irrigation ${fmt.int(d.IRCM)} mm\nrain ${fmt.int(d.PRCM)} mm\nyield ${fmt.int(d.yield)} kg/ha`}),
+    Plot.ruleY([0])
+  ]
+}), "mekong_irrigation_by_year", "area-weighted mean of the rice cells; season year: the dong xuan crop of December, then the he thu crop of the next April")
+```
+
+## What the water buys
+
+```{ojs}
+gainOf = s => {
+  const irr = bySeason(seasons, perc, s), rf = bySeason(seasons, "rainfed", s)
+  const y = irr.map(d => ({year: d.season_year, irr: d.yield, rf: rf.find(e => e.season_year === d.season_year).yield, mm: d.IRCM}))
+  return {rows: y, gain: d3.mean(y, d => d.irr - d.rf), mm: d3.mean(y, d => d.mm),
+          rf: d3.mean(y, d => d.rf), irr: d3.mean(y, d => d.irr)}
+}
+gDx = gainOf("dong_xuan")
+gHt = gainOf("he_thu")
+md`The same fields, the same weather, the same rice, but only rain behind the bund: that is what the water has to beat.
+In the dry season the flooded crop gives **${fmt.int(gDx.irr)} kg/ha** and the rainfed one **${fmt.int(gDx.rf)} kg/ha**:
+${fmt.int(gDx.mm)} mm of irrigation buys **${fmt.int(gDx.gain)} kg** of grain, **${fmt.d2(gDx.gain / (gDx.mm * 10))} kg per m³**.
+In the he thu season the rain does the work: flooded **${fmt.int(gHt.irr)}**, rainfed **${fmt.int(gHt.rf)} kg/ha**. The
+${fmt.int(gHt.mm)} mm of irrigation the model adds to keep the flood ${Math.abs(gHt.gain) < 150 ? "buys almost nothing" :
+gHt.gain > 0 ? `buys ${fmt.int(gHt.gain)} kg` : `comes with ${fmt.int(-gHt.gain)} kg less`}${gHt.gain < -150 ?
+` (with the experiment's percolation, the rainfed crop matures a median 5 days later and takes up 199 rather than
+188 kg N/ha)` : ""}. FAOSTAT puts Viet Nam's
+national rice yield at 5.82-5.92 t/ha in 2018-2020 (<a href="#ref-faostat_qcl">FAO 2025</a>): the model's levels are higher, its differences are
+the result.`
+```
+
+```{ojs}
+buyRows = ["dong_xuan", "he_thu"].flatMap(s => gainOf(s).rows.flatMap(d => [
+  {season: SEASON[s], year: d.year, water: "flooded", yield: d.irr, mm: d.mm},
+  {season: SEASON[s], year: d.year, water: "rainfed", yield: d.rf, mm: 0}]))
+withDownload(Plot.plot({
+  height: 300, marginLeft: 55,
+  fx: {label: null},
+  x: {label: null, tickFormat: d => String(d), ticks: 5},
+  y: {label: "Grain yield (kg/ha)", grid: true},
+  color: {legend: true, domain: ["flooded", "rainfed"], range: ["#2b6cb0", "#c0392b"]},
+  marks: [
+    Plot.line(buyRows, {fx: "season", x: "year", y: "yield", stroke: "water", strokeWidth: 1.8}),
+    Plot.dot(buyRows, {fx: "season", x: "year", y: "yield", fill: "water", r: 2.5, tip: true,
+      title: d => `${d.season}, season year ${d.year}\n${d.water}: ${fmt.int(d.yield)} kg/ha` +
+        (d.mm ? `\nirrigation ${fmt.int(d.mm)} mm` : "")}),
+    Plot.ruleY([0])
+  ]
+}), "mekong_flooded_vs_rainfed", "area-weighted means; flooded at the chosen percolation")
+```
+
+## Where the water goes
+
+```{ojs}
+TERMS = [["EPCM", "taken up by the crop (transpiration)"], ["ESCM", "evaporated from soil and flood water"],
+         ["DRCM", "drained below the roots"], ["ROCM", "ran off over the bund"], ["stored", "left in the field at harvest"]]
+flow = ["irrigated_perc1", "irrigated", "irrigated_perc4", "rainfed"].flatMap(r => ["dong_xuan", "he_thu"].flatMap(s => {
+  const rows = bySeason(seasons, r, s)
+  const tag = r === "rainfed" ? "rainfed" : `flood, ${PERC[r]} mm/d`
+  return TERMS.map(([k, name]) => ({regime: r, row: `${SEASON[s].split(" (")[0]}, ${tag}`, term: name,
+    mm: Math.max(0, mean(rows, k)), inflow: mean(rows, "IRCM") + mean(rows, "PRCM")}))
+}))
+chosen = flow.filter(d => d.regime === perc)
+cropShare = s => { const r = chosen.filter(d => d.row.startsWith(s)); return r[0].mm / r[0].inflow }
+md`Every millimetre that enters a field (irrigation and rain) leaves it in one of four ways before the harvest, or
+stays. With percolation at ${PERC[perc]} mm a day, the crop itself transpires **${fmt.pct(cropShare("Dong xuan"))}** of the
+dry-season water and **${fmt.pct(cropShare("He thu"))}** of the wet-season water. The rest is the cost of keeping a field
+flooded: evaporation from the water surface, seepage through the bottom of the field and, at harvest, a soaked soil
+and a standing flood that the next season will not inherit in this model (each season starts afresh).`
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 330, marginLeft: 150, marginRight: 20,
+  x: {label: "Water per season (mm): irrigation and rain in, by where it goes", grid: true},
+  y: {label: null, domain: [...new Set(flow.map(d => d.row))]},
+  color: {legend: true, domain: TERMS.map(d => d[1]), range: ["#2f8f4e", "#e0a030", "#5b7fbf", "#8e7cc3", "#b0b0b0"]},
+  marks: [
+    Plot.barX(flow, Plot.stackX({x: "mm", y: "row", fill: "term", order: TERMS.map(d => d[1]),
+      fillOpacity: d => (d.regime === perc || d.regime === "rainfed" ? 1 : 0.35), tip: true,
+      title: d => `${d.row}\n${d.term}: ${fmt.int(d.mm)} mm (${fmt.pct(d.mm / d.inflow)} of the water in)`})),
+    Plot.ruleX([0])
+  ]
+}), "mekong_water_balance", "mean of 33 seasons, area-weighted; the chosen percolation in full colour; 'left in the field' = water in minus water out")
+```
+
+## The soil you cannot see
+
+```{ojs}
+pDx = p => mean(bySeason(seasons, p, "dong_xuan"), "IRCM")
+pY = p => mean(bySeason(seasons, p, "dong_xuan"), "yield")
+md`Percolation does not show in the harvest but it does in the bill. From 1 to 4 mm a day, a dong xuan crop's
+irrigation goes from **${fmt.int(pDx("irrigated_perc1"))}** to **${fmt.int(pDx("irrigated_perc4"))} mm**, while its yield
+moves from ${fmt.int(pY("irrigated_perc1"))} to ${fmt.int(pY("irrigated_perc4"))} kg/ha. The water that seeps away
+leaves the bottom of the model's soil profile; where it goes from there is outside the model. The map shows how the
+dry-season bill varies from cell to cell.`
+```
+
+```{ojs}
+viewof mapMetric = Inputs.radio(new Map([["Irrigation", "IRCM"], ["Drained below the roots", "DRCM"],
+  ["Grain bought per m³ of irrigation", "kgm3"]]), {value: "IRCM", label: "Dong xuan map"})
+```
+
+```{ojs}
+dxCells = {
+  const rf = new Map(cells.filter(d => d.regime === "rainfed" && d.season === "dong_xuan").map(d => [`${d.iy}_${d.ix}`, d.yield]))
+  return cells.filter(d => d.regime === perc && d.season === "dong_xuan")
+    .map(d => ({...d, rf: rf.get(`${d.iy}_${d.ix}`), kgm3: (d.yield - rf.get(`${d.iy}_${d.ix}`)) / (d.IRCM * 10)}))
+}
+withDownload(Plot.plot({
+  height: 460, aspectRatio: 1,
+  projection: {type: "equirectangular", domain: cellFeatures(dxCells)},
+  color: {scheme: mapMetric === "kgm3" ? "Greens" : "Blues", legend: true,
+          label: {IRCM: "Irrigation per dong xuan season (mm)", DRCM: "Drainage below the roots (mm)",
+                  kgm3: "Grain bought per m³ of irrigation (kg)"}[mapMetric]},
+  marks: [
+    Plot.geo(cellFeatures(dxCells), {fill: d => d.properties[mapMetric], stroke: "white", strokeWidth: 0.4}),
+    ...placeMarks(Plot, adm1, adm2, {labels: "adm1", fontSize: 9}),
+    Plot.tip(dxCells, Plot.pointer({x: "lon", y: "lat",
+      title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E\nirrigation ${fmt.int(d.IRCM)} mm, rain ${fmt.int(d.PRCM)} mm\n` +
+        `drained ${fmt.int(d.DRCM)} mm\nflooded ${fmt.int(d.yield)} kg/ha, rainfed ${fmt.int(d.rf)} kg/ha\n` +
+        `${fmt.d2(d.kgm3)} kg grain per m³\nrice ${fmt.int(d.ha)} ha`})),
+    Plot.frame()
+  ]
+}), "mekong_dong_xuan_map", `dong xuan, mean of 33 seasons, percolation ${PERC[perc]} mm a day`)
+```
+
+## What this does not say
+
+- **Uncalibrated.** IR 64 runs with DSSAT's own coefficients, at 105 kg N, without pests, diseases or weeds.
+  The yields are above the national average; the comparisons between seasons and regimes are the result.
+- **Water at the field.** Irrigation is what the field receives. Canal and pumping losses on the way are not
+  counted, and the model has no salt in its water.
+- **One flood schedule.** Bund heights, flood depths and their dates come from the 1986 experiment. Other
+  water-saving practices, such as letting the field dry between floods, would need another template.
+- **Each season starts afresh** at 90% of the soil's available water. In the field the water left at a
+  harvest partly carries into the next season; a crop sequence (DSSAT's mode Q, which xdssat runs) would
+  follow it.
+- **Every rice hectare, both seasons.** MapSPAM gives the physical area of rice; the volumes above assume
+  all of it carries both crops.
+
+## Run it yourself
+
+```bash
+python scripts/make_templates.py          # writes templates/XDRW8601.RIX
+python scripts/prepare_weather.py   --config configs/cases/mekong-rice.yml
+python scripts/prepare_crop_mask.py --config configs/cases/mekong-rice.yml
+python scripts/prepare_soils.py     --config configs/cases/mekong-rice.yml --aoi mekong_rice
+python scripts/run_aoi.py --config configs/cases/mekong-rice.yml --regime irrigated
+python scripts/run_aoi.py --config configs/cases/mekong-rice.yml --regime irrigated_perc1
+python scripts/run_aoi.py --config configs/cases/mekong-rice.yml --regime irrigated_perc4
+python scripts/run_aoi.py --config configs/cases/mekong-rice.yml --regime rainfed
+python docs/scripts/export_cases.py mekong
+python docs/scripts/export_boundaries.py mekong
+```
+
+The three-year version of this area ships with xdssat: `example-inputs/mekong_rice/`
+([Examples](../xdssat/examples.qmd)).

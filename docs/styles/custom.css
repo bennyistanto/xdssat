@@ -35,6 +35,39 @@
   max-width: 100%;
 }
 
+/* Navbar menus: a group title ("Java - Rice") reads like the other items (same font, size, case and
+   spacing), in semibold; the pages of the Java group are indented under it */
+.navbar .dropdown-menu .dropdown-header {
+  font-size: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
+  color: var(--bs-dropdown-link-color);
+  padding: var(--bs-dropdown-item-padding-y) var(--bs-dropdown-item-padding-x);
+  margin: 0;
+}
+
+.navbar .dropdown-menu a.dropdown-item[href*="java/"] {
+  padding-left: calc(var(--bs-dropdown-item-padding-x) + 1rem);
+}
+
+/* Two maps side by side on the case pages (locator + study area); stacks on narrow screens */
+.map-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.map-pair > .dl-wrap {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.map-pair .dl-bar {
+  max-width: 300px;
+}
+
 .kpi-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

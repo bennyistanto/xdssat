@@ -1,0 +1,322 @@
+---
+title: "Kenya - Maize: is fertiliser worth it?"
+nocite: |
+  @faostat_qcl, @kiwia2022
+subtitle: "Thirty-three long-rains seasons in the western highlands, four nitrogen rates. The model says yes, every year. The useful question is how wrong it can be before the answer changes"
+---
+
+```{ojs}
+import {withDownload, cellFeatures, fmt, locatorMap, placeMarks, boxPolygon} from "../assets/js/dl.js"
+S = FileAttachment("data/kenya/summary.json").json()
+B = FileAttachment("data/kenya/boundaries.json").json()
+countries = FileAttachment("data/kenya/countries.geojson").json()
+adm1 = FileAttachment("data/kenya/adm1.geojson").json()
+adm2 = FileAttachment("data/kenya/adm2.geojson").json()
+years = FileAttachment("data/kenya/years.csv").csv({typed: true})
+price = FileAttachment("data/kenya/maize_price_eldoret.csv").csv({typed: true})
+cells = FileAttachment("data/kenya/cells.csv").csv({typed: true})
+RATES = [0, 60, 120, 180]
+STEPS = [[0, 60], [60, 120], [120, 180]]
+stepName = k => `${STEPS[k][0]} to ${STEPS[k][1]} kg N`
+MARKET = 1 / (1 - S.moisture)          // dry matter to grain at market moisture
+KIWIA_AEN = 21                          // Kenya on-farm trials, kg grain per kg N (Kiwia et al. 2022, Fig. 4a)
+byYear = d3.rollups(years, v => Object.fromEntries(v.map(d => [d.n, d.yield])), d => d.season_year)
+  .map(([year, y]) => ({year, y})).sort((a, b) => a.year - b.year)
+resp = RATES.map(n => {
+  const v = years.filter(d => d.n === n).map(d => d.yield)
+  return {n, mean: d3.mean(v), p10: d3.quantile(v, 0.1), p50: d3.quantile(v, 0.5), p90: d3.quantile(v, 0.9)}
+})
+aeModel = d3.mean(byYear, d => (d.y[60] - d.y[0]) / 60)
+anchor = KIWIA_AEN / (aeModel * MARKET)
+vcrClass = v => v < 1 ? "below 1: loses money" : v < 2 ? "1 to 2: pays back" : v < 4 ? "2 to 4: doubles the money" : "4 or more: safe bet"
+vcrColor = ({domain: ["below 1: loses money", "1 to 2: pays back", "2 to 4: doubles the money", "4 or more: safe bet"],
+             range: ["#c0392b", "#e0a030", "#7fb3d5", "#1f5f99"]})
+```
+
+| Setup | |
+|---|---|
+| Area | 34.6-35.6 E, 0.1-1.1 N, western Kenya (counties below) |
+| Crop map | MapSPAM 2020 maize, physical area [@spam2020] |
+| Weather, soil | AgERA5 1990-2024 [@agera5]; SoilGrids 2.0 [@poggio2021], one profile per 0.1° cell |
+| Crop, template | CERES-Maize, hybrid H610 (DSSAT cultivar IB0060), template `XDMZ8201.MZX`; the model simulates water and nitrogen (phosphorus, potassium and diseases are off) |
+| Treatments | rainfed; 0, 60, 120 or 180 kg N/ha as urea, a third at sowing and two thirds 35 days later |
+| Sowing | 15 March every year, the long rains |
+| Years | 1991-2023, 33 seasons |
+| Prices | maize: WFP monthly wholesale price, Eldoret [@wfp_kenya_prices]; fertiliser: three bag prices reported in 2022 and 2023 [@capitalfm2022; @capitalfm2023] |
+| Boundaries | edge-matched OCHA administrative boundaries (COD-AB) from HDX: [Kenya](https://data.humdata.org/dataset/cod-ab-ken) (IEBC), [Uganda](https://data.humdata.org/dataset/cod-ab-uga) (UBOS), CC BY-IGO |
+| Experiment file | [`configs/cases/kenya-maize.yml`](https://github.com/bennyistanto/xdssat/blob/main/configs/cases/kenya-maize.yml) |
+
+```{ojs}
+html`<div class="kpi-row">
+  <div class="kpi"><div class="v">${fmt.int(S.seasons_total)}</div><div class="l">maize seasons simulated (4 run folders)</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.failed_total)}</div><div class="l">seasons the engine rejected</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.cells)}</div><div class="l">0.1° weather cells with maize</div></div>
+  <div class="kpi"><div class="v">${fmt.int(S.ha)} ha</div><div class="l">of maize, MapSPAM 2020</div></div>
+  <div class="kpi"><div class="v">${S.maize_price_months}</div><div class="l">months of Eldoret maize prices</div></div>
+</div>`
+```
+
+## Where
+
+```{ojs}
+md`The study box sits in western Kenya, east of the border with Uganda.
+${B.box_adm1.map((u, i) => `${u.name}${i === 0 ? " takes" : ""} ${fmt.pct(u.share_of_box)}${i === 0 ? " of it" : ""}${
+  u.share_of_unit_in_box >= 0.9 ? ` (nearly all of the county lies inside)` : ""}`).join(", ")}. The maize prices used below are
+those of the Eldoret market in Uasin Gishu. Maize grows on ${fmt.int(S.ha)} ha of the box (MapSPAM 2020), in
+${S.cells} of the 0.1° weather cells.`
+```
+
+```{ojs}
+maize = cells.filter(d => d.ha > 0)
+html`<div class="map-pair">
+  ${withDownload(locatorMap(Plot, countries, B, {width: 280, height: 280}), "kenya_locator", "red: the study box")}
+  ${withDownload(Plot.plot({
+    width: 420, height: 420,
+    projection: {type: "equirectangular", domain: boxPolygon([B.box[0] - 0.05, B.box[1] - 0.05, B.box[2] + 0.05, B.box[3] + 0.05])},
+    color: {scheme: "YlGn", legend: true, label: "Maize in the cell (ha, MapSPAM 2020)"},
+    marks: [
+      Plot.geo(cellFeatures(maize), {fill: d => d.properties.ha, stroke: "white", strokeWidth: 0.3}),
+      ...placeMarks(Plot, adm1, adm2, {labels: "adm1"}),
+      Plot.geo(boxPolygon(B.box), {stroke: "#d0021b", strokeWidth: 1.5, fill: "none"}),
+      Plot.tip(maize, Plot.pointer({x: "lon", y: "lat",
+        title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E\nmaize ${fmt.int(d.ha)} ha`})),
+      Plot.frame({stroke: "#bbb"})
+    ]
+  }), "kenya_maize_area", "0.1° cells; bold: counties, thin: sub-counties")}
+</div>`
+```
+
+## Four bags, four harvests
+
+A 50 kg bag of urea holds 23 kg of nitrogen. The question a maize grower asks is simple: does the grain the
+bag adds sell for more than the bag costs? Here the same hybrid, in the same fields, is grown with no
+nitrogen, 60, 120 and 180 kg per hectare, in each of 33 long-rains seasons.
+
+```{ojs}
+md`Averaged over the 33 seasons, the model's maize yields **${fmt.int(resp[0].mean)} kg/ha** without nitrogen and
+**${fmt.int(resp[1].mean)}**, **${fmt.int(resp[2].mean)}** and **${fmt.int(resp[3].mean)} kg/ha** with 60, 120 and 180 kg
+(dry matter). Each of the first 60 kg adds **${fmt.d1(aeModel)} kg** of grain. The response does not flatten
+within the range tested. FAOSTAT puts Kenya's national maize yield at 1.56-1.77 t/ha in 2018-2020
+(<a href="#ref-faostat_qcl">FAO 2025</a>): the model's crop without any fertiliser already out-yields the country's average field.`
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 320, marginLeft: 60,
+  x: {label: "Nitrogen applied (kg N/ha)", ticks: RATES},
+  y: {label: "Grain yield, kg/ha (area-weighted, dry matter)", grid: true, domain: [0, 13000]},
+  marks: [
+    Plot.areaY(resp, {x: "n", y1: "p10", y2: "p90", fill: "#2b6cb0", fillOpacity: 0.15}),
+    Plot.rectY([{y1: 1560, y2: 1774}], {x1: 0, x2: 180, y1: "y1", y2: "y2", fill: "#c98b2b", fillOpacity: 0.35}),
+    Plot.text([{x: 178, y: 1774}], {x: "x", y: "y", text: () => "FAOSTAT Kenya, 2018-2020", textAnchor: "end", dy: -8, fill: "#8a5a12"}),
+    Plot.line(resp, {x: "n", y: "mean", stroke: "#2b6cb0", strokeWidth: 2.5}),
+    Plot.dot(resp, {x: "n", y: "mean", fill: "#2b6cb0", r: 5, tip: true,
+      title: d => `${d.n} kg N/ha\nmean ${fmt.int(d.mean)} kg/ha\nmedian ${fmt.int(d.p50)}\n10th-90th percentile ${fmt.int(d.p10)}-${fmt.int(d.p90)}`}),
+    Plot.ruleY([0])
+  ]
+}), "kenya_n_response", "line: mean of 33 seasons; band: 10th-90th percentile; brown: FAOSTAT national yield")
+```
+
+## The model's answer: always
+
+The value-cost ratio (VCR) divides the value of the extra grain by the cost of the fertiliser that grew it.
+At 1 the bag pays for itself; 2, a 100% return, is the usual bar for fertiliser to be worth buying, and 4 is
+proposed where weather and prices are risky and farmers short of cash [@kiwia2022]. Set the two prices
+below; the charts on the rest of the page follow them. The maize slider covers the range of the monthly
+Eldoret wholesale price in 2021-2026.
+
+```{ojs}
+viewof maizePrice = Inputs.range([20, 95], {value: S.maize_price_ksh_kg.median, step: 0.5, label: "Maize price (KSh per kg of grain)"})
+viewof nPrice = Inputs.radio(new Map([
+  ["Subsidised bag, 2023: KSh 2,500 per 50 kg", S.n_price_ksh_kg_n["subsidised 2023"]],
+  ["Subsidised urea, 2022: KSh 3,500 per 50 kg", S.n_price_ksh_kg_n["subsidised 2022"]],
+  ["Market urea, 2022: KSh 6,500 per 50 kg", S.n_price_ksh_kg_n["market 2022"]]]),
+  {value: S.n_price_ksh_kg_n["market 2022"], label: "Fertiliser price"})
+viewof stepPick = Inputs.radio(new Map([["0 to 60 kg N", 0], ["60 to 120", 1], ["120 to 180", 2]]), {value: 0, label: "Step"})
+```
+
+```{ojs}
+vcr = (row, a, b, s) => s * maizePrice * MARKET * (row.y[b] - row.y[a]) / (nPrice * (b - a))
+vcrYears = byYear.map(r => {
+  const [a, b] = STEPS[stepPick], v = vcr(r, a, b, share)
+  return {year: r.year, vcr: v, gain: r.y[b] - r.y[a], cls: vcrClass(v)}
+})
+md`At **${fmt.d1(maizePrice)} KSh/kg** for maize and **${fmt.int(nPrice)} KSh** per kg of nitrogen, the step from
+${stepName(stepPick)} has a median VCR of **${fmt.d1(d3.median(vcrYears, d => d.vcr))}**${share < 1 ?
+` with the farm getting ${fmt.pct(share)} of the model's response` : ""}. It pays back in
+**${fmt.pct(d3.mean(vcrYears, d => d.vcr >= 1))}** of the 33 seasons, doubles the money in
+**${fmt.pct(d3.mean(vcrYears, d => d.vcr >= 2))}** and passes the risk-proof bar of 4 in
+**${fmt.pct(d3.mean(vcrYears, d => d.vcr >= 4))}**.`
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 300, marginLeft: 50,
+  x: {label: null, type: "band", tickFormat: d => d % 5 === 0 ? String(d) : ""},
+  y: {label: `Value-cost ratio, ${stepName(stepPick)}`, grid: true},
+  color: {legend: true, ...vcrColor},
+  marks: [
+    Plot.barY(vcrYears, {x: "year", y: "vcr", fill: "cls", inset: 1, tip: true,
+      title: d => `${d.year}\nextra grain ${fmt.int(d.gain)} kg/ha (dry)\nVCR ${fmt.d1(d.vcr)}`}),
+    Plot.ruleY([1, 2, 4], {stroke: "#333", strokeDasharray: "3,3"}),
+    Plot.ruleY([0])
+  ]
+}), "kenya_vcr_by_year", "one bar per long-rains season; dashed lines at VCR 1, 2 and 4")
+```
+
+## How wrong can the model be?
+
+```{ojs}
+md`Too good to be true? The model's field has no weeds, pests or diseases and never runs short of phosphorus
+or potassium; its hybrid grows with DSSAT's standard coefficients. Farm fields are not like that. In 2009-2013 maize trials on farms in Kakamega, Busia and Embu counties, each of the first 60 kg of
+nitrogen (given with 20-22 kg phosphorus) added about **${KIWIA_AEN} kg** of grain, a VCR of about 2, and the
+fertilised plot yielded less than the unfertilised one in 24% of the trials (<a href="#ref-kiwia2022">Kiwia et al. 2022</a>). The model adds
+**${fmt.d1(aeModel * MARKET)} kg** of grain at 14% moisture: the trial farms got about
+**${fmt.pct(anchor)}** of the model's response (the trials do not state the grain moisture; on a dry basis the
+share would be ${fmt.pct(KIWIA_AEN / aeModel)}).
+
+So the model's kilograms are not to be trusted, but its answer can be tested for how much error it can
+absorb. The slider below scales the model's response down to the share a real farm gets. Every chart on the
+page follows it.`
+```
+
+```{ojs}
+viewof share = Inputs.range([0.05, 1], {value: 1, step: 0.01, label: "Share of the model's response a farm gets"})
+viewof thr = Inputs.radio(new Map([["1: costs back", 1], ["2: doubles the money", 2], ["4: safe under risk", 4]]),
+  {value: 2, label: "A step pays when its VCR is at least"})
+```
+
+```{ojs}
+curve = d3.range(0.05, 1.0001, 0.01).flatMap(s => STEPS.map(([a, b], k) => ({
+  s, step: stepName(k), frac: d3.mean(byYear, r => vcr(r, a, b, s) >= thr)})))
+half = STEPS.map(([a, b], k) => ({step: stepName(k), s50: thr / d3.median(byYear, r => vcr(r, a, b, 1))}))
+md`With these prices, the first 60 kg still reach a VCR of ${thr} in half of the seasons as long as a farm gets at
+least **${fmt.pct(half[0].s50)}** of the model's response${half[0].s50 > anchor ? ", **more than the trial farms got**" :
+", less than the trial farms got"}. For the step from 120 to 180 kg the bar is **${fmt.pct(half[2].s50)}**.
+${half.some(h => h.s50 > 1) ? "A share above 100% means the step does not reach the bar in half the seasons even at the model's full response." : ""}`
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 320, marginLeft: 60,
+  x: {label: "Share of the model's response a farm gets", tickFormat: "%", domain: [0, 1]},
+  y: {label: `Share of seasons with VCR of at least ${thr}`, tickFormat: "%", domain: [0, 1], grid: true},
+  color: {legend: true, domain: STEPS.map((_, k) => stepName(k)), range: ["#1f5f99", "#4f9a6a", "#c98b2b"]},
+  marks: [
+    Plot.ruleX([anchor], {stroke: "#888", strokeDasharray: "4,3"}),
+    Plot.text([anchor], {x: d => d, y: 1, text: () => "Kenya trials", textAnchor: "start", dx: 4, dy: 6, fill: "#666"}),
+    Plot.ruleX([share], {stroke: "#d0021b"}),
+    Plot.line(curve, {x: "s", y: "frac", stroke: "step", strokeWidth: 2}),
+    Plot.tip(curve, Plot.pointerX({x: "s", y: "frac",
+      title: d => `${d.step}\nfarm gets ${fmt.pct(d.s)} of the model's response\nVCR >= ${thr} in ${fmt.pct(d.frac)} of seasons`}))
+  ]
+}), "kenya_breakeven_share", "red: the share chosen above; dashed: on-farm trials in Kenya (Kiwia et al. 2022)")
+```
+
+## The price of a sack
+
+The weather is not the only risk. The same bag bought at planting is repaid by grain sold months later, at
+whatever price the market then pays.
+
+```{ojs}
+pMin = price.reduce((a, b) => (b.ksh_kg < a.ksh_kg ? b : a))
+pMax = price.reduce((a, b) => (b.ksh_kg > a.ksh_kg ? b : a))
+md`Eldoret's wholesale maize price ranged from **${fmt.d1(pMin.ksh_kg)} KSh/kg** (${pMin.date.toISOString().slice(0, 7)}) to
+**${fmt.d1(pMax.ksh_kg)} KSh/kg** (${pMax.date.toISOString().slice(0, 7)}) in the ${price.length} months on record.`
+```
+
+```{ojs}
+priceBar = {
+  const [a, b] = STEPS[stepPick]
+  const gain = d3.median(byYear, r => r.y[b] - r.y[a])
+  return thr * nPrice * (b - a) / (share * MARKET * gain)
+}
+below = price.filter(d => d.ksh_kg < priceBar).length
+md`For the step from ${stepName(stepPick)}, with the farm getting ${fmt.pct(share)} of the model's response, a
+median season reaches a VCR of ${thr} only when maize sells above **${fmt.d1(priceBar)} KSh/kg**. Eldoret's
+wholesale price was below that in **${below} of ${price.length}** months.`
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 280, marginLeft: 60,
+  x: {label: null, type: "utc"},
+  y: {label: "Maize, wholesale, Eldoret (KSh/kg)", grid: true, domain: [0, Math.max(d3.max(price, d => d.ksh_kg) * 1.08, priceBar * 1.1)]},
+  marks: [
+    Plot.areaY([{x: d3.min(price, d => d.date)}, {x: d3.max(price, d => d.date)}],
+      {x: "x", y1: 0, y2: priceBar, fill: "#c0392b", fillOpacity: 0.08}),
+    Plot.ruleY([priceBar], {stroke: "#c0392b", strokeDasharray: "4,3"}),
+    Plot.ruleY([maizePrice], {stroke: "#2b6cb0"}),
+    Plot.line(price, {x: "date", y: "ksh_kg", stroke: "#333", strokeWidth: 1.5}),
+    Plot.dot(price, {x: "date", y: "ksh_kg", r: 2.5, fill: d => d.ksh_kg < priceBar ? "#c0392b" : "#333", tip: true,
+      title: d => `${d.date.toISOString().slice(0, 7)}\n${fmt.d1(d.ksh_kg)} KSh/kg\n${d.ksh_kg < priceBar ? "below" : "above"} the price for VCR ${thr}`})
+  ]
+}), "kenya_maize_price", "WFP monthly wholesale price, white maize, 90 kg bags; red: below the price at which the step reaches the chosen VCR; blue: price chosen above")
+```
+
+## How far to go, cell by cell
+
+```{ojs}
+cellsK = cells.filter(d => d["180"] > 0).map(d => {
+  const m = RATES.map(n => share * maizePrice * MARKET * (d[String(n)] - d["0"]) - nPrice * n)
+  return {...d, best: RATES[m.indexOf(d3.max(m))], y0: d["0"], first: d["60"] - d["0"], gain: d3.max(m)}
+})
+bestHa = d3.rollups(cellsK, v => d3.sum(v, d => d.ha), d => d.best)
+totalHa = d3.sum(cellsK, d => d.ha)
+md`For each weather cell, the rate with the highest mean margin (the grain value it adds minus the fertiliser
+cost) at the prices and share chosen above:
+${RATES.map(n => { const h = (bestHa.find(e => e[0] === n) || [n, 0])[1]; return `**${n} kg N** on ${fmt.pct(h / totalHa)} of the maize area` }).join(", ")}.`
+```
+
+```{ojs}
+viewof mapMetric = Inputs.radio(new Map([["Best N rate", "best"], ["Yield without N", "y0"], ["Grain from the first 60 kg", "first"]]),
+  {value: "best", label: "Map"})
+```
+
+```{ojs}
+withDownload(Plot.plot({
+  height: 460, aspectRatio: 1,
+  projection: {type: "equirectangular", domain: cellFeatures(cellsK)},
+  color: mapMetric === "best"
+    ? {type: "ordinal", domain: RATES, range: ["#f1e3c6", "#9ecae1", "#4292c6", "#08306b"], legend: true, label: "Best N rate (kg N/ha)"}
+    : {scheme: "YlGnBu", legend: true, label: mapMetric === "y0" ? "Mean yield without N (kg/ha, dry)" : "Grain from the first 60 kg N (kg/ha, dry)"},
+  marks: [
+    Plot.geo(cellFeatures(cellsK), {fill: d => d.properties[mapMetric], stroke: "white", strokeWidth: 0.4}),
+    ...placeMarks(Plot, adm1, adm2, {labels: "adm1", fontSize: 9}),
+    Plot.tip(cellsK, Plot.pointer({x: "lon", y: "lat",
+      title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E\nbest rate ${d.best} kg N/ha\nyield: ` +
+        RATES.map(n => `${n} N ${fmt.int(d[String(n)])}`).join(", ") + ` kg/ha\nmaize ${fmt.int(d.ha)} ha`})),
+    Plot.frame()
+  ]
+}), "kenya_cell_map", "0.1° AgERA5 cells with maize in MapSPAM 2020; mean of 33 seasons")
+```
+
+## What this does not say
+
+- **Uncalibrated.** H610 runs with DSSAT's own coefficients, in a field without weeds, pests, diseases or
+  phosphorus shortage. Its kilograms are not a forecast of farm yields; the share slider is there for
+  that reason.
+- **A rich soil.** Without fertiliser the model's crop still takes up about 100 kg N/ha a season from the
+  soil, mineralised from the SoilGrids organic matter. A poorer soil would make nitrogen worth more, a
+  richer one less.
+- **Only the bag.** The VCR counts the fertiliser price alone: no transport, labour, credit or the cost of
+  phosphorus that farmers usually buy with it. The 2023 subsidised price was reported without the type of
+  fertiliser and is priced here as urea.
+- **Prices from 2021-2026, weather from 1991-2023.** Every season is valued at the 2021-2026 price range, and one
+  market stands for the whole box.
+- **One sowing date.** Every season is sown on 15 March. A late start of the rains is a different
+  experiment (see [Niger - Millet](niger.qmd)).
+
+## Run it yourself
+
+```bash
+python scripts/prepare_weather.py   --config configs/cases/kenya-maize.yml
+python scripts/prepare_crop_mask.py --config configs/cases/kenya-maize.yml
+python scripts/prepare_soils.py     --config configs/cases/kenya-maize.yml --aoi kenya_maize
+python scripts/run_aoi.py           --config configs/cases/kenya-maize.yml
+python docs/scripts/export_cases.py kenya --wfp <folder>/wfp_food_prices_ken.csv
+```
+
+The export reads WFP's Kenya price file, downloaded from the Humanitarian Data Exchange
+([`wfp_food_prices_ken.csv`](https://data.humdata.org/dataset/wfp-food-prices-for-kenya), CC BY-IGO). The three-year version of this
+area ships with xdssat: `example-inputs/kenya_maize/` ([Examples](../xdssat/examples.qmd)).

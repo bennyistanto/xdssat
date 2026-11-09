@@ -31,9 +31,9 @@ The [DSSAT training](../learn/index.qmd) modules use the same building blocks on
 From the repository README; the module docstrings hold the details and the measured facts.
 :::
 
-## Runs of the case study
+## Runs of the Java case study
 
-Every run folder in the cache, with its size and wall time (the case study's runs):
+Every run folder of the Java rice case study in the cache, with its size and wall time:
 
 ```{ojs}
 withDownload(Plot.plot({
@@ -52,5 +52,5 @@ The current run simulated ${fmt.int(cur.seasons)} seasons with ${fmt.int(cur.fai
 
 - [How xdssat differs from common DSSAT use](gridding.qmd): gridding, data preparation, chunked runs, netCDF.
 - [Implementation](implementation.qmd): each script, the settings that change its result, and its outputs.
-- [Getting started](../getting-started.md): setup from an empty machine.
+- [Getting started](getting-started.md): setup from an empty machine.
 - [Input data](data.qmd): what each input must be, how to prepare your own, and the alternatives.

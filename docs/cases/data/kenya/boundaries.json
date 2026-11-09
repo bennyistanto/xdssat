@@ -1,0 +1,74 @@
+{
+ "case": "kenya",
+ "iso3": "KEN",
+ "country": "Kenya",
+ "box": [
+  34.6,
+  0.1,
+  35.6,
+  1.1
+ ],
+ "box_adm1": [
+  {
+   "name": "Uasin Gishu",
+   "share_of_unit_in_box": 0.95,
+   "share_of_box": 0.262
+  },
+  {
+   "name": "Kakamega",
+   "share_of_unit_in_box": 0.717,
+   "share_of_box": 0.175
+  },
+  {
+   "name": "Nandi",
+   "share_of_unit_in_box": 0.62,
+   "share_of_box": 0.143
+  },
+  {
+   "name": "Elgeyo-Marakwet",
+   "share_of_unit_in_box": 0.562,
+   "share_of_box": 0.137
+  },
+  {
+   "name": "Bungoma",
+   "share_of_unit_in_box": 0.552,
+   "share_of_box": 0.135
+  },
+  {
+   "name": "Trans Nzoia",
+   "share_of_unit_in_box": 0.65,
+   "share_of_box": 0.131
+  },
+  {
+   "name": "Vihiga",
+   "share_of_unit_in_box": 0.34,
+   "share_of_box": 0.016
+  }
+ ],
+ "country_bounds": [
+  33.91,
+  -4.742,
+  41.907,
+  4.631
+ ],
+ "dataset": "Edge-matched administrative boundaries from OCHA COD-AB (HDX)",
+ "sources": {
+  "KEN": {
+   "src_name": "IEBC",
+   "src_lic": "Creative Commons Attribution for Intergovernmental Organisations",
+   "src_url": "https://data.humdata.org/dataset/cod-ab-ken",
+   "src_update": "2021-09-28"
+  },
+  "UGA": {
+   "src_name": "Uganda Bureau of Statistics with support from WHO",
+   "src_lic": "Creative Commons Attribution for Intergovernmental Organisations",
+   "src_url": "https://data.humdata.org/dataset/cod-ab-uga",
+   "src_update": "2020-08-28"
+  }
+ },
+ "files": {
+  "countries.geojson": 11865,
+  "adm1.geojson": 34204,
+  "adm2.geojson": 84639
+ }
+}

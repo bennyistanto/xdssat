@@ -31,7 +31,7 @@ cli = ({
 
 Setup from an empty machine (Python environment, building or reusing the DSSAT engine, data locations,
 timings on the reference machine) is in
-[`docs/getting-started.md`](https://github.com/bennyistanto/xdssat/blob/main/docs/getting-started.md). This
+[`docs/xdssat/getting-started.md`](https://github.com/bennyistanto/xdssat/blob/main/docs/xdssat/getting-started.md). This
 page does not repeat it; it maps each step to its script and to the settings that change the result.
 
 ## Settings: where things live
@@ -77,7 +77,7 @@ Inputs.table(settings, {header: {setting: "config.py name", variable: "Environme
 
 ::: {.source-note}
 Compiled from the scripts' docstrings and their `--help` (below). Step order and timings:
-`docs/getting-started.md`, section 6.
+`docs/xdssat/getting-started.md`, section 6.
 :::
 
 ### `run_aoi.py`: the options that change the simulation

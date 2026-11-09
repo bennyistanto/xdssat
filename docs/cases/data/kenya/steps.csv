@@ -1,0 +1,28 @@
+maize_price,n_price,step,vcr_median,share_pays,share_vcr2
+low (p10),subsidised 2023,0-60,11.5,1.0,1.0
+low (p10),subsidised 2023,60-120,15.559,1.0,1.0
+low (p10),subsidised 2023,120-180,12.885,1.0,1.0
+low (p10),subsidised 2022,0-60,8.215,1.0,1.0
+low (p10),subsidised 2022,60-120,11.113,1.0,1.0
+low (p10),subsidised 2022,120-180,9.203,1.0,1.0
+low (p10),market 2022,0-60,4.423,1.0,1.0
+low (p10),market 2022,60-120,5.984,1.0,1.0
+low (p10),market 2022,120-180,4.956,1.0,1.0
+median,subsidised 2023,0-60,15.333,1.0,1.0
+median,subsidised 2023,60-120,20.744,1.0,1.0
+median,subsidised 2023,120-180,17.179,1.0,1.0
+median,subsidised 2022,0-60,10.952,1.0,1.0
+median,subsidised 2022,60-120,14.817,1.0,1.0
+median,subsidised 2022,120-180,12.27,1.0,1.0
+median,market 2022,0-60,5.897,1.0,1.0
+median,market 2022,60-120,7.978,1.0,1.0
+median,market 2022,120-180,6.607,1.0,1.0
+high (p90),subsidised 2023,0-60,26.203,1.0,1.0
+high (p90),subsidised 2023,60-120,35.45,1.0,1.0
+high (p90),subsidised 2023,120-180,29.357,1.0,1.0
+high (p90),subsidised 2022,0-60,18.716,1.0,1.0
+high (p90),subsidised 2022,60-120,25.321,1.0,1.0
+high (p90),subsidised 2022,120-180,20.969,1.0,1.0
+high (p90),market 2022,0-60,10.078,1.0,1.0
+high (p90),market 2022,60-120,13.635,1.0,1.0
+high (p90),market 2022,120-180,11.291,1.0,1.0

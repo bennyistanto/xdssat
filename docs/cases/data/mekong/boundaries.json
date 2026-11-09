@@ -1,0 +1,94 @@
+{
+ "case": "mekong",
+ "iso3": "VNM",
+ "country": "Viet Nam",
+ "box": [
+  105.2,
+  9.7,
+  106.2,
+  10.7
+ ],
+ "box_adm1": [
+  {
+   "name": "Dong Thap",
+   "share_of_unit_in_box": 0.702,
+   "share_of_box": 0.196
+  },
+  {
+   "name": "An Giang",
+   "share_of_unit_in_box": 0.412,
+   "share_of_box": 0.12
+  },
+  {
+   "name": "Vinh Long",
+   "share_of_unit_in_box": 0.955,
+   "share_of_box": 0.12
+  },
+  {
+   "name": "Can Tho city",
+   "share_of_unit_in_box": 1.0,
+   "share_of_box": 0.119
+  },
+  {
+   "name": "Kien Giang",
+   "share_of_unit_in_box": 0.206,
+   "share_of_box": 0.107
+  },
+  {
+   "name": "Hau Giang",
+   "share_of_unit_in_box": 0.763,
+   "share_of_box": 0.102
+  },
+  {
+   "name": "Tien Giang",
+   "share_of_unit_in_box": 0.409,
+   "share_of_box": 0.081
+  },
+  {
+   "name": "Long An",
+   "share_of_unit_in_box": 0.152,
+   "share_of_box": 0.056
+  },
+  {
+   "name": "Soc Trang",
+   "share_of_unit_in_box": 0.164,
+   "share_of_box": 0.045
+  },
+  {
+   "name": "Tra Vinh",
+   "share_of_unit_in_box": 0.224,
+   "share_of_box": 0.042
+  },
+  {
+   "name": "Ben Tre",
+   "share_of_unit_in_box": 0.06,
+   "share_of_box": 0.012
+  }
+ ],
+ "country_bounds": [
+  102.144,
+  8.381,
+  109.468,
+  23.393
+ ],
+ "dataset": "Edge-matched administrative boundaries from OCHA COD-AB (HDX)",
+ "sources": {
+  "KHM": {
+   "src_name": "Department of Geography of the Ministry of Land Management, Urbanization and Construction in 2008, WFP",
+   "src_lic": "Creative Commons Attribution for Intergovernmental Organisations",
+   "src_url": "https://data.humdata.org/dataset/cod-ab-khm",
+   "src_update": "2018-10-16"
+  },
+  "VNM": {
+   "src_name": "Government of Viet Nam",
+   "src_lic": "Creative Commons Attribution for Intergovernmental Organisations",
+   "src_url": "https://data.humdata.org/dataset/cod-ab-vnm",
+   "src_update": "2020-10-27"
+  }
+ },
+ "files": {
+  "countries.geojson": 49441,
+  "adm1.geojson": 43195,
+  "adm2.geojson": 97413
+ }
+}

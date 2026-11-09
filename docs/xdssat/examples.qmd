@@ -1,0 +1,121 @@
+---
+title: "Examples"
+subtitle: "Five small areas with their inputs prepared from public data, ready to run"
+---
+
+`example-inputs/` holds five areas of about 1 x 1 degree, each with an experiment file
+and its prepared inputs, for the agricultural years 2018-2020. They run without any
+source data: the Python environment, the DSSAT engine and three folders are all they
+need ([Getting started](getting-started.md#run-an-example-first)).
+
+```bash
+python scripts/run_aoi.py --config example-inputs/<area>/experiment.yml
+```
+
+| Area | Crop and model | Template | Box (W, S, E, N) |
+|---|---|---|---|
+| [`kenya_maize`](#western-kenya-maize) | maize, CERES-Maize | `XDMZ8201.MZX` | 34.6, 0.1, 35.6, 1.1 |
+| [`mekong_rice`](#mekong-delta-rice) | rice, CERES-Rice | `XDRI8601.RIX` | 105.2, 9.7, 106.2, 10.7 |
+| [`niger_millet`](#niger-pearl-millet) | pearl millet, CERES-Millet | `XDML8601.MLX` | 2.0, 13.0, 3.0, 14.0 |
+| [`java_rice`](#west-java-rice) | rice, CERES-Rice | `XDRI8601.RIX` | 107.5, -7.0, 108.5, -6.0 |
+| [`java_maize`](#east-java-maize) | maize, CERES-Maize | `XDMZ8201.MZX` | 111.4, -8.0, 112.4, -7.0 |
+
+## What an example holds
+
+```
+example-inputs/<area>/
+    experiment.yml                    every section written out
+    inputs/weather/agera5_<area>/     daily AgERA5, 0.1 degree, one file per variable and year
+    inputs/crop_mask/<crop>_spam2020_<area>/   MapSPAM 2020 physical area of the crop
+    inputs/soil/soilgrids_<area>/     one SoilGrids profile per weather cell with crop
+    inputs/water_regime/...           MapSPAM 2020 irrigated share (Mekong, West and East Java)
+```
+
+The experiment file sets `paths > datasets` to its own folder, so a run reads these
+datasets and writes its run folders to `<paths > cache>/runs`. Its `prepare` section
+says how each dataset was made; `python scripts/make_example_inputs.py` makes them
+again from the source archives (AgERA5, the SoilGrids mirror, the MapSPAM zip).
+
+**Sources and licences.** All three are CC BY 4.0, read from each dataset's own record
+on 9 November 2026: AgERA5 [@agera5] (Climate Data Store), SoilGrids 2.0 [@poggio2021]
+(ISRIC), MapSPAM 2020 v2r2 [@spam2020] (IFPRI terms of the Dataverse record). Each
+`input.json` names its source and licence. Using the examples needs the same attribution.
+
+**What the examples are not.** The calendars are placeholders, the cultivars are library
+entries of the engine's cultivar files, and nothing is calibrated (SLPF 1): the results
+show how the model responds to weather, soil and management, not farm yields. Each area
+has no region input; its box alone decides which crop counts.
+
+## Results
+
+**Tested** with each experiment file as shipped, agricultural years 2018-2020, all cells,
+uncalibrated (SLPF 1). Yield is area-weighted grain yield (HWAH, dry matter). FAOSTAT is
+the national yield of the same years [@faostat_qcl], for scale only: it covers the whole
+country, all varieties and all management.
+
+| Area | Seasons | Failed | Yield (kg/ha) | FAOSTAT 2018-2020 (t/ha) |
+|---|---|---|---|---|
+| `kenya_maize` | 417 | 0 | 5,427 | Kenya maize 1.77, 1.56, 1.77 |
+| `mekong_rice` | 1,089 | 0 | 8,367 dong xuan, 7,478 he thu (irrigated) | Viet Nam rice 5.82, 5.84, 5.92 |
+| `niger_millet` | 396 per N rate | 0 | 941 at 0 kg N, 989 at 45 kg N | Niger millet 0.55, 0.48, 0.52 |
+| `java_rice` | 573 | 0 | 7,364 wet, 7,438 dry (irrigated); 8,486 wet (rainfed) | Indonesia rice 5.20, 5.11, 5.13 |
+| `java_maize` | 744 | 0 | 10,131 wet, 9,337 dry (irrigated); 10,079 wet, 8,842 dry (rainfed) | Indonesia maize 5.31, 6.14, 5.53 |
+
+Each run took under a minute on 8 workers.
+
+### Western Kenya maize
+
+Box 34.6-35.6 E, 0.1-1.1 N, the highlands around Kitale and Eldoret: 350,557 ha of
+MapSPAM maize in 139 weather cells, all rainfed (MapSPAM gives 0.1% irrigated). Hybrid H610
+(`IB0060`, "H610(UH)" in `MZCER048.CUL`), 60 kg N/ha, sown on 15 March for the long rains.
+Seasons took a median 191 to 197 days from sowing to maturity, so `run > season_days` is
+300. Season rain was 1,050 to 1,596 mm (medians by year).
+
+### Mekong Delta rice
+
+Box 105.2-106.2 E, 9.7-10.7 N (An Giang, Can Tho, Dong Thap): 920,503 ha of MapSPAM
+rice in 121 cells, 99.8% irrigated. The rice template of the Java case study
+(`XDRI8601.RIX`: transplanted, flooded) with IR 64 at 105 kg N/ha, in two seasons: dong
+xuan (winter-spring, transplanted on 1 December) and he thu (summer-autumn, 20 April).
+The template transplants seedlings; a direct-seeded crop needs a template that sows.
+Irrigation was 864 to 1,054 mm in dong xuan and 434 to 576 mm in he thu (medians by year).
+
+### Niger pearl millet
+
+Box 2.0-3.0 E, 13.0-14.0 N, around Niamey and the ICRISAT Sahelian Centre at Sadore:
+180,362 ha of MapSPAM pearl millet in 132 cells, rainfed. The template `XDML8601.MLX` is
+the Sadore experiment ITSC8601 (1986) as DSSAT ships it: cultivar CIVT, 3 plants/m2, with
+0 or 45 kg N/ha. Run at Sadore with the experiment's own weather and soil, the engine
+gives 156 and 617 kg/ha against 280 and 480 kg/ha observed (`ITSC8601.MLA`).
+
+Sowing date matters most here. **Tested** on a 20-cell sample, 2018-2020, 45 kg N/ha:
+sown on 20 June (the template's date is 17 June) 206 kg/ha; with initial soil water 0.6
+instead of 0.3, 447 kg/ha; sown on 5 July, 920 kg/ha. The example sows on 5 July. AgERA5
+June-September rain in these cells was a median 265, 291 and 307 mm in 2018, 2019 and
+2020; the Sadore station file of the experiment has 546 mm for June-September 1986. The
+response to N is small (941 against 989 kg/ha), in line with seasons that water limits.
+
+### West Java rice
+
+Box 107.5-108.5 E, 7.0-6.0 S, the north-coast plain of Karawang, Subang and Indramayu:
+273,945 ha of MapSPAM rice in 92 cells, 93.6% irrigated. The settings of the Java case
+study on public data: the rice template `XDRI8601.RIX`, IR 58 at 140 kg N/ha, the wet
+season on 15 November for irrigated and rainfed rice, the dry season on 1 April for
+irrigated rice. The case study itself runs on the national maps (ATR/BPN 2024 rice fields,
+Ministry of Agriculture irrigation classes): [Case study: rice in Java](../java/index.qmd)
+and [alternative input data](../java/alternatives.qmd), which compares MapSPAM with them.
+One coastal cell had no SoilGrids data and takes its neighbour's profile.
+
+### East Java maize
+
+Box 111.4-112.4 E, 8.0-7.0 S (Madiun, Nganjuk, Kediri, Jombang): 60,787 ha of MapSPAM
+maize in 110 cells, 1% irrigated. The maize template with McCurdy 84aa, 120 kg N/ha, as
+[Another crop](another-crop.qmd) describes for the whole of East Java.
+
+## Make your own example
+
+`scripts/make_example_inputs.py` holds each area's settings (box, crop, template,
+cultivar, calendar). A new area needs a new entry there, the AgERA5 archive, the SoilGrids
+tiles of its box (`python scripts/fetch_soilgrids.py --config example-inputs/<area>/experiment.yml --aoi <area> --dry-run`
+counts the missing ones), and the MapSPAM files of its crop.
+

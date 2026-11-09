@@ -1,11 +1,15 @@
-# Getting started
+---
+title: "Getting started"
+aliases:
+  - ../getting-started.html
+---
 
 From an empty machine to a gridded rice run for Java. Each step says what it
 needs, what to run, and how long it took on the reference machine (Windows 11,
 2 x Intel Xeon Gold 6138: 40 cores, 80 logical processors; data on a local hard disk; measured November 2026).
 
 **Everything you set lives in one file.** Copy
-[`configs/rice-java.yml`](../configs/rice-java.yml) to `configs/xdssat.yml` and edit that copy:
+[`configs/rice-java.yml`](https://github.com/bennyistanto/xdssat/blob/main/configs/rice-java.yml) to `configs/xdssat.yml` and edit that copy:
 machine paths, area, cultivars, N rates, water regimes, planting calendar,
 scenarios (CO2, warming, calibration factors) and years. Every setting is
 explained in the file, with its range, its default and what happens if it is
@@ -18,6 +22,26 @@ including the line of the file to change:
 ```bash
 python scripts/check_setup.py
 ```
+
+## Run an example first
+
+`example-inputs/` holds five small areas with their inputs already prepared from
+public data (AgERA5, SoilGrids, MapSPAM 2020), each about 1 x 1 degree for the
+agricultural years 2018-2020: maize in western Kenya, rice in the Mekong Delta,
+pearl millet in Niger, rice in West Java and maize in East Java ([Examples](examples.qmd)).
+They need no source data: only the Python environment (section 1), the DSSAT
+engine (section 2), and three folders given as environment variables
+(PowerShell):
+
+```powershell
+$env:XDSSAT_ENGINE = "C:\TEMP\dsn\dssat"     # the engine folder (section 2)
+$env:XDSSAT_WORK = "C:\TEMP\dsn\work"        # short, local, outside OneDrive
+$env:XDSSAT_CACHE = "D:\xdssat-cache"        # where the run folders go
+python scripts/run_aoi.py --config example-inputs/kenya_maize/experiment.yml
+```
+
+Each example's `experiment.yml` reads the datasets of its own folder
+(`paths > datasets`) and writes its run folders to `<cache>/runs`.
 
 ## 0. What the pieces are
 
@@ -48,7 +72,7 @@ C:/TEMP/dsn/work/            run folders (paths > work)
 
 ## 1. Python environment
 
-Any environment with the packages in [`requirements.txt`](../requirements.txt)
+Any environment with the packages in [`requirements.txt`](https://github.com/bennyistanto/xdssat/blob/main/requirements.txt)
 works. Tested: Python 3.11 with pandas 3.0 (conda env `climate`) and Python
 3.12 with pandas 2.3 (miniforge base).
 
@@ -150,13 +174,13 @@ Do not point `paths > engine` at a folder inside OneDrive.
 ### One experiment file
 
 An experiment is **one YAML file** that holds everything a user changes. All of
-them live in [`configs/`](../configs/README.md). The reference is
-[`configs/rice-java.yml`](../configs/rice-java.yml): each section starts
+them live in [`configs/`](https://github.com/bennyistanto/xdssat/blob/main/configs/README.md). The reference is
+[`configs/rice-java.yml`](https://github.com/bennyistanto/xdssat/blob/main/configs/rice-java.yml): each section starts
 with what it is for, and every setting has a comment above it with what it
 means, its range, its default, and what happens if it is set too low or too
 high. As written it reproduces the standard Java run (IR 58, 140 kg N, uniform
 calendar, 1991-2020).
-[`configs/rice-java-all-options.yml`](../configs/rice-java-all-options.yml) is the same
+[`configs/rice-java-all-options.yml`](https://github.com/bennyistanto/xdssat/blob/main/configs/rice-java-all-options.yml) is the same
 case with every setting written out and every kind of option in use, as a menu to copy
 from.
 
@@ -209,7 +233,7 @@ xdssat.yml line 199, setting 'treatments > nitrogen_kg':
 
 ### Paths on several machines
 
-The seven folders under `paths` can also come from environment variables, which
+The eight folders under `paths` can also come from environment variables, which
 win over the file. One shared experiment file then runs on several machines,
 each with its own folders. None has a default; the third column is the reference
 machine's, as a pattern:
@@ -223,6 +247,7 @@ machine's, as a pattern:
 | `paths > inputs` | `XDSSAT_INPUTS` | `E:/temp` | rice and soil maps (`idn-lbs/`, `idn-soil/`) |
 | `paths > cache` | `XDSSAT_CACHE` | `E:/temp/xdssat` | everything the scripts build |
 | `paths > boundaries` | `XDSSAT_BOUNDARIES` | `F:/temp/hybrid-bias-correction/data/subset/bnd` | `idn_bnd_adm1.shp`, `idn_bnd_adm2.shp` (district and province layers, comparisons) |
+| `paths > datasets` | `XDSSAT_DATASETS` | not set (= `cache`) | the prepared inputs, `inputs/<kind>/<name>/`; set to read shipped datasets such as `example-inputs/<area>/` |
 
 A run needs `engine`, `work` and `cache`; the others are needed only to prepare
 the inputs. Set a variable permanently (PowerShell, current user):
@@ -233,7 +258,7 @@ the inputs. Set a variable permanently (PowerShell, current user):
 
 `python scripts/check_setup.py` prints every path, where its value came from
 (a line of the file, an environment variable, or the default) and the exact
-line to edit. The loader is [`src/config.py`](../src/config.py).
+line to edit. The loader is [`src/config.py`](https://github.com/bennyistanto/xdssat/blob/main/src/config.py).
 
 ## 4. Check the setup
 
@@ -251,7 +276,7 @@ that need the engine or the prepared caches are skipped when those are absent.
 ## 5. Source data of the Java case study
 
 The Java case study is built from these files. For another area, use your own
-data or the alternatives in [Input data](xdssat/data.qmd).
+data or the alternatives in [Input data](data.qmd).
 
 | Data | Expected location | Notes |
 |---|---|---|
@@ -268,7 +293,7 @@ A run reads six kinds of prepared input: weather, crop mask and soil
 (required), water regime, region and zones (optional). Each is a dataset in a
 standard form in `<paths > cache>/inputs/<kind>/<name>/`, and the `inputs`
 section of the experiment file names which dataset of each kind a run uses.
-[Input data](xdssat/data.qmd) describes each kind: what it is used for, the form
+[Input data](data.qmd) describes each kind: what it is used for, the form
 it must have, how to prepare it from your own files, and the global datasets to
 use when you have none.
 
@@ -302,8 +327,8 @@ Notes:
   names `configs/rice-java.yml` uses. For a cache made before that, run
   `python scripts/register_inputs.py` once.
 - What each step does and why is in the module docstrings:
-  [`agera5.py`](../src/agera5.py), [`rasters.py`](../src/rasters.py),
-  [`soils.py`](../src/soils.py).
+  [`agera5.py`](https://github.com/bennyistanto/xdssat/blob/main/src/agera5.py), [`rasters.py`](https://github.com/bennyistanto/xdssat/blob/main/src/rasters.py),
+  [`soils.py`](https://github.com/bennyistanto/xdssat/blob/main/src/soils.py).
 
 ## 7. Run the simulations
 
@@ -361,7 +386,12 @@ scenarios:
   ENVIRONMENT MODIFICATIONS section (daylength, radiation, tmax, tmin, rain,
   co2, dewpoint, wind; add, subtract, multiply or replace), cultivar file
   coefficients (`cultivar_coefficients`, e.g. `{TCLDF: 19}`), and the soil
-  fertility factor (`slpf`, `slpf_rainfed`, `slpf_table`).
+  fertility factor (`slpf`, `slpf_rainfed`, `slpf_table`). They also change the
+  template's simulation controls (`simulation`, e.g. `{WATER: N, NITRO: N}` for
+  potential production, `{ITHRL: 80}` for an automatic-irrigation threshold),
+  single planting and initial-condition fields (`management`, e.g.
+  `{MP.PPOP: 150}`), and move every planting date (`planting_offset_days`).
+  `configs/rice-java.yml` lists the allowed fields and codes.
 - **Folder names** are `<aoi>_<mode>_<first>-<last>` plus a tag for anything
   that is not the default: `_ir64_n105` for cultivar and N, `_slpf0.76_rf0.58`,
   `_tcldf19`, and the scenario name unless it is `baseline`.
@@ -378,12 +408,48 @@ python scripts/run_aoi.py --config configs/westjava.yml
 
 Each area needs its own inputs. The Ministry of Agriculture irrigation map
 covers Java only: elsewhere, use another water regime map, or none with
-`treatments > default_regime` ([Input data](xdssat/data.qmd#water-regime)).
+`treatments > default_regime` ([Input data](data.qmd#water-regime)).
+
+### Another crop
+
+The crop comes from the template FileX. `configs/maize-example.yml` runs
+CERES-Maize in East Java; [Another crop](another-crop.qmd) lists what
+changes per crop and which settings act on maize.
+
+```bash
+python scripts/run_aoi.py --config configs/maize-example.yml
+```
+
+### Crop sequences
+
+A template with the extension `.SQX` is a DSSAT sequence experiment: the crops of
+one cycle share a treatment number, in order in the `R` column. Every stratum
+then runs its whole sequence for all years in one engine call (mode Q), with the
+soil's water, N and organic matter carried from crop to crop
+([`src/sequence.py`](https://github.com/bennyistanto/xdssat/blob/main/src/sequence.py)).
+
+- `treatments > water_regimes > template_level` names the sequence treatment of
+  each water regime.
+- The first date of `seasons > calendar` is the first crop's planting; every
+  date of every crop moves with it, so the crops keep their place in the cycle.
+- `years` are the cycles. The engine runs on until that many years after the
+  first sowing; a first crop it starts after that is left out.
+- Cultivars and N rates come from the template. Scenarios work as for single
+  seasons, except `slpf_table`.
+
+`templates/XDRM8601.SQX` (`python scripts/make_templates.py`) is wet-season rice
+(IR 58, 140 kg N, transplanted on 15 November; sequence 1 flooded, 2 rainfed
+bunded) followed by rainfed maize (McCurdy 84aa, 120 kg N, sown on 15 March),
+composed from the two single-crop templates with `sequence.compose`.
+
+**Tested**: DSSAT's `Sequence/ITHY7501.SQX` (soybean, chickpea in an automatic
+planting window, fallow; 5 cycles, measured weather) rebuilt through xdssat gives
+the same seasons as the original run (`tests/test_sequence.py`).
 
 ### Management modes
 
 `seasons > mode` (or `--mode`) picks one of three ways to set planting dates
-([`management.py`](../src/management.py)):
+([`management.py`](https://github.com/bennyistanto/xdssat/blob/main/src/management.py)):
 
 - **Strata**: one per weather cell and water regime (irrigated or rainfed, from
   the water regime input), carrying its crop area in ha.
@@ -397,7 +463,7 @@ covers Java only: elsewhere, use another water regime map, or none with
 - **by_zone**: one calendar per agro-ecological zone, from
   `seasons > zone_table` (a CSV with columns `zone,season,month_day`, or rows
   in the file) or, without it, the median onset of each zone's cells.
-- Template: [`templates/XDRI8601.RIX`](../templates/XDRI8601.RIX), IRRI's
+- Template: [`templates/XDRI8601.RIX`](https://github.com/bennyistanto/xdssat/blob/main/templates/XDRI8601.RIX), IRRI's
   IRMZ8601 (IR 58, 140 kg N) with an added rainfed bunded water level, IR 64
   as a second cultivar, and one treatment per cultivar, water regime and N
   rate (`scripts/make_templates.py`). The runner picks the treatment by its
@@ -458,7 +524,7 @@ stratum and its `ha`), `failed.csv`, `run_info.json`, and `onset.csv` /
 `zone_table.csv` where used.
 
 The run also writes `<aoi>_<mode>_<years>.nc`, a CF netCDF of the seasonal
-results on the weather grid ([`outputs.py`](../src/outputs.py)). To
+results on the weather grid ([`outputs.py`](https://github.com/bennyistanto/xdssat/blob/main/src/outputs.py)). To
 rebuild it from an existing run folder:
 
 ```bash
@@ -470,15 +536,52 @@ python scripts/make_netcdf.py E:/temp/xdssat/runs/java_per_cell_1991-2020
 - `time` is 1 Aug of each agricultural year; `planting_date`,
   `anthesis_date` and `maturity_date` hold the actual dates.
 - Per season: `yield` (HWAH), `biomass`, `lai_max`, `rain`, `irrigation`,
-  `evapotranspiration`, `n_uptake`, `season_length`.
-- Areas: `rice_area` (ha of the system's water regime in the cell),
+  `evapotranspiration`, `n_uptake`, `season_length`, and the water and N
+  balance: `n_fertilizer` (NICM), `n_leached` (NLCM), `n_mineralized` (NMINC),
+  `n2o_emitted` (N2OEM), `n_fixed` (NFXM), `runoff` (ROCM), `drainage` (DRCM),
+  `soil_evaporation` (ESCM), `transpiration` (EPCM), `water_at_maturity`
+  (SWXM). Definitions: the engine's `Data/DATA.CDE`.
+- Areas: `crop_area` (ha of the system's water regime in the cell),
   `harvested_area` (the same where a yield was simulated) and `production`
   (t). The area-weighted mean yield of any region is
   `production.sum() / harvested_area.sum() * 1000` in kg/ha. The irrigated
   area appears under both `wet_irrigated` and `dry_irrigated`, so do not sum
-  `rice_area` over `system`; `rice_area_total` is the rice area per cell.
+  `crop_area` over `system`; `crop_area_total` is the crop area per cell. Rice
+  runs also carry them as `rice_area` and `rice_area_total`.
 - Values are per stratum (one simulation per cell and regime), not per 100 m
   pixel. Java 1991-2020 is 2.4 MB and takes 6 s.
+
+Daily outputs are kept when `run > daily` lists the engine's daily groups
+(e.g. `[plantgro, soilwat]`): `daily_<group>.csv.gz` in the run folder, one
+row per season and day, keyed by `cell`, `stratum`, `water`, `season`,
+`season_year` and `pdate`.
+
+### Seasonal analysis
+
+How the results vary over the years, per cell and per region, as the DSSAT
+seasonal analysis tool shows them for one field (box plots, cumulative
+distributions, mean-variance):
+
+```bash
+python scripts/seasonal_summary.py <run folder> --below 5000
+python scripts/seasonal_summary.py <run A> <run B> --out <folder>     # mean-variance of runs
+python scripts/seasonal_summary.py <run> --price 0.25 --fixed-cost 400 --n-cost 0.9
+```
+
+It writes `seasonal_cells.csv` (per cell, regime and season: mean, sd, cv,
+quantiles, share of years below `--below`), `seasonal_years.csv` (the
+area-weighted mean of each year), `seasonal_region.csv` and `seasonal_cdf.csv`
+into the run folder, and `mean_variance.csv` for several runs. `--var` picks
+another summary column (e.g. `NLCM`, N leached). With `--price` (per kg of
+the variable; HWAH is dry matter) and costs it adds the gross margin per ha:
+price x yield - fixed costs - N price x NICM - irrigation price x IRCM. The
+engine itself has no economics.
+
+**Tested** on the 30-year uniform-calendar Java runs (IR 58, 140 kg N):
+area-weighted yield 7,807 kg/ha uncalibrated (sd 193, cv 2.5%) and 4,635
+kg/ha calibrated (`slpf_temp_v1`, TCLDF 19; sd 157, cv 3.4%). Per cell the
+median cv over the years is 4.0-4.7% uncalibrated and 6.9-7.4% calibrated,
+by season and regime.
 
 ### Compare with BPS yields
 
@@ -512,6 +615,58 @@ district and simulated vs reported harvested area. The admin2 boundaries
 and Papua Barat codes to the new provinces.
 
 A smaller check on 40 cells: `spikes/java_engine_check.py`.
+
+### Compare and calibrate in any area
+
+The same comparison for any country and region map, from the run's own inputs
+and a plain table of observations
+([`src/evaluate.py`](https://github.com/bennyistanto/xdssat/blob/main/src/evaluate.py)):
+
+```bash
+python scripts/prepare_layers.py --config <file> --kind region       # e.g. districts, as a region input
+python scripts/compare_regions.py <run folder> --obs yields.csv --region-input <districts> --units t/ha
+python scripts/compare_regions.py <run folder> --obs national.csv     # region "all": a national series
+```
+
+The observations are a CSV with columns `region` (a class name of the region
+input, or `all`), `year` and `yield`, optionally `area` (harvested ha) and
+`group` (e.g. province). `--units` is kg/ha, t/ha or ku/ha; `--moisture` (0.14)
+is the moisture of the reported yields, since HWAH is dry matter. Seasons go to
+the calendar year of harvest (`--year-basis season`: the agricultural year).
+`--config` gives the experiment file of a run folder made before runs kept
+theirs. The SLPF fit takes the same tables:
+
+```bash
+python scripts/fit_slpf.py --runs <three runs> --config <experiment.yml> \
+    --region-input <districts> --obs-table yields.csv --obs-units t/ha
+```
+
+**Tested**: the Java districts as a region input (`idn_adm2_filled.tif`, the BPS
+codes as class names) and the BDSP yields as a table give, for
+`java_per_cell_1991-2020_slpf_temp_v1_tcldf19`, the same 94 districts, crop area,
+simulated means, ratios and detrended correlations as `compare_districts.py`
+(differences below 1e-13); `fit_slpf.py` through the table gives byte-identical
+`slpf_table.csv`, `fit_slpf_grid.csv` and `fit_slpf.json`.
+
+### Calibrate cultivar coefficients (GLUE)
+
+Cultivar coefficients against field experiments, with the method of DSSAT's GLUE
+tool: round 1 draws the phenology coefficients (P in the cultivar file's
+`!Calibration` row) between its `MINIMA` and `MAXIMA`, round 2 the growth
+coefficients (G); each draw runs on the engine and is weighted by the normal
+likelihood of the FileA measurements
+([`src/glue.py`](https://github.com/bennyistanto/xdssat/blob/main/src/glue.py)):
+
+```bash
+python scripts/glue_calibrate.py --crop MZCER048 --cultivar IB0035 \
+    --experiment ../dssat-csm-data/Maize/UFGA8201.MZX:4 --experiment ../dssat-csm-data/Maize/UFGA8201.MZX:3 --n 1000
+```
+
+It prints the calibrated values as a `cultivar_coefficients` line for a
+scenario. **Tested** with 300 sets per round on the two irrigated treatments of
+UFGA8201 (42 s): P1 255 (posterior mean 251, sd 11; the cultivar file has 259),
+P2 0.91, P5 970 (947), G2 990 (924), G3 12.0 (8.2). G2 is at the top of its
+range (990), so the measurements would like more than the range allows.
 
 ## Troubleshooting
 

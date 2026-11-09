@@ -1,0 +1,186 @@
+---
+title: "Another crop"
+subtitle: "What changes when xdssat runs a crop other than rice, with maize in East Java as the worked example"
+---
+
+xdssat runs any crop that DSSAT-CSM simulates from a FileX. The crop comes from the
+**template**: every simulated season copies one of its treatments, so the crop, the model,
+the planting method and the management all come from that file. The Python code holds no
+crop. A new crop needs a template, the crop model's cultivar file, a crop mask, and a few
+settings in the experiment file.
+
+[`configs/maize-example.yml`](https://github.com/bennyistanto/xdssat/blob/main/configs/maize-example.yml)
+is the complete maize example. It is commented for what differs from rice, and
+[`configs/rice-java.yml`](https://github.com/bennyistanto/xdssat/blob/main/configs/rice-java.yml)
+explains every setting in full.
+
+## What changes per crop
+
+| Setting | Rice in Java | Maize in East Java |
+|---|---|---|
+| `template > file` | `templates/XDRI8601.RIX` (from IRRI's IRMZ8601) | `templates/XDMZ8201.MZX` (from Florida's UFGA8201) |
+| `template > crop_model` | `RICER048` (CERES-Rice) | `MZCER048` (CERES-Maize) |
+| `cultivars` | codes from `RICER048.CUL` | codes from `MZCER048.CUL` |
+| `inputs > crop_mask` | ATR/BPN 2024 rice fields | MapSPAM 2020 maize, physical area |
+| `inputs > water_regime` | MoA irrigation classes | MapSPAM 2020 irrigated share of maize |
+| `treatments > nitrogen_levels` | 0 to 140 kg N (template levels 0-4) | 0, 60, 116, 120, 180, 401 kg N |
+| `treatments > water_regimes` | flooded (level 1), rainfed bunded (level 3) | automatic irrigation (level 4), rainfed (level 0) |
+| `treatments > initial_soil_water` | 0.9 | 0.5 |
+| `seasons > calendar` | wet 15 Nov, dry 1 Apr (irrigated only) | wet 15 Nov, dry 15 Mar (both regimes) |
+| scenario `cultivar_coefficients` | e.g. `TCLDF` | `P1`, `P2`, `P5`, `G2`, `G3`, `PHINT` |
+
+Write out every section of a new experiment file. A section left out takes the default
+of `configs/rice-java.yml`, which is the rice case study.
+
+## The template
+
+Any DSSAT experiment file of the crop can be the template. It must have:
+
+- **One treatment for every water regime and N rate** the experiment file asks for. A run
+  finds the treatment by its irrigation level (MI) and fertilizer level (MF);
+  `treatments > water_regimes > template_level` and `treatments > nitrogen_levels` point at
+  them. Level 0 means none: no irrigation section, or no fertilizer.
+- **A planting date** in its planting level: every other date of the treatment moves with
+  it, so management keeps its timing relative to planting.
+- **A sowing depth** (`PLDP`) between 0 and 100 cm. The engine stops without it for every
+  crop except sugarcane (`ipexp.for:1024-1026`).
+- **`PLME` S (seed)** for crops other than rice, or a transplant weight (`SDWTPL`) with `PLME`
+  T: a non-rice crop with `PLME` T and no `SDWTPL` stops the run (`ipexp.for:1047-1051`).
+- No soil analysis (SA), chemical (MC) or tillage (MT) levels in the treatments it uses.
+
+The engine reads the crop code from the experiment code in the first line of the template
+(`UFGA8201MZ`: `MZ`), and the run writes its experiment files with the template's own
+extension (`.MZX`). Cultivars other than the template's go into the template's cultivar
+level, so a variety needs only its line in the cultivar file. CERES-Maize also needs the
+ecotype file (`MZCER048.ECO`) and stops when a cultivar's ecotype is missing from it
+(`MZ_PHENOL.for:283-303`); xdssat copies the engine's ecotype and species files into every run.
+
+### The maize template
+
+`python scripts/make_templates.py` writes `templates/XDMZ8201.MZX` from DSSAT's
+`UFGA8201.MZX` [@bennett1986]: maize hybrid McCurdy 84aa sown on 26 Feb 1982 at
+Gainesville, Florida, 7.2 plants/m2 in 61 cm rows, 7 cm deep. This is the CERES-Maize
+example of the DSSAT ecosystem chapter [@hoogenboom2019, section 12.1].
+
+| Treatments | Water | N |
+|---|---|---|
+| 1-6 | the experiment's own: rainfed (one 13 mm irrigation 6 days after sowing), irrigated, vegetative stress | 116 or 401 kg N/ha in the experiment's own splits |
+| 7-12 | automatic irrigation (MI 4, SM 2) | 0, 60, 116, 120, 180, 401 kg N/ha |
+| 13-18 | rainfed, no irrigation (MI 0, SM 1) | 0, 60, 116, 120, 180, 401 kg N/ha |
+
+The 60, 120 and 180 kg N levels are urea, incorporated at 5 cm, one third at sowing and two
+thirds 35 days after sowing. This split is an xdssat assumption, not part of the experiment.
+The experiment's own levels give their first dose 40 days (116 kg N) and 17 days (401 kg N)
+after sowing.
+
+## Water regimes of an upland crop
+
+A rice template floods the irrigated field and holds rain behind bunds in the rainfed one.
+An upland crop needs neither: the maize template uses the engine's automatic irrigation for
+the irrigated regime and no irrigation for the rainfed one.
+
+- **Automatic irrigation.** The treatment's simulation controls set `IRRIG` to `A`. When the
+  plant-available water of the top `IMDEP` cm (30) falls to `ITHRL` percent (50), the engine
+  adds enough water to bring it back to `ITHRU` percent (100), plus 5 mm
+  (`IRRIG.for:820-840, 1025-1062`). It irrigates from the simulation start to maturity
+  (`IRRIG.for:810-813`). The efficiency comes from `IREFF` of the automatic row; `EFIR` of
+  the irrigation section and the method `IMETH` are not used for automatic irrigation
+  (`IRRIG.for:761-766`). It needs no irrigation level, so the maize template's level 4 only
+  marks the treatment.
+- **Rainfed.** Irrigation level 0 with `IRRIG` R applies no water (`IRRIG.for:702-714`).
+
+Flood, bund and puddling operations (`IR006` to `IR011`) are written for paddy rice. The
+engine does not limit them to rice, so they would also flood a maize field.
+
+## Settings that act on maize
+
+| Setting | CERES-Maize | Evidence |
+|---|---|---|
+| `slpf`, `slpf_rainfed`, `slpf_table` | multiplies daily carbohydrate, as in rice | `MZ_GROSUB.for:1192-1193` |
+| SLNF (soil file) | scales organic matter mineralisation with the CERES method (`MESOM` G); ignored with CENTURY (`MESOM` P) | `SoilOrg.for:673`, `SOMDEC_C.for:24` |
+| `cultivar_coefficients: TCLDF` | rice only: refused for a maize run | `RICER048.CUL` |
+| cold | the crop dies after `CDAY` (15) days with Tmin at or below `TSEN` (6 C), from `MZCER048.ECO` | `MZ_GROSUB.for:1686-1710` |
+| `environment: co2` | acts through a radiation-use multiplier table of `MZCER048.SPE` (1.02 at 400 ppm, 1.05 at 570 ppm) | `MZ_GROSUB.for:1133-1141` |
+| `initial_soil_water` | crop-independent | `IPSLIN.for:100-124` |
+| harvest | at maturity (`HARVS` M); the summary has the same columns as rice | `AUTHAR.for:151-153` |
+
+Source references are to the DSSAT-CSM 4.8 code [@dssatcsmos].
+
+## Crop mask and water regime for maize
+
+The crop mask can be any map of the crop (see [Input data](data.qmd#crop-mask)). The
+example uses MapSPAM 2020 [@spam2020], CC BY 4.0, from the physical-area zip
+(`spam2020V2r2_global_physical_area.geotiff.zip`):
+
+- `spam2020_V2r2_global_A_MAIZ_A.tif`: maize physical area, all technologies, ha per pixel
+  (5 arc-minutes, about 9 km). xdssat reads each pixel as 10 x 10 sub-points of about 900 m.
+- `spam2020_V2r2_global_A_MAIZ_I.tif`: irrigated maize. Divided by `_A`, it gives the
+  irrigated share of each pixel (`values: ratio`).
+
+A general cropland class (ESA WorldCover class 40) does not say which crop grows where; with
+it, maize is assumed on all cropland.
+
+## Run the example
+
+Unzip the two maize files into `<paths > inputs>/spam2020/`, fill in the paths of a copy of
+the experiment file (or set the `XDSSAT_*` environment variables), then:
+
+```bash
+python scripts/make_templates.py
+python scripts/prepare_crop_mask.py --config configs/maize-example.yml
+python scripts/prepare_layers.py --config configs/maize-example.yml
+python scripts/prepare_soils.py --config configs/maize-example.yml --aoi ejava
+python scripts/run_aoi.py --config configs/maize-example.yml --check
+python scripts/run_aoi.py --config configs/maize-example.yml
+```
+
+**Tested** on East Java, agricultural years 2016-2020, uniform calendar, McCurdy 84aa, 120 kg
+N, SLPF 1 (uncalibrated): 582 strata in 492 weather cells, 282,804 ha of maize (38,704 ha
+irrigated), 5,820 seasons, none failed, 66 s on 32 workers. Area-weighted grain yield (HWAH,
+dry matter):
+
+| | wet season | dry season |
+|---|---|---|
+| automatic irrigation | 9,962 kg/ha | 10,536 kg/ha |
+| rainfed | 10,079 kg/ha | 9,061 kg/ha |
+
+Median irrigation was 27 mm in the wet season and 109 mm in the dry season; rainfed seasons
+got none. FAOSTAT gives Indonesia's maize yield as 5.31, 5.30, 5.31, 6.14 and 5.53 t/ha for
+2016 to 2020 [@faostat_qcl], a mean of 5.52 t/ha. The uncalibrated simulation (9,663 kg/ha
+over all seasons) is about 1.75 times that. Calibration (SLPF, cultivar) closes the gap.
+
+**Tested** on a 40-cell sample, 2017-2018, the same settings except the N rate. Area-weighted
+yield in kg/ha:
+
+| kg N/ha | irrigated wet | irrigated dry | rainfed wet | rainfed dry |
+|---|---|---|---|---|
+| 0 | 2,696 | 2,968 | 2,909 | 2,662 |
+| 60 | 6,619 | 6,919 | 6,744 | 5,548 |
+| 116 (the experiment's late split) | 8,254 | 8,721 | 8,608 | 6,214 |
+| 120 | 9,718 | 10,216 | 10,032 | 7,491 |
+| 180 | 10,354 | 11,022 | 10,850 | 7,426 |
+| 401 | 10,370 | 11,019 | 10,905 | 6,317 |
+
+Yield rises with N to about 180 kg N. Rainfed dry-season maize levels off near 7.4 t/ha,
+where water limits it.
+
+Seasons are longer in cool cells. In 36 of the 492 cells (mean daily Tmin 16.7 C, against
+23.1 C in the others: Tengger, Ijen, Argopuro, Arjuno, Lawu, Wilis), rainfed maize took more
+than 150 days from sowing to maturity in some years: 284 of the 5,820 seasons, 4.6% of the
+area. Thermal time accumulates slowly there. Two more rainfed seasons (dry season of 2020)
+were not mature when the 220 days of weather of `run > season_days` ended, and have no
+maturity date in `summary.csv`.
+
+## Outputs of another crop
+
+The run folder has the same files for every crop (see
+[Getting started](getting-started.md#outputs)). The crop is recorded in `run_info.json`
+(`crop`: code, name, model, model name, from the engine's `DETAIL.CDE` and
+`SIMULATION.CDE`), and the netCDF names it in its `title`, `crop` and `crop_model`
+attributes. The area variables are `crop_area` (per system) and `crop_area_total`. Rice
+runs also carry them as `rice_area` and `rice_area_total`, the names of files written
+before other crops. A run folder without `crop` in `run_info.json` is rice.
+
+The onset setting `seasons > onset > planting_after_days` is the days from rainfall onset
+to planting (sowing or transplanting). Older files call it `transplant_after_days`; that
+name is still read.

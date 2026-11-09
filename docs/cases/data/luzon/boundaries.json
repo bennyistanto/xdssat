@@ -1,0 +1,53 @@
+{
+ "case": "luzon",
+ "iso3": "PHL",
+ "country": "Philippines",
+ "box": [
+  120.5,
+  16.0,
+  121.5,
+  17.0
+ ],
+ "box_adm1": [
+  {
+   "name": "Cordillera Administrative Region",
+   "share_of_unit_in_box": 0.286,
+   "share_of_box": 0.44
+  },
+  {
+   "name": "Region II",
+   "share_of_unit_in_box": 0.178,
+   "share_of_box": 0.397
+  },
+  {
+   "name": "Region I",
+   "share_of_unit_in_box": 0.121,
+   "share_of_box": 0.126
+  },
+  {
+   "name": "Region III",
+   "share_of_unit_in_box": 0.02,
+   "share_of_box": 0.037
+  }
+ ],
+ "country_bounds": [
+  116.929,
+  4.587,
+  126.605,
+  21.122
+ ],
+ "dataset": "Edge-matched administrative boundaries from OCHA COD-AB (HDX)",
+ "sources": {
+  "PHL": {
+   "src_name": "National Mapping and Resource Information Authority (NAMRIA), Philippines Statistics Authority (PSA)",
+   "src_lic": "Creative Commons Attribution for Intergovernmental Organisations",
+   "src_url": "https://data.humdata.org/dataset/cod-ab-phl",
+   "src_update": "2021-12-24"
+  }
+ },
+ "files": {
+  "countries.geojson": 67151,
+  "adm1.geojson": 22362,
+  "adm2.geojson": 22766
+ }
+}

@@ -1,0 +1,35 @@
+{
+ "generated": "2026-11-09",
+ "cells": 139,
+ "ha": 350557.4989296496,
+ "seasons_per_run": 4587,
+ "runs": 4,
+ "seasons_total": 18348,
+ "failed_total": 0,
+ "minutes_total": 14.6,
+ "years": [
+  1991,
+  2023
+ ],
+ "moisture": 0.14,
+ "maize_price_ksh_kg": {
+  "low (p10)": 33.38,
+  "median": 44.5,
+  "high (p90)": 76.05
+ },
+ "maize_price_months": 44,
+ "maize_price_period": [
+  "2021-01-15",
+  "2026-09-15"
+ ],
+ "n_price_ksh_kg_n": {
+  "subsidised 2023": 108.7,
+  "subsidised 2022": 152.2,
+  "market 2022": 282.6
+ },
+ "faostat_kenya_maize_t_ha": {
+  "2018": 1.766,
+  "2019": 1.56,
+  "2020": 1.774
+ }
+}

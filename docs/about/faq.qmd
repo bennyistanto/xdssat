@@ -1,24 +1,42 @@
 ---
+aliases:
+  - ../faq.html
 title: "Frequently asked questions"
-description: "Short answers about xdssat, the case study and the training, with links to the pages that go deeper."
+description: "Short answers about xdssat, the case studies and the training, with links to the pages that go deeper."
 ---
 
 ```{ojs}
 //| echo: false
-summary = FileAttachment("java/data/summary.json").json()
+summary = FileAttachment("../java/data/summary.json").json()
 cur = summary.current
 fmt = ({int: d3.format(",.0f"), d1: d3.format(",.1f")})
 ```
 
 ## About xdssat
 
+### Where does xdssat come from?
+
+From a question I asked in 2018. At the [DSSAT training in Chiang Mai](../learn/index.qmd), Thailand, I told
+[Prof. Gerrit Hoogenboom](https://scholar.google.com/citations?user=6t7Zm4oAAAAJ&hl=en) what I was curious about: running DSSAT spatially, across a whole region, probably with
+Python. The interest was older. As an undergraduate I worked on the Shierary Rice model and its economic value,
+and that is when I was introduced to DSSAT. Later my work stayed close to crops, monitoring harvest and
+cultivation area, but never reached yield. xdssat closes that gap: the process-based DSSAT model, unchanged,
+driven by gridded data. It is a casual-weekend project, eight years after that conversation, and still
+experimental.
+
 ### What is xdssat?
 
 A bridge between the DSSAT crop model and Python. It writes the DSSAT engine's own input files (experiment,
 weather, soil and cultivar files) for every grid cell and season of a region, runs the engine many times in
-parallel, and collects the results into one netCDF file that xarray can read. [What xdssat is](xdssat/index.qmd)
-explains the idea; [How xdssat differs from common DSSAT use](xdssat/gridding.qmd) compares it with running
+parallel, and collects the results into one netCDF file that xarray can read. [What xdssat is](../xdssat/index.qmd)
+explains the idea; [How xdssat differs from common DSSAT use](../xdssat/gridding.qmd) compares it with running
 DSSAT one field at a time.
+
+![Your data is prepared into gridded inputs, the unmodified DSSAT engine runs on every cell and season, and the
+results come back as one netCDF file.](../assets/readme/xdssat-how-it-works.svg){fig-alt="Diagram of how xdssat
+works in four steps: 1, your data (weather, crop mask, soil, water regime, optional regions); 2, prepare, with the
+prepare scripts and one experiment file; 3, run, the unmodified dscsm048 engine in many parallel processes over
+strata of weather cell and water regime; 4, results, a CF netCDF per run plus tables per season."}
 
 ### Is xdssat part of DSSAT?
 
@@ -27,8 +45,10 @@ DSSAT engine as it is published. See [Acknowledgements and how to cite](acknowle
 
 ### Is xdssat ready to rely on?
 
-It is experimental. It is tested on one case study (rice in Java), short runs in Sumatra and the Philippines,
-and the examples of the training modules; the repository has one template experiment, for rice. Use it at your
+It is experimental. It is tested on one main case study (rice in Java), five further case studies
+(maize after rice in East Java, millet in Niger, maize in Kenya, rice in the Mekong Delta and in northern
+Luzon), short runs in Sumatra, and the examples of the training modules. The
+repository has template experiments for rice, maize and pearl millet, and one rice-then-maize sequence. Use it at your
 own risk, and check its results against your own observations before relying on them. The licence (MPL-2.0) provides it "as is", without
 warranty.
 
@@ -46,51 +66,51 @@ DSSAT-CSM 4.8. The engine on this site was built from version 4.8.6.4 of the
 
 You need the engine, in one of two ways: build it from source with `scripts/build_engine.py` (needs gfortran,
 cmake and make), or point xdssat at an existing DSSAT 4.8 installation on Windows. Both routes are in
-[Getting started](getting-started.md), section 2.
+[Getting started](../xdssat/getting-started.md), section 2.
 
 ### Which crops can it simulate?
 
 The DSSAT engine covers many crops (48 crop codes in the files listed on the
-[training page](learn/index.qmd)). xdssat builds every experiment file from a template experiment, and the
+[training page](../learn/index.qmd)). xdssat builds every experiment file from a template experiment, and the
 repository ships one template, for rice (`templates/XDRI8601.RIX`). Another crop needs its own template
 experiment and crop model (`template` section of the experiment file); this is untested.
 
 ### Which regions can it run?
 
 Any region for which the inputs are prepared: weather, a crop mask and soil are required; a water regime map,
-a region map and zones are optional ([Input data](xdssat/data.qmd)). The area is the `aoi` section of the
+a region map and zones are optional ([Input data](../xdssat/data.qmd)). The area is the `aoi` section of the
 experiment file (name and box). Runs in Lampung (Sumatra) and Central Luzon (Philippines) used global datasets
 only.
 
 ### Where do the weather and soil data come from?
 
-From your own files or from global datasets: [Input data](xdssat/data.qmd) lists what each input must be and
+From your own files or from global datasets: [Input data](../xdssat/data.qmd) lists what each input must be and
 the alternatives. The Java case study uses daily AgERA5 reanalysis from the Copernicus Climate Change Service
 (0.1°) and SoilGrids 2.0 texture and organic carbon at six depths, turned into DSSAT soil profiles with the
-Saxton and Rawls equations; everything is listed on the [case study's Data page](java/data.qmd).
+Saxton and Rawls equations; everything is listed on the [case study's Data page](../java/data.qmd).
 
 ### How long does a run take?
 
 The current case-study run simulated ${fmt.int(cur.seasons)} seasons (${fmt.int(cur.strata)} strata in
 ${fmt.int(cur.cells)} cells of Java, 1991-2020) in ${fmt.d1(cur.minutes)} minutes, with ${cur.workers} engine
 processes in parallel. A quick test on 30 cells and 2 years takes about 20 seconds
-([Getting started](getting-started.md), section 7). Preparing the inputs once takes longer: about 1.5 hours
+([Getting started](../xdssat/getting-started.md), section 7). Preparing the inputs once takes longer: about 1.5 hours
 in total, mostly downloading and caching weather and soil data (section 6).
 
 ### What does a run produce?
 
-One netCDF file per run, on the weather grid (0.1° in the case study), with yield, biomass, season length, water and nitrogen variables and
+One netCDF file per run, on the weather grid (0.1° in the case studies), with yield, biomass, season length, water and nitrogen variables and
 the key dates for each water regime, season and cell. Its full structure is on
-[How xdssat differs from common DSSAT use](xdssat/gridding.qmd).
+[How xdssat differs from common DSSAT use](../xdssat/gridding.qmd).
 
-## About the case study
+## About the Java case study
 
 ### Why do the simulated yields differ from the official statistics?
 
 A crop model simulates the yield its inputs allow: the weather, the soil, the cultivar and the management written
 into the experiment file. Official statistics reflect everything else that happens on real farms as well. The
 case study compares the two district by district and calibrates a soil fertility factor against the
-statistics. The [Scientific method](java/science.qmd) page shows how close they get and what remains.
+statistics. The [Scientific method](../java/science.qmd) page shows how close they get and what remains.
 
 ### Does the website run DSSAT in my browser?
 
@@ -101,21 +121,21 @@ and draw the charts in the browser. The [Rebuild notes](rebuild.qmd) show how th
 
 ### Is this the official DSSAT training?
 
-No. The [DSSAT training](learn/index.qmd) section is adapted from the 2018 DSSAT training in Chiang Mai,
+No. The [DSSAT training](../learn/index.qmd) section is adapted from the 2018 DSSAT training in Chiang Mai,
 Thailand, and follows its syllabus and exercises, but it is written for this site. The course's slides and
 exercise sheets are not reproduced. For official training, see the [DSSAT website](https://dssat.net).
 
 ### Do I need xdssat to follow the training?
 
-To read the pages, no: every chart is already computed. To run the [notebooks](notebooks/index.qmd) yourself,
+To read the pages, no: every chart is already computed. To run the [notebooks](../notebooks/index.qmd) yourself,
 yes: they use xdssat's Python code to write the files and run the engine, plus the DSSAT example data
 (`dssat-csm-data`) next to this repository. The
-[training overview](learn/index.qmd#what-you-need-to-run-the-notebooks) lists what they need.
+[training overview](../learn/index.qmd#what-you-need-to-run-the-notebooks) lists what they need.
 
 ### Why do some modules end with a map of Java?
 
 Modules 1, 2, 3 and 5 close with a section called "From one field to a grid: xdssat". It takes the module's
-single-field idea (phenology, weather, soil water, yield risk) and shows it for every cell of the case study.
+single-field idea (phenology, weather, soil water, yield risk) and shows it for every cell of the Java case study.
 That is the step xdssat adds to what the course teaches.
 
 ## Using and citing

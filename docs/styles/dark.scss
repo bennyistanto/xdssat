@@ -32,3 +32,6 @@ h2 { border-bottom: 2px solid rgba($xd-orange, 0.35); padding-bottom: 0.2rem; }
 .callout-note { border-left-color: $xd-green !important; }
 .track-card { border-top: 4px solid $xd-orange; }
 .kpi .v { color: $xd-orange; }
+// inline code: the light layer's purple is too dark here and plain white hides against the text;
+// the logo orange stands out on the grey code background (code blocks keep their own colours)
+:not(pre) > code { color: $xd-orange; }

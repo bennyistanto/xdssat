@@ -1,10 +1,12 @@
 ---
+aliases:
+  - ../rebuild.html
 title: "Rebuild the site"
 subtitle: "Refresh the data extracts after a new run, then render"
 ---
 
 ```{ojs}
-summary = FileAttachment("java/data/summary.json").json()
+summary = FileAttachment("../java/data/summary.json").json()
 ```
 
 The pages hold no results of their own. Every number, chart and map is read from the small files in
@@ -50,7 +52,7 @@ machine; the extracts total about 2 MB.
 
 ## 1a. The alternative input data page
 
-[Alternative input data](java/alternatives.qmd) reads `docs/java/data/alternatives/`, made by two scripts.
+[Alternative input data](../java/alternatives.qmd) reads `docs/java/data/alternatives/`, made by two scripts.
 The first runs every comparison (one input changed per run; the prepared inputs each needs are listed by
 `--list`), the second writes the extracts:
 

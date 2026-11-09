@@ -1,0 +1,66 @@
+{
+ "case": "niger",
+ "iso3": "NER",
+ "country": "Niger",
+ "box": [
+  2.0,
+  13.0,
+  3.0,
+  14.0
+ ],
+ "box_adm1": [
+  {
+   "name": "Tillaberi",
+   "share_of_unit_in_box": 0.104,
+   "share_of_box": 0.788
+  },
+  {
+   "name": "Dosso",
+   "share_of_unit_in_box": 0.063,
+   "share_of_box": 0.167
+  },
+  {
+   "name": "Niamey",
+   "share_of_unit_in_box": 0.947,
+   "share_of_box": 0.044
+  }
+ ],
+ "country_bounds": [
+  0.162,
+  11.694,
+  16.0,
+  23.515
+ ],
+ "dataset": "Edge-matched administrative boundaries from OCHA COD-AB (HDX)",
+ "sources": {
+  "BEN": {
+   "src_name": "Secondary Administrative Level Boundary(SALB) Project, OCHA ROWCA",
+   "src_lic": "Creative Commons Attribution for Intergovernmental Organisations",
+   "src_url": "https://data.humdata.org/dataset/cod-ab-ben",
+   "src_update": "2021-12-31"
+  },
+  "BFA": {
+   "src_name": "Institut G\u00e9ographique du Burkina",
+   "src_lic": "Creative Commons Attribution for Intergovernmental Organisations",
+   "src_url": "https://data.humdata.org/dataset/cod-ab-bfa",
+   "src_update": "2020-03-26"
+  },
+  "NER": {
+   "src_name": "IGNN (as of 2006) and  OCHA/ROWCA ( 2014/ 2015)",
+   "src_lic": "Other",
+   "src_url": "https://data.humdata.org/dataset/cod-ab-ner",
+   "src_update": "2021-09-29"
+  },
+  "NGA": {
+   "src_name": "Office for the Surveyor General of the Federation of Nigeria (OSGOF), Ehealth, United Nations Cartographic Section (UNCS)",
+   "src_lic": "Creative Commons Attribution for Intergovernmental Organisations",
+   "src_url": "https://data.humdata.org/dataset/cod-ab-nga",
+   "src_update": "2020-04-22"
+  }
+ },
+ "files": {
+  "countries.geojson": 15162,
+  "adm1.geojson": 7919,
+  "adm2.geojson": 13107
+ }
+}

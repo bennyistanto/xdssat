@@ -1,0 +1,26 @@
+{
+ "generated": "2026-11-09",
+ "cells": 121,
+ "ha": 920502.6,
+ "seasons_per_run": 7986,
+ "runs": 4,
+ "seasons_total": 31944,
+ "failed_total": 0,
+ "minutes_total": 14.7,
+ "years": [
+  1991,
+  2023
+ ],
+ "percolation_mm_d": {
+  "irrigated": 2,
+  "irrigated_perc1": 1,
+  "irrigated_perc4": 4,
+  "rainfed": 2
+ },
+ "faostat_viet_nam_rice_t_ha": {
+  "2018": 5.818,
+  "2019": 5.837,
+  "2020": 5.919
+ },
+ "template": "XDRW8601.RIX"
+}

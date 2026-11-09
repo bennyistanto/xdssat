@@ -1,28 +1,34 @@
 # xdssat documentation site
 
-A Quarto website with Observable JS (Observable Plot) charts and maps. `getting-started.md` and
-`feasibility-review.md` in this folder are project documents; the first is also rendered as a page.
+A Quarto website with Observable JS (Observable Plot) charts and maps. `feasibility-review.md` in this
+folder is a project document (not rendered); the getting-started guide is `xdssat/getting-started.md`.
 
 | Section | Files |
 |---|---|
 | Home: xdssat as a bridge between DSSAT and Python | `index.qmd` |
-| xdssat | `xdssat/index.qmd`, `xdssat/gridding.qmd`, `xdssat/implementation.qmd`, `getting-started.md`, `xdssat/data.qmd` (input data) |
-| Case study: rice in Java | `java/index.qmd` (story), `java/data.qmd`, `java/alternatives.qmd` (alternative input data), `java/science.qmd`; their data in `java/data/` |
-| DSSAT training (6 modules, adapted from the 2018 International Training Program on DSSAT) | `learn/index.qmd` (from the case study to DSSAT itself), `learn/module1.qmd` ... `module6.qmd`; their data in `learn/data/moduleN/` |
+| Guide | `xdssat/index.qmd`, `xdssat/gridding.qmd`, `xdssat/implementation.qmd`, `xdssat/getting-started.md`, `xdssat/examples.qmd`, `xdssat/data.qmd` (input data), `xdssat/another-crop.qmd` |
+| Main case study: rice in Java | `java/index.qmd` (story), `java/data.qmd`, `java/alternatives.qmd` (alternative input data), `java/science.qmd`; their data in `java/data/` |
+| Further case studies | `cases/java-maize.qmd`, `cases/niger.qmd`, `cases/kenya.qmd`, `cases/mekong.qmd`, `cases/luzon.qmd`; their data in `cases/data/<case>/`, written by `scripts/export_cases.py` (results) and `scripts/export_boundaries.py` (location maps) |
+| DSSAT training (6 modules, adapted from the 2018 International Training Program on DSSAT) | `learn/index.qmd` (from the case studies to DSSAT itself), `learn/module1.qmd` ... `module6.qmd`; their data in `learn/data/moduleN/` |
 | Notebooks | `notebooks/index.qmd`, `notebooks/module1.ipynb` ... `module6.ipynb`; helpers `notebooks/learnlib.py` and `notebooks/glue.py` (GLUE port); the course's data files in `notebooks/course-data/` |
-| About (navbar, right) | `faq.qmd`, `acknowledgements.qmd` (not an official DSSAT product; how to cite DSSAT and xdssat), `rebuild.qmd` |
+| About (navbar, right) | `about/faq.qmd`, `about/acknowledgements.qmd` (not an official DSSAT product; how to cite DSSAT and xdssat), `about/rebuild.qmd` |
 
 | Folder | Holds |
 |---|---|
-| `assets/java/` | the case study's two static maps (`scripts/export_data.py`) and backup SVG and PNG of its charts, one folder per page |
+| `assets/java/` | the Java case study's two static maps (`scripts/export_data.py`) and backup SVG and PNG of its charts, one folder per page |
 | `assets/xdssat/` | backup SVG and PNG of the charts of the xdssat pages and the home page |
+| `assets/readme/` | the two images of the repository README (also used on the FAQ) |
 | `assets/logo/` | the logo (light and dark, with small copies for the navbar), `favicon.ico` (16-64 px), `favicon-32.png`, `apple-touch-icon.png` |
 | `assets/training/` | backup SVG and PNG of every chart of the training pages, one folder per page |
 | `assets/js/dl.js` | download buttons and chart helpers |
 | `styles/` | `light.scss` and `dark.scss` (theme layers on cosmo and darkly, logo colours), `custom.css` |
 
-No numbers are typed into the pages: they are read in the browser from small CSV and JSON files.
-`scripts/export_data.py` writes `java/data/` and the two maps in `assets/java/` from the xdssat cache (`XDSSAT_CACHE`); each
+No model results are typed into the pages: they are read in the browser from small CSV and JSON files.
+Figures from outside sources (FAOSTAT yields, prices, published trial results, DSSAT coefficients) are
+typed in, each with its citation. `scripts/export_data.py` writes `java/data/` and the two maps in
+`assets/java/` from the xdssat cache (`XDSSAT_CACHE`); `scripts/export_cases.py <case>` and
+`scripts/export_boundaries.py <case>` write `cases/data/<case>/` (each case page's "Run it yourself"
+lists its commands); each
 training notebook writes its own `learn/data/<module>/` when it is run. The site never runs the DSSAT engine at
 render time: Quarto does not execute `.ipynb` files by default (the stored outputs are shown) and
 `freeze: auto` keeps anything executed.
@@ -46,7 +52,7 @@ On Windows, stop any server serving `_site/` before `quarto render`, or the rend
 (os error 32). To refresh a training module, run its notebook top to bottom from `docs/notebooks/` (needs the
 engine, `XDSSAT_WORK`, `dssat-csm-data` next to this repository and `xlrd`), save it, then render. Run
 `scripts/compare_districts.py --run <run folder>` first for a new run, so its district comparison exists.
-`export_data.py --run <folder>` picks which run the pages call current. Details: `rebuild.qmd`.
+`export_data.py --run <folder>` picks which run the pages call current. Details: `about/rebuild.qmd`.
 
 ## Publishing
 
@@ -68,8 +74,9 @@ holding the folder it just wrote; wait a little and run it again.
 
 `assets/js/dl.js` exports `withDownload(chart, name)`, which wraps any Plot chart with "Download SVG" and
 "Download PNG" buttons; `chartImages()`, which returns every chart of a page as SVG and PNG (used by
-`scripts/save_charts.py`, which writes them to `assets/training/`, `assets/java/` and `assets/xdssat/`); `cellFeatures(rows)`, which turns 0.1° cell centres into GeoJSON squares for maps; and
-`adminMarks()` for the province and district lines.
+`scripts/save_charts.py`, which writes them to `assets/training/`, `assets/java/` and `assets/xdssat/`); `cellFeatures(rows)`, which turns 0.1° cell centres into GeoJSON squares for maps;
+`adminMarks()` for the province and district lines of the Java pages; and, for the case pages,
+`locatorMap()` (the country with the study box), `placeMarks()` (admin lines and names) and `boxPolygon()`.
 
 ## Analytics
 

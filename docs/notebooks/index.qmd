@@ -23,4 +23,4 @@ repository together with its two helpers: `learnlib.py` (running the engine, cul
 files, engine soil layers, sequences) and `glue.py` (the GLUE port). The course's data files are in
 `docs/notebooks/course-data/`. What the notebooks need is listed on the
 [training overview](../learn/index.qmd#what-you-need-to-run-the-notebooks); how long each takes is in the
-[rebuild notes](../rebuild.qmd).
+[rebuild notes](../about/rebuild.qmd).

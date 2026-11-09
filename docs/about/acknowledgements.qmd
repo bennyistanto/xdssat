@@ -1,4 +1,6 @@
 ---
+aliases:
+  - ../acknowledgements.html
 title: "Acknowledgements and how to cite"
 description: "xdssat is an independent project built on DSSAT. What it uses, who made it, and how to cite it."
 ---
@@ -9,7 +11,9 @@ supported by the DSSAT Foundation or the DSSAT development team. The names DSSAT
 site only to say which software xdssat works with. Questions about xdssat belong in
 [its issue tracker](https://github.com/bennyistanto/xdssat/issues), not with the DSSAT team.
 
-**It is also experimental.** So far it has been tested on one case (rice in Java) and the training examples. Use
+**It is also experimental.** So far it has been tested on one main case study (rice in Java), five further case
+studies (maize after rice in East Java, millet in Niger, maize in Kenya, rice in the Mekong Delta and in
+northern Luzon), and the training examples. Use
 it at your own risk, and check its results against your own data before relying on them.
 :::
 
@@ -35,23 +39,25 @@ be read as such an endorsement.
 
 ## The training material
 
-The [DSSAT training](learn/index.qmd) section is based on the DSSAT training held in Chiang Mai, Thailand, in
+The [DSSAT training](../learn/index.qmd) section is based on the DSSAT training held in Chiang Mai, Thailand, in
 2018. The trainers were Prof. Gerrit Hoogenboom of the University of Florida and Prof. Attachai Jintrawet of
 Chiang Mai University. The modules follow its syllabus and exercises but are written for this site. The
 course's slides and exercise sheets belong to their authors and are not reproduced or published here. The
 data files the course handed out for its exercises are used in the notebooks (`docs/notebooks/course-data/`).
 
-## Data of the case study
+## Data of the case studies
 
-The [rice case study](java/index.qmd) uses these data sets. Full details, including versions and
-processing, are on the [Data page](java/data.qmd).
+The [Java rice case study](../java/index.qmd) uses these data sets. The other case studies use
+global data (AgERA5, SoilGrids, MapSPAM 2020, OCHA boundaries); each page lists its sources and licences in its
+setup table. Full details, including versions and
+processing, are on the [Data page](../java/data.qmd).
 
 | Data | Provider |
 |---|---|
 | AgERA5 daily agrometeorological indicators | Copernicus Climate Change Service, ECMWF [@agera5] |
 | SoilGrids 2.0 | ISRIC - World Soil Information [@poggio2021] |
 | District rice statistics (BDSP) | Ministry of Agriculture of the Republic of Indonesia, from BPS [@bdsp] |
-| Rice field and irrigation maps, agro-ecological zones, soil map | ATR/BPN, Ministry of Agriculture, BBSDLP (see the [Data page](java/data.qmd)) |
+| Rice field and irrigation maps, agro-ecological zones, soil map | ATR/BPN, Ministry of Agriculture, BBSDLP (see the [Data page](../java/data.qmd)) |
 
 ## Software
 
@@ -67,26 +73,26 @@ If you publish results produced with xdssat, cite DSSAT as the DSSAT Foundation 
 the top of every engine output file) and cite the references below. Then cite xdssat itself, with the commit or
 release you used.
 
-DSSAT, as listed by the DSSAT Foundation:
+1. DSSAT, as listed by the DSSAT Foundation:
 
-- Hoogenboom, G., et al. (2026). *Decision Support System for Agrotechnology Transfer (DSSAT) Version 4.8.6.*
-  DSSAT Foundation, Gainesville, Florida, USA. <https://dssat.net>
-- Boote, K. J., et al. (2025). The Decision Support System for Agrotechnology Transfer (DSSAT) crop modeling
-  ecosystem: evolution and advances. In G. Hoogenboom (Ed.), *Current Crop Models: State-of-the-Art and Future
-  Developments* (pp. 3-63). Burleigh Dodds Science Publishing. <https://doi.org/10.19103/AS.2025.0155.01>
-- Hoogenboom, G., et al. (2019). The DSSAT crop modeling ecosystem. In K. J. Boote (Ed.), *Advances in Crop
-  Modelling for a Sustainable Agriculture* (pp. 173-216). Burleigh Dodds Science Publishing.
-  <https://doi.org/10.19103/AS.2019.0061.10>
-- Jones, J. W., et al. (2003). The DSSAT cropping system model. *European Journal of Agronomy*, 18(3-4),
-  235-265. <https://doi.org/10.1016/S1161-0301(02)00107-7>
+    - Hoogenboom, G., et al. (2026). *Decision Support System for Agrotechnology Transfer (DSSAT) Version 4.8.6.*
+     DSSAT Foundation, Gainesville, Florida, USA. <https://dssat.net>
+    - Boote, K. J., et al. (2025). The Decision Support System for Agrotechnology Transfer (DSSAT) crop modeling
+     ecosystem: evolution and advances. In G. Hoogenboom (Ed.), *Current Crop Models: State-of-the-Art and Future
+     Developments* (pp. 3-63). Burleigh Dodds Science Publishing. <https://doi.org/10.19103/AS.2025.0155.01>
+    - Hoogenboom, G., et al. (2019). The DSSAT crop modeling ecosystem. In K. J. Boote (Ed.), *Advances in Crop
+     Modelling for a Sustainable Agriculture* (pp. 173-216). Burleigh Dodds Science Publishing.
+     <https://doi.org/10.19103/AS.2019.0061.10>
+    - Jones, J. W., et al. (2003). The DSSAT cropping system model. *European Journal of Agronomy*, 18(3-4),
+     235-265. <https://doi.org/10.1016/S1161-0301(02)00107-7>
 
-The full author lists are in the references below and on the DSSAT page.
+    The full author lists are in the references below and on the DSSAT page.
 
-xdssat:
+2. xdssat:
 
-```text
-Istanto, B. (2026). xdssat: gridded crop simulation with the DSSAT-CSM engine, driven from Python. Version <commit or release>. https://github.com/bennyistanto/xdssat
-```
+    ```text
+    Istanto, B. (2026). xdssat: gridded crop simulation with the DSSAT-CSM engine, driven from Python. Version <commit or release>. https://github.com/bennyistanto/xdssat
+    ```
 
 ## License
 
