@@ -94,3 +94,22 @@ def test_write_round_trip(tmp_path):
         assert f["yield"].coordinates == "season water_regime season_year"
         local = re.compile(r"\b[A-Za-z]:[\\/]")                    # no local drive paths published
         assert not local.search(f.xdssat_run) and not local.search(f.source)
+
+
+def test_other_crop_names_its_area_and_attributes():
+    s, st = _run()
+    maize = {"code": "MZ", "name": "maize", "model": "MZCER048", "model_name": "CERES-Maize"}
+    ds = outputs.seasonal_dataset(s, st, LAT, LON, crop=maize)
+    assert float(ds.crop_area_total.sum()) == st.ha.sum()
+    assert "rice_area" not in ds and "maize area" in ds.crop_area.attrs["long_name"]
+    rice = outputs.seasonal_dataset(s, st, LAT, LON)                  # default: rice, old names kept too
+    np.testing.assert_array_equal(rice.rice_area.values, rice.crop_area.values)
+    info = {"args": {"aoi": "ejava", "mode": "uniform", "cultivar": "McCurdy 84aa", "n": "120"},
+            "crop": maize, "template": "C:/x/templates/XDMZ8201.MZX",
+            "inputs": {"crop_mask": {"name": "maize_spam", "source": "SPAM 2020 maize"}}}
+    a = outputs.run_attrs("run", info)
+    assert a["title"].startswith("xdssat maize simulation") and a["crop_model"] == "MZCER048"
+    assert "CERES-Maize" in a["source"] and "SPAM 2020 maize" in a["source"]
+    assert "cold_sterility_threshold_TCLDF" not in a and "XDMZ8201.MZX" in a["cultivar"]
+    old = outputs.run_attrs("run", {"args": {}})                       # a folder from before: rice
+    assert old["crop_model"] == "RICER048" and "cold_sterility_threshold_TCLDF" in old

@@ -269,3 +269,36 @@ def test_environment_section_layout_and_dates_move_with_planting():
     assert odates == [encode_date((d - pd.Timedelta(days=3)).date()) for d in units.pdate]
     with pytest.raises(ValueError):
         with_environment(fx, {"ECO2": ("R", 600)})       # already has environment modifications
+
+
+OS_DATA = Path(__file__).resolve().parents[2] / "dssat-csm-os" / "Data"
+
+
+@pytest.mark.skipif(not (OS_DATA / "DETAIL.CDE").is_file(), reason="dssat-csm-os not found")
+def test_crop_info_names_the_crop_from_the_engine_code_lists():
+    from genotype import crop_info
+    assert crop_info("MZCER048", "MZ", OS_DATA) == {"code": "MZ", "name": "maize", "model": "MZCER048",
+                                                    "model_name": "CERES-Maize"}
+    assert crop_info("RICER048", engine_dir=OS_DATA)["model_name"] == "CERES-Rice"
+    assert crop_info("ZZZZZ048", engine_dir=OS_DATA)["name"] == "zz"      # unknown: falls back to the code
+
+
+def test_simulation_and_management_overrides_land_where_the_engine_reads_them():
+    """Codes right-aligned at the engine's columns (WATER 20, NITRO 26, IRRIG 26, ITHRL 32 ...;
+    IPSIM.for formats), planting fields under their header names."""
+    from fixedwidth import parse_header
+    tpl = FileX.read(Path(__file__).resolve().parents[1] / "templates" / "XDMZ8201.MZX")
+    units = pd.DataFrame({"cell": [1], "wsta": "GR000001", "soil_id": "IBMZ910014",
+                          "pdate": pd.Timestamp("1982-03-10"), "trno_template": 10,
+                          "MP.PPOP": 5.5, "MP.PLRS": 75.0})
+    text = build_filex(tpl, units, simulation_overrides={"WATER": "N", "NITRO": "N", "IRRIG": "N",
+                                                         "ITHRL": 70}).text.splitlines()
+    row = lambda tag: next(ln for ln in text if ln.startswith(f" 1 {tag}"))  # noqa: E731
+    assert row("OP")[19] == "N" and row("OP")[25] == "N"                    # WATER, NITRO
+    assert row("MA")[25] == "N"                                             # IRRIG
+    assert row("IR")[21:26].strip() == "70"                                 # ITHRL, columns 22-26
+    hdr = next(ln for ln in text if ln.startswith("@P PDATE"))
+    cols = {c.name: c for c in parse_header(hdr)}
+    pl = next(ln for ln in text if ln.startswith(" 1 8") and "S " in ln)
+    assert pl[cols["PPOP"].start - 1:cols["PPOP"].end].strip() == "5.5"
+    assert pl[cols["PLRS"].start - 1:cols["PLRS"].end].strip() == "75"

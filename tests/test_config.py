@@ -30,7 +30,7 @@ def _machine_paths(tmp_path=None) -> dict:
     for key in config.PATH_KEYS:
         if config.CURRENT.has_path(key):
             out[key] = config.CURRENT.path(key).as_posix()
-        elif tmp_path is not None:
+        elif tmp_path is not None and key != "datasets":     # unset datasets = the cache
             out[key] = (tmp_path / key).as_posix()
     return out
 
@@ -117,7 +117,7 @@ def test_all_options_file_uses_every_option(tmp_path):
     assert set(config._keys(config.DEFAULTS)) <= set(config.read_yaml(config.ALL_OPTIONS_FILE)[1])
     exp = config.load(_write(tmp_path, _example(tmp_path, config.ALL_OPTIONS_FILE)), env={})
     assert config.check_files(exp) == []
-    assert len(exp.combinations()) == 36
+    assert len(exp.combinations()) == 42                     # 3 cultivars x 2 N rates x 7 scenarios
     scs = raw["scenarios"]
     env = {k: v for s in scs for k, v in (s.get("environment") or {}).items()}
     assert set(env) == set(config.ENVIRONMENT)
@@ -349,3 +349,71 @@ def test_sample_run_from_yaml_equals_run_from_flags(tmp_path, monkeypatch):
     for f in ("strata.csv", "units.csv"):
         pd.testing.assert_frame_equal(pd.read_csv(flags / f), pd.read_csv(from_yaml / f))
     assert config.load(from_yaml / "experiment.yml", env={}).data["run"]["sample"] == 30
+
+
+# ---------------------------------------------------------------- other crops
+
+
+MAIZE_FILE = ROOT / "configs" / "maize-example.yml"
+
+
+def test_maize_example_loads_and_its_template_has_every_level(tmp_path):
+    exp = config.load(MAIZE_FILE, env={config.PATH_KEYS[k][0]: v for k, v in _machine_paths(tmp_path).items()})
+    assert exp.template_file == ROOT / "templates" / "XDMZ8201.MZX"
+    assert exp.data["template"]["crop_model"] == "MZCER048"
+    assert exp.water_level("rainfed") == 0 and exp.water_level("irrigated") == 4
+    # every rate x regime has a template treatment (the engine path is only needed for the cultivar)
+    every = config.load(MAIZE_FILE, env={config.PATH_KEYS[k][0]: v for k, v in _machine_paths(tmp_path).items()},
+                        overrides={"treatments": {"nitrogen_kg": [0, 60, 116, 120, 180, 401]}})
+    problems = [p for p in config.check_files(every) if "cultivars" not in p]
+    assert problems == []
+    # every section is written out: a left-out section would take the rice defaults
+    raw, _ = config.read_yaml(MAIZE_FILE)
+    assert set(config.DEFAULTS) <= set(raw)
+
+
+def test_old_key_name_still_loads_and_both_names_are_refused(tmp_path):
+    old = _write(tmp_path, text="seasons:\n  onset:\n    transplant_after_days: 25\n", name="old.yml")
+    assert config.load(old, env={}).data["seasons"]["onset"]["planting_after_days"] == 25
+    both = _write(tmp_path, text="seasons:\n  onset:\n    transplant_after_days: 25\n    planting_after_days: 20\n",
+                  name="both.yml")
+    with pytest.raises(config.ConfigError, match="both set"):
+        config.load(both, env={})
+
+
+def test_rainfed_level_0_is_allowed_but_a_missing_level_is_named(tmp_path):
+    d = _example(tmp_path)
+    d["treatments"]["water_regimes"]["rainfed"]["template_level"] = 0
+    exp = config.load(_write(tmp_path, d), env={})
+    # the rice template has no MI 0 treatment at 140 kg N: named, not a crash
+    assert any("irrigation level 0" in p for p in config.check_files(exp))
+
+
+def test_sample_cells_draws_without_replacement_even_when_one_cell_dominates():
+    run = _run_aoi()
+    even = pd.Series([10.0] * 50, index=range(50))
+    a = run.sample_cells(even, 10, seed=1)
+    assert list(a) == list(even.sample(10, weights=even, random_state=1).index)     # unchanged where pandas can
+    skew = pd.Series([1000.0] + [1.0] * 49, index=range(100, 150))                    # pandas refuses this
+    b = run.sample_cells(skew, 10, seed=1)
+    assert len(set(b)) == 10 and 100 in b and set(b) <= set(skew.index)
+    assert list(run.sample_cells(skew, 10, seed=1)) == list(b)                        # same seed, same cells
+    assert len(run.sample_cells(skew, 500, seed=1)) == 50                             # never more than there are
+
+
+def test_scenario_simulation_management_and_offset_are_checked(tmp_path):
+    d = _example(tmp_path)
+    d["scenarios"] = [{"name": "potential", "simulation": {"WATER": "N", "NITRO": "no", "ITHRL": 70},
+                       "management": {"MP.PPOP": 30, "IC.ICRES": 500}, "planting_offset_days": -14}]
+    exp = config.load(_write(tmp_path, d), env={})
+    assert config._code(exp.data["scenarios"][0]["simulation"]["NITRO"]) == "N"   # 'no' reads as N
+    bad = [({"simulation": {"WTHER": "W"}}, "not a simulation setting"),
+           ({"simulation": {"FERTI": "D"}}, "should be one of"),
+           ({"simulation": {"ITHRL": "x"}}, "number"),
+           ({"management": {"MF.FAMN": 40}}, "not a field xdssat can change"),
+           ({"management": {"MP.PDATE": 82057}}, "not a field xdssat can change"),
+           ({"planting_offset_days": 400}, "planting_offset_days")]
+    for extra, msg in bad:
+        d["scenarios"] = [{"name": "x", **extra}]
+        with pytest.raises(config.ConfigError, match=msg):
+            config.load(_write(tmp_path, d, name="bad.yml"), env={})

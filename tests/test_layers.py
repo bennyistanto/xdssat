@@ -23,7 +23,7 @@ REGIME = {1: "irrigated", 2: "irrigated", 3: "irrigated", 4: "rainfed"}
 
 def _stats(**cols):
     base = {"iy": [0, 0, 1], "ix": [0, 1, 1], "lat": [-6.0, -6.0, -6.1], "lon": [107.0, 107.1, 107.1],
-            "rice_class": [0, 0, 0], "ha": [10.0, 20.0, 30.0]}
+            "crop_class": [0, 0, 0], "ha": [10.0, 20.0, 30.0]}
     return pd.DataFrame({**base, **cols})
 
 
