@@ -52,11 +52,12 @@
 # ==========================================================================================
 # paths: where things are on this computer
 # ==========================================================================================
-# Seven folders. They have NO default, in this file or in xdssat: every computer sets its own.
+# Eight folders. They have NO default, in this file or in xdssat: every computer sets its own
+# (datasets alone falls back to cache).
 # Fill them in your own copy (configs/xdssat.yml), or set the environment variable named under
 # each one, which wins over the file. With the variables, one shared experiment file works on
 # several machines unchanged. A folder left null is fine until a step needs it; that step then
-# stops and says which line to fill. python scripts/check_setup.py lists all seven, where each
+# stops and says which line to fill. python scripts/check_setup.py lists all eight, where each
 # value came from, and the line to edit.
 #
 # The engine and work folders must be SHORT paths (under about 40 characters) on a local disk,
@@ -102,6 +103,12 @@ paths:
   # Environment variable: XDSSAT_BOUNDARIES.
   # Example: F:/temp/hybrid-bias-correction/data/subset/bnd   Default: not set
   boundaries: null
+  # Where the prepared input datasets are: the folder that holds inputs/<kind>/<name>/ (the
+  # datasets of the inputs section below). null = the cache folder, where the prepare scripts
+  # write them. A folder of shipped datasets, such as example-inputs/<area>/, is read from here
+  # while runs still go to the cache. Environment variable: XDSSAT_DATASETS.
+  # Example: example-inputs/kenya_maize   Default: null (= cache)
+  datasets: null
 
 
 # ==========================================================================================
@@ -315,6 +322,8 @@ prepare:
   # How to make a weather input (null = this file does not make one). The keys:
   #   name                  the dataset to write; use it in inputs > weather afterwards
   #   description           free text, kept in the dataset's description
+  #   source                free text, e.g. the dataset, its DOI and licence; kept in the
+  #                         dataset's input.json before the files each variable came from
   #   box                   [west, south, east, north]; null = aoi > bbox (plus one cell)
   #   grid_step             cell size in degrees; null = the grid of the TMAX source.
   #                         Finer cells: more weather cells to simulate (run time grows with
@@ -573,7 +582,8 @@ seasons:
     # the template transplants 23-day-old seedlings. Allowed 0 to 120. Recommended 15 to 30.
     # Too low: transplanting before the field holds water (rainfed rice suffers first).
     # Too high: the season moves into the end of the rains. Default: 20
-    transplant_after_days: 20
+    # (Older files call it transplant_after_days; that name is still read.)
+    planting_after_days: 20
     # Days from one season's planting to the next season's planting (wet to dry). Allowed 0 to
     # 300. It should be at least the field duration of the cultivar plus land preparation:
     # irrigated IR 58 took about 92 days from transplanting to maturity, IR 64 about 108,
@@ -637,7 +647,7 @@ seasons:
 #                          it around heading cuts spikelet fertility (RI_Phenol.for:600-648).
 #                          RICER048.CUL has 15.0 for IR 58 and IR 64. 19 lowered yields of cool
 #                          highland cells (Tmin under 20 C) by about 40% and left the lowlands
-#                          as they were (measured, Java calibration, docs/getting-started.md).
+#                          as they were (measured, Java calibration, docs/xdssat/getting-started.md).
 #
 #   slpf                   soil fertility factor, more than 0 and at most 1. CERES-Rice
 #                          multiplies daily carbohydrate production by it (RI_Grosub.for:648-649),
@@ -652,6 +662,36 @@ seasons:
 #                          per weather cell and regime. Replaces slpf and slpf_rainfed (give only
 #                          one of them).
 #
+#   simulation             settings of the template's SIMULATION CONTROLS to change, by their
+#                          column name, for every season of the run:
+#                            options      WATER NITRO SYMBI PHOSP POTAS CHEM TILL: Y or N;
+#                                         CO2: W (from the weather file), M (Mauna Loa record),
+#                                         D (380 ppm)
+#                            methods      EVAPO F R S T Z; INFIL R S N; PHOTO C R L; MESOM G P;
+#                                         MESEV R S; MESOL 1 2 3; METMP D R E; MEGHG 0 1; NSWIT
+#                            management   PLANT A F R; IRRIG A N R F P W; FERTI N R; RESID N R;
+#                                         HARVS A M R
+#                            automatic    planting PH2OL PH2OU PH2OD PSTMX PSTMN; irrigation
+#                                         IMDEP ITHRL ITHRU IRAMT IREFF; harvest HPCNP HPCNR
+#                          (codes from the engine's reader, IPSIM.for, and Data/SIMULATION.CDE).
+#                          WATER N switches the N and P balances off too (IPSIM.for:245-249).
+#                          Potential production: {WATER: N, NITRO: N}. Not offered: the weather
+#                          generator (WTHER), pests (DISES) and code D (days after planting).
+#   management             single fields of the template's planting details (MP) and initial
+#                          conditions (IC), as <factor>.<column>: MP.PPOP MP.PPOE MP.PLME MP.PLDS
+#                          MP.PLRS MP.PLRD MP.PLDP MP.PLWT MP.PAGE MP.PENV MP.PLPH MP.SPRL;
+#                          IC.ICRT IC.ICND IC.ICRN IC.ICRE IC.ICWD IC.ICRES IC.ICREN IC.ICREP
+#                          IC.ICRIP IC.ICRID. Example: {MP.PPOP: 150, MP.PPOE: 150} (plants/m2).
+#   planting_offset_days   days added to every planting date of the run (negative: earlier),
+#                          -180 to 180; every other date of the season moves with it. Seasons
+#                          that then need weather outside the weather input are left out.
+#                          Measured (on a 30-cell sample of Java, 2015-2016, uniform calendar,
+#                          SLPF 1 = uncalibrated, IR 58, 140 kg N; irrigated dry / irrigated wet /
+#                          rainfed wet, kg/ha): baseline 7,403 / 7,608 / 8,224; potential
+#                          production {WATER: N, NITRO: N} 7,689 / 7,976 / 8,759; planted 14 days
+#                          earlier 7,473 / 7,516 / 7,872; 150 plants/m2 (the template: 75 at
+#                          planting, 25 at emergence) 8,576 / 8,651 / 8,796.
+#
 # Examples (remove the # to use them):
 #   - name: co2_550
 #     description: "CO2 at 550 ppm all season"
@@ -663,6 +703,11 @@ seasons:
 #     slpf: 0.76
 #     slpf_rainfed: 0.58
 #     cultivar_coefficients: {TCLDF: 19}
+#   - name: potential
+#     description: "no water or N limitation"
+#     simulation: {WATER: N, NITRO: N}
+#   - name: earlier14
+#     planting_offset_days: -14
 # Default: one scenario, baseline, with no changes.
 # ------------------------------------------------------------------------------------------
 scenarios:
@@ -721,3 +766,10 @@ run:
   # Parent folder of the run folders. null = <cache>/runs. A folder per study (e.g.
   # E:/temp/xdssat/runs/co2_study) keeps studies apart. Default: null
   output_folder: null
+  # Daily outputs to keep, as a list of the engine's daily output groups: plantgro (growth:
+  # LAI, weights, stage), plantn, plantc, plantgr2, plantgrf, soilwat (soil water by layer), soiltemp,
+  # et, soilni (soil N), weather, soilorg, etphot, mulch, plantp, soilpi, n2o (Data/OUTPUT.CDE).
+  # Each becomes daily_<group>.csv.gz in the run folder, one row per season and day, keyed by
+  # cell, stratum, water regime, season and planting date. Large: one row per day of every
+  # season (the full Java run has 84,870 seasons). null = seasonal results only. Default: null
+  daily: null

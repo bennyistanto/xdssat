@@ -36,6 +36,8 @@ paths:
   cache: null
   # needed only for district and province layers and comparisons
   boundaries: null
+  # the prepared datasets (inputs/<kind>/<name>/); null = the cache
+  datasets: null
 
 # The whole of Java.
 aoi:
@@ -174,7 +176,7 @@ seasons:
     # wet dasarian in a row
     dasarian: 3
     # onset to transplanting of the first season, days
-    transplant_after_days: 20
+    planting_after_days: 20
     # one season's planting to the next one's, days
     next_season_after_days: 120
     # onset climatology over these years (null = the run years)
@@ -225,6 +227,12 @@ scenarios:
   - name: ir64_cold_tolerant
     description: "TCLDF 19 for all cultivars but 17 for IR 64"
     cultivar_coefficients: {TCLDF: 19, "IR 64": {TCLDF: 17}}
+  # simulation switches, single management fields and a planting-date offset
+  - name: potential_dense_earlier
+    description: "no water or N limit, 150 plants/m2, planted 14 days earlier"
+    simulation: {WATER: N, NITRO: N, CO2: M, ITHRL: 50}
+    management: {MP.PPOP: 150, MP.PPOE: 150, IC.ICRES: 1000}
+    planting_offset_days: -14
   # SLPF per weather cell and regime from a table (scripts/fit_slpf.py writes one). It needs
   # the CSV on this computer, so it is left out here; to use it, add a scenario such as:
   #   - name: slpf_temperature
@@ -250,3 +258,5 @@ run:
   # parent folder of the 36 run folders (null = <cache>/runs). A folder of its own keeps this
   # study apart; a relative path is read from the xdssat folder.
   output_folder: null
+  # daily output groups to keep (run folder daily_<group>.csv.gz); null = seasonal only
+  daily: [plantgro, soilwat]

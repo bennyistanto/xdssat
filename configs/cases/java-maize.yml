@@ -1,0 +1,81 @@
+# ==========================================================================================
+# configs/cases/java-maize.yml - case study "Java - Maize: the second crop"
+# ==========================================================================================
+# Rice then maize on the same East Java rice fields, every cycle 1991-2022 (32), as one DSSAT crop
+# sequence (mode Q, templates/XDRM8601.SQX): IR 58 rice (140 kg N) transplanted on 15 November,
+# then McCurdy 84aa maize (120 kg N), rainfed, sown on 15 March. The soil's water, nitrogen and
+# organic matter pass from each crop to the next; the flood does not (DSSAT sets it to zero
+# every season, Paddy_Mgmt.for:59-62). Two runs, one per sequence (--regime):
+#   irrigated  sequence 1: flooded rice, then maize
+#   rainfed    sequence 2: rainfed bunded rice, then maize
+# configs/cases/java-maize-alone.yml grows the same maize alone, on the same cells and dates.
+# docs/cases/java-maize.qmd tells the story; configs/rice-java.yml explains every setting.
+#   python scripts/prepare_weather.py   --config configs/cases/java-maize.yml
+#   python scripts/prepare_crop_mask.py --config configs/cases/java-maize.yml
+#   python scripts/prepare_soils.py     --config configs/cases/java-maize.yml --aoi java_maize_case
+#   python scripts/run_aoi.py --config configs/cases/java-maize.yml --regime irrigated
+#   python scripts/run_aoi.py --config configs/cases/java-maize.yml --regime rainfed
+#   python scripts/run_aoi.py --config configs/cases/java-maize-alone.yml
+
+paths: {engine: null, work: null, agera5: null, soilgrids: null, inputs: null, cache: null, boundaries: null,
+  datasets: null}
+aoi:
+  name: java_maize_case
+  bbox: [111.4, -8.0, 112.4, -7.0]
+  region: null
+inputs: {weather: agera5_case_javamaize, crop_mask: rice_spam2020_case_javamaize, soil: soilgrids_case_javamaize,
+  water_regime: null, region: null, zones: null}
+prepare:
+  weather:
+    name: agera5_case_javamaize
+    description: AgERA5 for the Java maize case (East Java), 1990-2024
+    source: AgERA5 (Copernicus Climate Change Service, doi:10.24381/cds.6c68c9bb), CC BY 4.0
+    box: null
+    grid_step: null
+    years: [1990, 2024]
+    station_code: AGE5
+    temperature_height_m: 2
+    variables:
+      TMAX: {files: '{agera5}/t2mmax/agera5_t2mmax_{year}.nc', variable: Temperature_Air_2m_Max_24h}
+      TMIN: {files: '{agera5}/t2mmin/agera5_t2mmin_{year}.nc', variable: Temperature_Air_2m_Min_24h}
+      SRAD: {files: '{agera5}/srad/agera5_srad_{year}.nc', variable: Solar_Radiation_Flux}
+      RAIN: {files: '{agera5}/precip/agera5_precip_{year}.nc', variable: Precipitation_Flux, regrid: mean}
+      DEWP: {files: '{agera5}/t2mdp/agera5_t2mdp_{year}.nc', variable: Dew_Point_Temperature_2m_Mean_24h}
+      WIND: {files: '{agera5}/ws10m/agera5_ws10m_{year}.nc', variable: Wind_Speed_10m_Mean_24h, height_m: 10}
+  crop_mask: {name: rice_spam2020_case_javamaize, files: '{inputs}/spam2020/spam2020_V2r2_global_A_RICE_A.tif',
+    values: ha, box: null, source: 'SPAM 2020 v2r2 (IFPRI, doi:10.7910/DVN/SWPENT), CC BY 4.0: physical
+      area of rice, all technologies (the fields where maize can follow rice)'}
+  water_regime: null
+  region: null
+  zones: null
+  soil: {name: soilgrids_case_javamaize, method: soilgrids, soc_scale: wise_indonesia, country: Indonesia}
+template: {file: templates/XDRM8601.SQX, crop_model: RICER048}
+cultivars: {IR 58: IB0012}          # cultivars and N rates of a sequence come from the template
+treatments:
+  nitrogen_kg: [140]
+  nitrogen_levels: {0: 0, 35: 1, 70: 2, 105: 3, 140: 4}
+  water_regimes:
+    irrigated:                     # sequence 1: flooded rice, then rainfed maize
+      template_level: 1
+      irrigation_classes: []
+    rainfed:                       # sequence 2: rainfed bunded rice, then rainfed maize
+      template_level: 2
+      irrigation_classes: []
+  default_regime: irrigated        # each run sets it with --regime
+  share_regimes: {share: irrigated, rest: rainfed}
+  initial_soil_water: 0.9
+seasons:
+  mode: uniform
+  year_starts: 08-01
+  calendar:                        # the first date is the rice; the maize keeps its place (15 March)
+  - name: rice
+    date: 11-15
+    regimes: [irrigated, rainfed]
+  onset: {rain_mm: 50, dasarian: 3, planting_after_days: 20, next_season_after_days: 120, years: null}
+  zone_table: null
+  zone_column: aez
+scenarios:
+- {name: baseline}
+years: [1991, 2022]               # 32 cycles: the engine starts one more rice crop after the last (Nov 2023)
+run: {workers: 32, chunk_size: 200, years_per_batch: 5, sample: null, seed: 1, season_days: 220, output_folder: null,
+  daily: null}

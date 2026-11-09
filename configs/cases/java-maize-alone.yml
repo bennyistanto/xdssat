@@ -1,0 +1,48 @@
+# ==========================================================================================
+# configs/cases/java-maize-alone.yml - the comparison run of "Java - Maize: the second crop"
+# ==========================================================================================
+# The same McCurdy 84aa maize (120 kg N, rainfed) as in configs/cases/java-maize.yml, sown on
+# 15 March on the same cells, soils and weather, but alone: each season starts from the soil
+# the template describes, at half its plant-available water (treatments > initial_soil_water),
+# instead of from the soil a rice crop left behind. Uses the inputs that java-maize.yml prepares.
+#   python scripts/run_aoi.py --config configs/cases/java-maize-alone.yml
+
+paths: {engine: null, work: null, agera5: null, soilgrids: null, inputs: null, cache: null, boundaries: null,
+  datasets: null}
+aoi:
+  name: java_maize_case
+  bbox: [111.4, -8.0, 112.4, -7.0]
+  region: null
+inputs: {weather: agera5_case_javamaize, crop_mask: rice_spam2020_case_javamaize, soil: soilgrids_case_javamaize,
+  water_regime: null, region: null, zones: null}
+prepare: {weather: null, crop_mask: null, water_regime: null, region: null, zones: null, soil: null}
+template: {file: templates/XDMZ8201.MZX, crop_model: MZCER048}
+cultivars: {McCurdy 84aa: IB0035}
+treatments:
+  nitrogen_kg: [120]
+  nitrogen_levels: {0: 0, 60: 3, 116: 1, 120: 4, 180: 5, 401: 2}
+  water_regimes:
+    irrigated:
+      template_level: 4
+      irrigation_classes: []
+    rainfed:
+      template_level: 0
+      irrigation_classes: []
+  default_regime: rainfed
+  share_regimes: {share: irrigated, rest: rainfed}
+  initial_soil_water: 0.5
+seasons:
+  mode: uniform
+  year_starts: 08-01
+  calendar:
+  - name: maize_alone
+    date: 03-15
+    regimes: [rainfed]
+  onset: {rain_mm: 50, dasarian: 3, planting_after_days: 20, next_season_after_days: 120, years: null}
+  zone_table: null
+  zone_column: aez
+scenarios:
+- {name: baseline}
+years: [1991, 2022]               # the same 32 seasons as the sequences (configs/cases/java-maize.yml)
+run: {workers: 32, chunk_size: 200, years_per_batch: 5, sample: null, seed: 1, season_days: 220, output_folder: null,
+  daily: null}

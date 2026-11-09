@@ -1,0 +1,88 @@
+# ==========================================================================================
+# configs/cases/mekong-rice.yml - case study "Mekong - Rice: the water bill"
+# ==========================================================================================
+# Lowland rice (IR 64, 105 kg N) in the Mekong Delta, two seasons a year: dong xuan transplanted
+# on 1 December (dry season) and he thu on 20 April (start of the rains), 1991-2023. Every
+# rice cell runs four water regimes, one run each (--regime): continuous flood with the
+# template's percolation of 2 mm/d, the same flood at 1 and 4 mm/d, and rainfed bunded. The
+# template is templates/XDRW8601.RIX (scripts/make_templates.py). docs/cases/mekong.qmd tells
+# the story; configs/rice-java.yml explains every setting.
+#   python scripts/prepare_weather.py   --config configs/cases/mekong-rice.yml
+#   python scripts/prepare_crop_mask.py --config configs/cases/mekong-rice.yml
+#   python scripts/prepare_soils.py     --config configs/cases/mekong-rice.yml --aoi mekong_rice
+#   python scripts/run_aoi.py --config configs/cases/mekong-rice.yml --regime irrigated
+#   python scripts/run_aoi.py --config configs/cases/mekong-rice.yml --regime irrigated_perc1
+#   python scripts/run_aoi.py --config configs/cases/mekong-rice.yml --regime irrigated_perc4
+#   python scripts/run_aoi.py --config configs/cases/mekong-rice.yml --regime rainfed
+
+paths: {engine: null, work: null, agera5: null, soilgrids: null, inputs: null, cache: null, boundaries: null,
+  datasets: null}
+aoi:
+  name: mekong_rice
+  bbox: [105.2, 9.7, 106.2, 10.7]
+  region: null
+inputs: {weather: agera5_case_mekong, crop_mask: rice_spam2020_case_mekong, soil: soilgrids_case_mekong,
+  water_regime: null, region: null, zones: null}
+prepare:
+  weather:
+    name: agera5_case_mekong
+    description: AgERA5 for the Mekong rice case, 1990-2024
+    source: AgERA5 (Copernicus Climate Change Service, doi:10.24381/cds.6c68c9bb), CC BY 4.0
+    box: null
+    grid_step: null
+    years: [1990, 2024]
+    station_code: AGE5
+    temperature_height_m: 2
+    variables:
+      TMAX: {files: '{agera5}/t2mmax/agera5_t2mmax_{year}.nc', variable: Temperature_Air_2m_Max_24h}
+      TMIN: {files: '{agera5}/t2mmin/agera5_t2mmin_{year}.nc', variable: Temperature_Air_2m_Min_24h}
+      SRAD: {files: '{agera5}/srad/agera5_srad_{year}.nc', variable: Solar_Radiation_Flux}
+      RAIN: {files: '{agera5}/precip/agera5_precip_{year}.nc', variable: Precipitation_Flux, regrid: mean}
+      DEWP: {files: '{agera5}/t2mdp/agera5_t2mdp_{year}.nc', variable: Dew_Point_Temperature_2m_Mean_24h}
+      WIND: {files: '{agera5}/ws10m/agera5_ws10m_{year}.nc', variable: Wind_Speed_10m_Mean_24h, height_m: 10}
+  crop_mask: {name: rice_spam2020_case_mekong, files: '{inputs}/spam2020/spam2020_V2r2_global_A_RICE_A.tif',
+    values: ha, box: null, source: 'SPAM 2020 v2r2 (IFPRI, doi:10.7910/DVN/SWPENT), CC BY 4.0: physical
+      area of rice, all technologies'}
+  water_regime: null
+  region: null
+  zones: null
+  soil: {name: soilgrids_case_mekong, method: soilgrids, soc_scale: none, country: Viet Nam}
+template: {file: templates/XDRW8601.RIX, crop_model: RICER048}
+cultivars: {IR 64: IB0015}
+treatments:
+  nitrogen_kg: [105]
+  nitrogen_levels: {0: 0, 35: 1, 70: 2, 105: 3, 140: 4}
+  water_regimes:
+    irrigated:                     # continuous flood, percolation 2 mm/d (IRMZ8601)
+      template_level: 1
+      irrigation_classes: []
+    irrigated_perc1:               # the same flood, percolation 1 mm/d
+      template_level: 4
+      irrigation_classes: []
+    irrigated_perc4:               # the same flood, percolation 4 mm/d
+      template_level: 5
+      irrigation_classes: []
+    rainfed:                       # bunded (150 mm), rain only
+      template_level: 3
+      irrigation_classes: []
+  default_regime: irrigated        # each run sets it with --regime
+  share_regimes: {share: irrigated, rest: rainfed}
+  initial_soil_water: 0.9
+seasons:
+  mode: uniform
+  year_starts: 08-01
+  calendar:
+  - name: dong_xuan
+    date: 12-01
+    regimes: [irrigated, irrigated_perc1, irrigated_perc4, rainfed]
+  - name: he_thu
+    date: 04-20
+    regimes: [irrigated, irrigated_perc1, irrigated_perc4, rainfed]
+  onset: {rain_mm: 50, dasarian: 3, planting_after_days: 20, next_season_after_days: 120, years: null}
+  zone_table: null
+  zone_column: aez
+scenarios:
+- {name: baseline}
+years: [1991, 2023]
+run: {workers: 32, chunk_size: 200, years_per_batch: 5, sample: null, seed: 1, season_days: 220, output_folder: null,
+  daily: null}

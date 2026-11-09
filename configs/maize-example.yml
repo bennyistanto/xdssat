@@ -1,0 +1,207 @@
+# ==========================================================================================
+# configs/maize-example.yml - another crop: maize in East Java
+# ==========================================================================================
+# The same kind of experiment file as configs/rice-java.yml, for CERES-Maize. That file explains
+# every setting in full; this one explains only what changes for another crop, and repeats
+# every section, because a setting left out takes the RICE default of rice-java.yml.
+#
+# What changes per crop (docs/xdssat/another-crop.qmd):
+#   template      a FileX of the crop (here templates/XDMZ8201.MZX, from DSSAT's UFGA8201.MZX)
+#   crop_model    the crop model's cultivar file (here MZCER048, CERES-Maize)
+#   cultivars     codes from that cultivar file
+#   crop_mask     a map of the crop (here MapSPAM 2020 maize)
+#   treatments    the template's own N and water levels
+#   seasons       the crop's own calendar
+#   scenarios     only coefficients of the crop's own cultivar file (TCLDF is rice only)
+#
+# Use it as rice-java.yml: copy it, fill in the paths (or set the XDSSAT_* environment
+# variables), then
+#   python scripts/prepare_crop_mask.py --config configs/maize-example.yml
+#   python scripts/prepare_layers.py    --config configs/maize-example.yml
+#   python scripts/prepare_soils.py     --config configs/maize-example.yml --aoi ejava
+#   python scripts/run_aoi.py           --config configs/maize-example.yml --check
+#   python scripts/run_aoi.py           --config configs/maize-example.yml
+
+
+# ==========================================================================================
+# paths: where things are on this computer (as in rice-java.yml)
+# ==========================================================================================
+paths:
+  engine: null
+  work: null
+  agera5: null
+  soilgrids: null
+  # The folder that holds spam2020/ with the two MapSPAM 2020 maize files (see prepare).
+  inputs: null
+  cache: null
+  boundaries: null
+  datasets: null
+
+
+# ==========================================================================================
+# aoi: East Java (with Madura), maize
+# ==========================================================================================
+aoi:
+  name: ejava
+  # [west, south, east, north]: the province of East Java
+  bbox: [110.9, -8.8, 114.7, -6.7]
+  # A class of the region input: keeps maize on Java (and Madura) inside the box
+  region: Jawa
+
+
+# ==========================================================================================
+# inputs: the prepared data this run reads
+# ==========================================================================================
+inputs:
+  # AgERA5 0.1 degree, cut to Indonesia (as rice-java.yml)
+  weather: agera5_idn
+  # MapSPAM 2020 maize, physical area (made by prepare > crop_mask below). MapSPAM pixels are
+  # 5 arc-minutes (about 9 km) and are read as 10 x 10 sub-points of about 900 m.
+  crop_mask: maize_spam2020_ejava
+  # SoilGrids, one profile per weather cell with maize (prepare > soil below)
+  soil: soilgrids_ejava_maize
+  # MapSPAM 2020 irrigated share of maize (prepare > water_regime below)
+  water_regime: spam2020_maize_irrigated_ejava
+  region: islands_bbsdlp_idn
+  # Not used by the uniform calendar
+  zones: null
+
+
+# ==========================================================================================
+# prepare: making the maize inputs from MapSPAM 2020
+# ==========================================================================================
+# MapSPAM 2020 v2r2 (IFPRI, doi:10.7910/DVN/SWPENT, CC BY 4.0), the zip
+# spam2020V2r2_global_physical_area.geotiff.zip. Unzip the two maize files into
+# {inputs}/spam2020/: spam2020_V2r2_global_A_MAIZ_A.tif (all technologies, ha per pixel)
+# and spam2020_V2r2_global_A_MAIZ_I.tif (irrigated).
+prepare:
+  weather: null
+  crop_mask:
+    name: maize_spam2020_ejava
+    files: "{inputs}/spam2020/spam2020_V2r2_global_A_MAIZ_A.tif"
+    values: ha
+    box: null
+    source: "SPAM 2020 v2r2, physical area of maize, all technologies (IFPRI, doi:10.7910/DVN/SWPENT)"
+  soil:
+    name: soilgrids_ejava_maize
+    method: soilgrids
+    # Fitted to WISE 1.1 profiles of Indonesia (rice-java.yml explains it)
+    soc_scale: wise_indonesia
+    country: Indonesia
+  water_regime:
+    name: spam2020_maize_irrigated_ejava
+    values: ratio
+    irrigated: "{inputs}/spam2020/spam2020_V2r2_global_A_MAIZ_I.tif"
+    total: "{inputs}/spam2020/spam2020_V2r2_global_A_MAIZ_A.tif"
+    source: "SPAM 2020 v2r2, maize physical area irrigated / all"
+  region: null
+  zones: null
+
+
+# ==========================================================================================
+# template: the maize experiment every season copies
+# ==========================================================================================
+# XDMZ8201.MZX (python scripts/make_templates.py) is DSSAT's UFGA8201.MZX: maize hybrid
+# McCurdy 84aa sown on 26 Feb 1982 at Gainesville, Florida, 7.2 plants/m2, 61 cm rows, 7 cm
+# deep, in three water levels x two N levels (Bennett et al., 1986, Agronomy Journal
+# 78:273-280, doi:10.2134/agronj1986.00021962007800020012x). It is the CERES-Maize example
+# of the DSSAT ecosystem chapter (Hoogenboom et al., 2019, section 12.1,
+# doi:10.19103/AS.2019.0061.10). xdssat adds:
+#   - irrigation level 4 with simulation-control level 2: automatic irrigation (IRRIG A).
+#     When the plant-available water of the top 30 cm falls to 50%, the engine refills it to
+#     100% (IRRIG.for:820-840), from the simulation start to maturity.
+#   - irrigation level 0 (none) with simulation-control level 1: rainfed, no water applied.
+#   - fertilizer levels 3, 4, 5: 60, 120, 180 kg N/ha as urea, 1/3 at sowing and 2/3 at 35
+#     days after sowing, incorporated at 5 cm. This split is an xdssat assumption, not part of
+#     the experiment.
+#   - treatments 7-18: every water regime x 0, 60, 116, 120, 180, 401 kg N.
+# Treatments 1-6 keep the experiment's own dated irrigation and N (116 and 401 kg N/ha).
+template:
+  file: templates/XDMZ8201.MZX
+  # CERES-Maize. (The engine also has IXIM-Maize, MZIXM048; a blank SMODEL in the template
+  # runs CERES, DSSATPRO.v48:44.)
+  crop_model: MZCER048
+
+
+# ==========================================================================================
+# cultivars: codes from <engine>/Genotype/MZCER048.CUL
+# ==========================================================================================
+# McCurdy 84aa (IB0035) is the template's own hybrid, calibrated on this experiment, a
+# temperate hybrid. MZCER048.CUL also has tropical entries, e.g. SUWAN-1 (IB0065, an open-
+# pollinated variety from Thailand), H610(UH) (IB0060), and generic LONG / MEDIUM / SHORT
+# SEASON (990001-990003). None of them is calibrated for Java: results are uncalibrated.
+cultivars:
+  "McCurdy 84aa": IB0035
+
+
+# ==========================================================================================
+# treatments: fertilizer and water
+# ==========================================================================================
+treatments:
+  # kg N/ha to run; each rate is its own run folder. Allowed: the rates of nitrogen_levels.
+  nitrogen_kg: [120]
+  # kg N/ha -> fertilizer level (MF) of XDMZ8201.MZX. 116 and 401 are the experiment's own
+  # splits (first dose 40 and 17 days after sowing); 60, 120, 180 the added urea levels.
+  nitrogen_levels: {0: 0, 60: 3, 116: 1, 120: 4, 180: 5, 401: 2}
+  # The water regime input is an irrigated share (MapSPAM), so the classes are not used
+  # (empty lists). template_level: 4 = automatic irrigation, 0 = rainfed (no irrigation).
+  water_regimes:
+    irrigated: {template_level: 4, irrigation_classes: []}
+    rainfed: {template_level: 0, irrigation_classes: []}
+  # Maize where MapSPAM has no maize value is taken as rainfed
+  default_regime: rainfed
+  share_regimes: {share: irrigated, rest: rainfed}
+  # Soil water at the start of each season, as a share of plant-available water. 0.5: upland
+  # soil at the start of the rains is drier than a puddled rice field (rice-java.yml: 0.9).
+  initial_soil_water: 0.5
+
+
+# ==========================================================================================
+# seasons: when maize is sown
+# ==========================================================================================
+# Placeholders, not an agronomic calendar: a wet-season crop sown on 15 Nov and a second crop
+# on 15 Mar on the late rains, both irrigated and rainfed maize. The sowing date is the
+# template's PDATE; every other date of the template moves with it.
+seasons:
+  mode: uniform
+  year_starts: "08-01"
+  calendar:
+    - {name: wet, date: "11-15", regimes: [irrigated, rainfed]}
+    - {name: dry, date: "03-15", regimes: [irrigated, rainfed]}
+  onset:
+    rain_mm: 50
+    dasarian: 3
+    # Days from onset to sowing of the first season (maize is sown directly)
+    planting_after_days: 0
+    # Days from one sowing to the next. Maize takes about 100 to 130 days to maturity.
+    next_season_after_days: 120
+    years: null
+  zone_table: null
+  zone_column: aez
+
+
+# ==========================================================================================
+# scenarios
+# ==========================================================================================
+# As in rice-java.yml. SLPF acts on CERES-Maize as on rice: it multiplies daily carbohydrate
+# (MZ_GROSUB.for:1192-1193). TCLDF is a rice coefficient; maize coefficients are P1, P2, P5,
+# G2, G3 and PHINT (MZCER048.CUL). Maize also dies after CDAY (15) days with Tmin at or below
+# TSEN (6 C) (MZCER048.ECO, MZ_GROSUB.for:1686-1710), which matters only in cold places.
+scenarios:
+  - name: baseline
+
+
+# ==========================================================================================
+# years and run
+# ==========================================================================================
+years: [2016, 2020]
+
+run:
+  workers: 32
+  chunk_size: 200
+  years_per_batch: 5
+  sample: null
+  seed: 1
+  season_days: 220
+  output_folder: null
+  daily: null

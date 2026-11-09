@@ -1,0 +1,83 @@
+# ==========================================================================================
+# configs/cases/luzon-rice.yml - case study "Luzon - Rice: too cold at the top, too hot at the bottom"
+# ==========================================================================================
+# Flooded rice in northern Luzon, from the lowlands up into the Cordillera, 1991-2023: a wet-season
+# crop transplanted on 1 July and a dry-season crop on 1 December, IR 64 and IR 58, 105 kg N.
+# Water is kept out of the story (every cell flooded), so what changes along the slope is
+# temperature. Three scenarios split the loss of spikelets (CERES-Rice, RI_Phenol.for:596-646,
+# RI_Grosub.for:409): the baseline; no cold sterility (TCLDF 0: the canopy is never below it);
+# no heat sterility (THOT 45: the heading-phase temperature never reaches it). The difference
+# with the baseline is the grain each stress costs. docs/cases/luzon.qmd tells the story;
+# configs/rice-java.yml explains every setting.
+#   python scripts/prepare_weather.py   --config configs/cases/luzon-rice.yml
+#   python scripts/prepare_crop_mask.py --config configs/cases/luzon-rice.yml
+#   python scripts/prepare_soils.py     --config configs/cases/luzon-rice.yml --aoi luzon_rice
+#   python scripts/run_aoi.py           --config configs/cases/luzon-rice.yml
+
+paths: {engine: null, work: null, agera5: null, soilgrids: null, inputs: null, cache: null, boundaries: null,
+  datasets: null}
+aoi:
+  name: luzon_rice
+  bbox: [120.5, 16.0, 121.5, 17.0]
+  region: null
+inputs: {weather: agera5_case_luzon, crop_mask: rice_spam2020_case_luzon, soil: soilgrids_case_luzon,
+  water_regime: null, region: null, zones: null}
+prepare:
+  weather:
+    name: agera5_case_luzon
+    description: AgERA5 for the Luzon rice case, 1990-2024
+    source: AgERA5 (Copernicus Climate Change Service, doi:10.24381/cds.6c68c9bb), CC BY 4.0
+    box: null
+    grid_step: null
+    years: [1990, 2024]
+    station_code: AGE5
+    temperature_height_m: 2
+    variables:
+      TMAX: {files: '{agera5}/t2mmax/agera5_t2mmax_{year}.nc', variable: Temperature_Air_2m_Max_24h}
+      TMIN: {files: '{agera5}/t2mmin/agera5_t2mmin_{year}.nc', variable: Temperature_Air_2m_Min_24h}
+      SRAD: {files: '{agera5}/srad/agera5_srad_{year}.nc', variable: Solar_Radiation_Flux}
+      RAIN: {files: '{agera5}/precip/agera5_precip_{year}.nc', variable: Precipitation_Flux, regrid: mean}
+      DEWP: {files: '{agera5}/t2mdp/agera5_t2mdp_{year}.nc', variable: Dew_Point_Temperature_2m_Mean_24h}
+      WIND: {files: '{agera5}/ws10m/agera5_ws10m_{year}.nc', variable: Wind_Speed_10m_Mean_24h, height_m: 10}
+  crop_mask: {name: rice_spam2020_case_luzon, files: '{inputs}/spam2020/spam2020_V2r2_global_A_RICE_A.tif',
+    values: ha, box: null, source: 'SPAM 2020 v2r2 (IFPRI, doi:10.7910/DVN/SWPENT), CC BY 4.0: physical
+      area of rice, all technologies'}
+  water_regime: null
+  region: null
+  zones: null
+  soil: {name: soilgrids_case_luzon, method: soilgrids, soc_scale: none, country: Philippines}
+template: {file: templates/XDRI8601.RIX, crop_model: RICER048}
+cultivars: {IR 64: IB0015, IR 58: IB0012}
+treatments:
+  nitrogen_kg: [105]
+  nitrogen_levels: {0: 0, 35: 1, 70: 2, 105: 3, 140: 4}
+  water_regimes:
+    irrigated:
+      template_level: 1
+      irrigation_classes: []
+    rainfed:
+      template_level: 3
+      irrigation_classes: []
+  default_regime: irrigated
+  share_regimes: {share: irrigated, rest: rainfed}
+  initial_soil_water: 0.9
+seasons:
+  mode: uniform
+  year_starts: 06-01
+  calendar:
+  - name: wet
+    date: 07-01
+    regimes: [irrigated]
+  - name: dry
+    date: 12-01
+    regimes: [irrigated]
+  onset: {rain_mm: 50, dasarian: 3, planting_after_days: 20, next_season_after_days: 120, years: null}
+  zone_table: null
+  zone_column: aez
+scenarios:
+- {name: baseline}
+- {name: no_cold, cultivar_coefficients: {TCLDF: 0}}
+- {name: no_heat, cultivar_coefficients: {THOT: 45}}
+years: [1991, 2023]
+run: {workers: 32, chunk_size: 200, years_per_batch: 5, sample: null, seed: 1, season_days: 220, output_folder: null,
+  daily: null}

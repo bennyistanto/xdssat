@@ -8,6 +8,8 @@ planting calendar, scenarios and years. Nobody needs to edit Python.
 |---|---|
 | [`rice-java.yml`](rice-java.yml) | **The reference.** The rice-in-Java case study, with every setting explained: what it means, its range, what happens when it is too low or too high, and its default. The built-in defaults are exactly this file. |
 | [`rice-java-all-options.yml`](rice-java-all-options.yml) | The same case with every setting written out and every kind of option in use (cultivar not in the template, per_cell calendar, zone table, all eight weather variables, all four kinds of change, cultivar coefficients, SLPF, and an example of every `prepare` section). A menu to copy from. |
+| [`maize-example.yml`](maize-example.yml) | A maize run (CERES-Maize, `templates/XDMZ8201.MZX`) in East Java, the starting point for another crop. |
+| [`cases/`](cases/) | One file per case study of the documentation (Niger millet, Kenya maize, Mekong rice, Luzon rice, Java maize as a rice-then-maize sequence), each with the commands that prepared its inputs and ran it in its header. |
 | `xdssat.yml` | **Your own file**, read when no `--config` is given. Not committed (gitignored), so it can hold this computer's folders. Make it from `rice-java.yml`. |
 | `<study>.yml` | Any study you want to keep and share, e.g. `co2-java.yml`. Run it with `--config configs/<study>.yml`. |
 
@@ -57,8 +59,12 @@ input must be and the global datasets to use when you have none.
 
 - Any area for which the inputs are prepared. Water regime, region and zones are
   optional; without a water regime map every crop pixel takes `treatments > default_regime`.
-- One template is included: rice with CERES-Rice (`templates/XDRI8601.RIX`). Another
-  crop needs its own template FileX and crop model (`template` section); this is
-  untested.
+- Templates are included for rice (CERES-Rice, `XDRI8601.RIX`, and `XDRW8601.RIX` with two
+  more percolation rates), maize (CERES-Maize, `XDMZ8201.MZX`), pearl millet (CERES-Millet,
+  `XDML8601.MLX`) and a rice-then-maize crop sequence (`XDRM8601.SQX`, run in DSSAT's mode Q),
+  all written by `scripts/make_templates.py`. Another crop needs its own template FileX and
+  crop model (`template` section); the
+  [Another crop](https://bennyistanto.github.io/xdssat/xdssat/another-crop.html) page walks
+  through one.
 - The single-site experiments of the DSSAT training run from the notebooks
   (`docs/notebooks/`), not from these files.

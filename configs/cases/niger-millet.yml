@@ -1,0 +1,77 @@
+# ==========================================================================================
+# configs/cases/niger-millet.yml - case study "Niger - Millet: the date is the decision"
+# ==========================================================================================
+# Pearl millet around Niamey and Sadore, 1991-2023, sown from 1 June to 10 August every 10 days
+# (scenarios, planting_offset_days), with and without 45 kg N/ha. The inputs are prepared into
+# the cache from the global AgERA5 archive, the SoilGrids mirror and MapSPAM 2020 (prepare
+# section); docs/cases/niger.qmd tells the story. configs/rice-java.yml explains every setting.
+#   python scripts/prepare_weather.py   --config configs/cases/niger-millet.yml
+#   python scripts/prepare_crop_mask.py --config configs/cases/niger-millet.yml
+#   python scripts/prepare_soils.py     --config configs/cases/niger-millet.yml --aoi niger_millet
+#   python scripts/run_aoi.py           --config configs/cases/niger-millet.yml
+
+paths: {engine: null, work: null, agera5: null, soilgrids: null, inputs: null, cache: null, boundaries: null,
+  datasets: null}
+aoi:
+  name: niger_millet
+  bbox: [2.0, 13.0, 3.0, 14.0]
+  region: null
+inputs: {weather: agera5_case_niger, crop_mask: pearlmillet_spam2020_case_niger, soil: soilgrids_case_niger,
+  water_regime: null, region: null, zones: null}
+prepare:
+  weather:
+    name: agera5_case_niger
+    description: AgERA5 for the Niger pearl millet case, 1990-2024
+    source: AgERA5 (Copernicus Climate Change Service, doi:10.24381/cds.6c68c9bb), CC BY 4.0
+    box: null
+    grid_step: null
+    years: [1990, 2024]
+    station_code: AGE5
+    temperature_height_m: 2
+    variables:
+      TMAX: {files: '{agera5}/t2mmax/agera5_t2mmax_{year}.nc', variable: Temperature_Air_2m_Max_24h}
+      TMIN: {files: '{agera5}/t2mmin/agera5_t2mmin_{year}.nc', variable: Temperature_Air_2m_Min_24h}
+      SRAD: {files: '{agera5}/srad/agera5_srad_{year}.nc', variable: Solar_Radiation_Flux}
+      RAIN: {files: '{agera5}/precip/agera5_precip_{year}.nc', variable: Precipitation_Flux, regrid: mean}
+      DEWP: {files: '{agera5}/t2mdp/agera5_t2mdp_{year}.nc', variable: Dew_Point_Temperature_2m_Mean_24h}
+      WIND: {files: '{agera5}/ws10m/agera5_ws10m_{year}.nc', variable: Wind_Speed_10m_Mean_24h, height_m: 10}
+  crop_mask: {name: pearlmillet_spam2020_case_niger, files: '{inputs}/spam2020/spam2020_V2r2_global_A_PMIL_A.tif',
+    values: ha, box: null, source: 'SPAM 2020 v2r2 (IFPRI, doi:10.7910/DVN/SWPENT), CC BY 4.0: physical
+      area of pearl millet, all technologies'}
+  water_regime: null
+  region: null
+  zones: null
+  soil: {name: soilgrids_case_niger, method: soilgrids, soc_scale: none, country: Niger}
+template: {file: templates/XDML8601.MLX, crop_model: MLCER048}
+cultivars: {CIVT: IB0044}
+treatments:
+  nitrogen_kg: [0, 45]
+  nitrogen_levels: {0: 0, 45: 1}
+  water_regimes:
+    rainfed:
+      template_level: 0
+      irrigation_classes: []
+  default_regime: rainfed
+  initial_soil_water: 0.3
+seasons:
+  mode: uniform
+  year_starts: 01-01
+  calendar:
+  - name: rainy
+    date: 06-01
+    regimes: [rainfed]
+  onset: {rain_mm: 50, dasarian: 3, planting_after_days: 20, next_season_after_days: 120, years: null}
+  zone_table: null
+  zone_column: aez
+scenarios:
+- {name: sow0601, description: sown on 01 June}
+- {name: sow0611, description: sown on 11 June, planting_offset_days: 10}
+- {name: sow0621, description: sown on 21 June, planting_offset_days: 20}
+- {name: sow0701, description: sown on 01 July, planting_offset_days: 30}
+- {name: sow0711, description: sown on 11 July, planting_offset_days: 40}
+- {name: sow0721, description: sown on 21 July, planting_offset_days: 50}
+- {name: sow0731, description: sown on 31 July, planting_offset_days: 60}
+- {name: sow0810, description: sown on 10 August, planting_offset_days: 70}
+years: [1991, 2023]
+run: {workers: 32, chunk_size: 200, years_per_batch: 5, sample: null, seed: 1, season_days: 220, output_folder: null,
+  daily: null}
