@@ -1,0 +1,37 @@
+{
+  "format": 1,
+  "kind": "crop_mask",
+  "name": "pearlmillet_spam2020_niger_millet",
+  "written": "2026-11-09T13:17:46",
+  "description": "crop area (ha per pixel) from ha of {inputs}/spam2020/spam2020_V2r2_global_A_PMIL_A.tif",
+  "source": "SPAM 2020 v2r2 (IFPRI, doi:10.7910/DVN/SWPENT), CC BY 4.0: physical area of pearl millet, all technologies",
+  "made_by": "scripts/prepare_crop_mask.py (prepare > crop_mask)",
+  "file": "inputs/crop_mask/pearlmillet_spam2020_niger_millet/crop_area.tif",
+  "band": 1,
+  "units": "ha per pixel",
+  "box": [
+    2.0,
+    13.0,
+    3.0,
+    14.0
+  ],
+  "values": "ha",
+  "classes_counted": null,
+  "aggregate": 1,
+  "split": 1,
+  "from_files": [
+    "{inputs}/spam2020/spam2020_V2r2_global_A_PMIL_A.tif"
+  ],
+  "seconds": 0.1,
+  "crs": "EPSG:4326",
+  "pixel": [
+    0.0833333332727273,
+    0.0833333332727273
+  ],
+  "width": 13,
+  "height": 12,
+  "total_ha": 180362.1995010376,
+  "pixels_with_crop": 156,
+  "units_per_ha": 1,
+  "class_band": null
+}

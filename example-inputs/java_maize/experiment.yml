@@ -1,0 +1,86 @@
+# ==========================================================================================
+# example-inputs/java_maize/experiment.yml - East Java, Indonesia, maize
+# ==========================================================================================
+# A ready-to-run example: the prepared inputs are in this folder (paths > datasets), made by
+# python scripts/make_example_inputs.py from public data, all CC BY 4.0:
+#   weather    AgERA5, Copernicus Climate Change Service, doi:10.24381/cds.6c68c9bb
+#   soil       SoilGrids 2.0, ISRIC, doi:10.5194/soil-7-217-2021
+#   crop mask and irrigated share  MapSPAM 2020 v2r2, IFPRI, doi:10.7910/DVN/SWPENT
+# Every section is written out; configs/rice-java.yml explains each setting, and
+# docs/xdssat/examples.qmd describes this area. Uncalibrated (SLPF 1): results show how the
+# model responds, not farm yields.
+#
+# Run it (engine, work and cache from your configs/xdssat.yml are not read here: give them
+# as environment variables XDSSAT_ENGINE, XDSSAT_WORK, XDSSAT_CACHE):
+#   python scripts/run_aoi.py --config example-inputs/java_maize/experiment.yml --check
+#   python scripts/run_aoi.py --config example-inputs/java_maize/experiment.yml
+# The run folders go to <cache>/runs. The prepare section says how the inputs were made; it
+# needs the source archives only to make them again.
+
+paths: {engine: null, work: null, agera5: null, soilgrids: null, inputs: null, cache: null, boundaries: null,
+  datasets: example-inputs/java_maize}
+aoi:
+  name: java_maize
+  bbox: [111.4, -8.0, 112.4, -7.0]
+  region: null
+inputs: {weather: agera5_java_maize, crop_mask: maize_spam2020_java_maize, soil: soilgrids_java_maize,
+  water_regime: spam2020_maize_irrigated_java_maize, region: null, zones: null}
+prepare:
+  weather:
+    name: agera5_java_maize
+    description: AgERA5 for East Java, Indonesia, maize, from the global archive
+    source: AgERA5 (Copernicus Climate Change Service, doi:10.24381/cds.6c68c9bb), CC BY 4.0
+    box: null
+    grid_step: null
+    years: [2018, 2021]
+    station_code: AGE5
+    temperature_height_m: 2
+    variables:
+      TMAX: {files: '{agera5}/t2mmax/agera5_t2mmax_{year}.nc', variable: Temperature_Air_2m_Max_24h}
+      TMIN: {files: '{agera5}/t2mmin/agera5_t2mmin_{year}.nc', variable: Temperature_Air_2m_Min_24h}
+      SRAD: {files: '{agera5}/srad/agera5_srad_{year}.nc', variable: Solar_Radiation_Flux}
+      RAIN: {files: '{agera5}/precip/agera5_precip_{year}.nc', variable: Precipitation_Flux, regrid: mean}
+      DEWP: {files: '{agera5}/t2mdp/agera5_t2mdp_{year}.nc', variable: Dew_Point_Temperature_2m_Mean_24h}
+      WIND: {files: '{agera5}/ws10m/agera5_ws10m_{year}.nc', variable: Wind_Speed_10m_Mean_24h, height_m: 10}
+  crop_mask: {name: maize_spam2020_java_maize, files: '{inputs}/spam2020/spam2020_V2r2_global_A_MAIZ_A.tif',
+    values: ha, box: null, source: 'SPAM 2020 v2r2 (IFPRI, doi:10.7910/DVN/SWPENT), CC BY 4.0: physical
+      area of maize, all technologies'}
+  water_regime: {name: spam2020_maize_irrigated_java_maize, values: ratio, irrigated: '{inputs}/spam2020/spam2020_V2r2_global_A_MAIZ_I.tif',
+    total: '{inputs}/spam2020/spam2020_V2r2_global_A_MAIZ_A.tif', box: null, source: 'SPAM 2020 v2r2 (IFPRI,
+      doi:10.7910/DVN/SWPENT), CC BY 4.0: maize physical area, irrigated / all'}
+  region: null
+  zones: null
+  soil: {name: soilgrids_java_maize, method: soilgrids, soc_scale: wise_indonesia, country: Indonesia}
+template: {file: templates/XDMZ8201.MZX, crop_model: MZCER048}
+cultivars: {McCurdy 84aa: IB0035}
+treatments:
+  nitrogen_kg: [120]
+  nitrogen_levels: {0: 0, 60: 3, 116: 1, 120: 4, 180: 5, 401: 2}
+  water_regimes:
+    irrigated:
+      template_level: 4
+      irrigation_classes: []
+    rainfed:
+      template_level: 0
+      irrigation_classes: []
+  default_regime: rainfed
+  share_regimes: {share: irrigated, rest: rainfed}
+  initial_soil_water: 0.5
+seasons:
+  mode: uniform
+  year_starts: 08-01
+  calendar:
+  - name: wet
+    date: 11-15
+    regimes: [irrigated, rainfed]
+  - name: dry
+    date: 03-15
+    regimes: [irrigated, rainfed]
+  onset: {rain_mm: 50, dasarian: 3, planting_after_days: 20, next_season_after_days: 120, years: null}
+  zone_table: null
+  zone_column: aez
+scenarios:
+- {name: baseline}
+years: [2018, 2020]
+run: {workers: 8, chunk_size: 200, years_per_batch: 5, sample: null, seed: 1, season_days: 220, output_folder: null,
+  daily: null}

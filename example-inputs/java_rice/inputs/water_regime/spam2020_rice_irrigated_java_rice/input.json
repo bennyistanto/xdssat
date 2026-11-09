@@ -1,0 +1,27 @@
+{
+  "format": 1,
+  "kind": "water_regime",
+  "name": "spam2020_rice_irrigated_java_rice",
+  "written": "2026-11-09T14:21:02",
+  "description": "water regime from spam2020_V2r2_global_A_RICE_I.tif",
+  "source": "SPAM 2020 v2r2 (IFPRI, doi:10.7910/DVN/SWPENT), CC BY 4.0: rice physical area, irrigated / all",
+  "made_by": "scripts/prepare_layers.py --kind water_regime",
+  "file": "inputs/water_regime/spam2020_rice_irrigated_java_rice/share.tif",
+  "band": 1,
+  "box": [
+    107.5,
+    -7.0,
+    108.5,
+    -6.0
+  ],
+  "from_files": [
+    "{inputs}/spam2020/spam2020_V2r2_global_A_RICE_I.tif",
+    "{inputs}/spam2020/spam2020_V2r2_global_A_RICE_A.tif"
+  ],
+  "values": "share",
+  "crs": "EPSG:4326",
+  "pixel": [
+    0.0833333333333144,
+    0.0833333333333144
+  ]
+}

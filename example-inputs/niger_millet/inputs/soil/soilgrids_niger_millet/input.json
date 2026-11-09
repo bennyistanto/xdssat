@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "kind": "soil",
+  "name": "soilgrids_niger_millet",
+  "written": "2026-11-09T13:38:59",
+  "description": "one profile per weather cell with crop, niger_millet, from SoilGrids 2.0",
+  "source": "SoilGrids 2.0 (ISRIC), CC-BY 4.0",
+  "made_by": "scripts/prepare_soils.py --aoi niger_millet --weather agera5_niger_millet --crop-mask pearlmillet_spam2020_niger_millet",
+  "method": "soilgrids",
+  "soc_scale": null,
+  "file": "inputs/soil/soilgrids_niger_millet/soil.SOL",
+  "map": "inputs/soil/soilgrids_niger_millet/soil_map.csv",
+  "weather": "agera5_niger_millet",
+  "crop_mask": "pearlmillet_spam2020_niger_millet",
+  "cell_id": "XS{iy:04d}{ix:04d}",
+  "profiles": 132,
+  "cells": 132,
+  "sub_points": 10
+}

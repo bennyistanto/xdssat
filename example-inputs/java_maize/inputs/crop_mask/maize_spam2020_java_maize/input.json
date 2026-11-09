@@ -1,0 +1,37 @@
+{
+  "format": 1,
+  "kind": "crop_mask",
+  "name": "maize_spam2020_java_maize",
+  "written": "2026-11-09T13:17:45",
+  "description": "crop area (ha per pixel) from ha of {inputs}/spam2020/spam2020_V2r2_global_A_MAIZ_A.tif",
+  "source": "SPAM 2020 v2r2 (IFPRI, doi:10.7910/DVN/SWPENT), CC BY 4.0: physical area of maize, all technologies",
+  "made_by": "scripts/prepare_crop_mask.py (prepare > crop_mask)",
+  "file": "inputs/crop_mask/maize_spam2020_java_maize/crop_area.tif",
+  "band": 1,
+  "units": "ha per pixel",
+  "box": [
+    111.4,
+    -8.0,
+    112.4,
+    -7.0
+  ],
+  "values": "ha",
+  "classes_counted": null,
+  "aggregate": 1,
+  "split": 1,
+  "from_files": [
+    "{inputs}/spam2020/spam2020_V2r2_global_A_MAIZ_A.tif"
+  ],
+  "seconds": 0.1,
+  "crs": "EPSG:4326",
+  "pixel": [
+    0.0833333332727273,
+    0.0833333332727273
+  ],
+  "width": 13,
+  "height": 12,
+  "total_ha": 60786.80015850067,
+  "pixels_with_crop": 106,
+  "units_per_ha": 1,
+  "class_band": null
+}

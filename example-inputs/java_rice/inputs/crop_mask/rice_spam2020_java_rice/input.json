@@ -1,0 +1,37 @@
+{
+  "format": 1,
+  "kind": "crop_mask",
+  "name": "rice_spam2020_java_rice",
+  "written": "2026-11-09T14:20:58",
+  "description": "crop area (ha per pixel) from ha of {inputs}/spam2020/spam2020_V2r2_global_A_RICE_A.tif",
+  "source": "SPAM 2020 v2r2 (IFPRI, doi:10.7910/DVN/SWPENT), CC BY 4.0: physical area of rice, all technologies",
+  "made_by": "scripts/prepare_crop_mask.py (prepare > crop_mask)",
+  "file": "inputs/crop_mask/rice_spam2020_java_rice/crop_area.tif",
+  "band": 1,
+  "units": "ha per pixel",
+  "box": [
+    107.5,
+    -7.0,
+    108.5,
+    -6.0
+  ],
+  "values": "ha",
+  "classes_counted": null,
+  "aggregate": 1,
+  "split": 1,
+  "from_files": [
+    "{inputs}/spam2020/spam2020_V2r2_global_A_RICE_A.tif"
+  ],
+  "seconds": 0.0,
+  "crs": "EPSG:4326",
+  "pixel": [
+    0.0833333333333144,
+    0.0833333333333144
+  ],
+  "width": 12,
+  "height": 12,
+  "total_ha": 273944.69797182083,
+  "pixels_with_crop": 95,
+  "units_per_ha": 1,
+  "class_band": null
+}

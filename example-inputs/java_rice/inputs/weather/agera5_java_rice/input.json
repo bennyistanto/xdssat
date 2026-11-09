@@ -1,0 +1,33 @@
+{
+  "format": 1,
+  "kind": "weather",
+  "name": "agera5_java_rice",
+  "written": "2026-11-09T14:20:55",
+  "description": "AgERA5 for north coast of West Java, Indonesia, rice, from the global archive",
+  "source": "AgERA5 (Copernicus Climate Change Service, doi:10.24381/cds.6c68c9bb), CC BY 4.0; TMAX: {agera5}/t2mmax/agera5_t2mmax_{year}.nc [Temperature_Air_2m_Max_24h, K], regrid exact; TMIN: {agera5}/t2mmin/agera5_t2mmin_{year}.nc [Temperature_Air_2m_Min_24h, K], regrid exact; SRAD: {agera5}/srad/agera5_srad_{year}.nc [Solar_Radiation_Flux, J m-2 d-1], regrid exact; RAIN: {agera5}/precip/agera5_precip_{year}.nc [Precipitation_Flux, mm d-1], regrid mean; DEWP: {agera5}/t2mdp/agera5_t2mdp_{year}.nc [Dew_Point_Temperature_2m_Mean_24h, K], regrid exact; WIND: {agera5}/ws10m/agera5_ws10m_{year}.nc [Wind_Speed_10m_Mean_24h, m s-1], regrid exact",
+  "made_by": "scripts/prepare_weather.py",
+  "made": "2026-11-09",
+  "files": "inputs/weather/agera5_java_rice/{var}/agera5_java_rice_{var}_{year}.nc",
+  "variables": [
+    "SRAD",
+    "TMAX",
+    "TMIN",
+    "RAIN",
+    "DEWP",
+    "WIND"
+  ],
+  "wind_height_m": 10.0,
+  "temperature_height_m": 2.0,
+  "station_code": "AGE5",
+  "grid_step": 0.1,
+  "box": [
+    107.4,
+    -7.1,
+    108.6,
+    -5.9
+  ],
+  "grid_reference": {
+    "var": "TMAX",
+    "year": 2018
+  }
+}

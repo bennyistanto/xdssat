@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "kind": "soil",
+  "name": "soilgrids_mekong_rice",
+  "written": "2026-11-09T13:48:08",
+  "description": "one profile per weather cell with crop, mekong_rice, from SoilGrids 2.0",
+  "source": "SoilGrids 2.0 (ISRIC), CC-BY 4.0",
+  "made_by": "scripts/prepare_soils.py --aoi mekong_rice --weather agera5_mekong_rice --crop-mask rice_spam2020_mekong_rice",
+  "method": "soilgrids",
+  "soc_scale": null,
+  "file": "inputs/soil/soilgrids_mekong_rice/soil.SOL",
+  "map": "inputs/soil/soilgrids_mekong_rice/soil_map.csv",
+  "weather": "agera5_mekong_rice",
+  "crop_mask": "rice_spam2020_mekong_rice",
+  "cell_id": "XS{iy:04d}{ix:04d}",
+  "profiles": 121,
+  "cells": 121,
+  "sub_points": 10
+}

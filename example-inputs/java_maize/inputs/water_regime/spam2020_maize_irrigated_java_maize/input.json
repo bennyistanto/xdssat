@@ -1,0 +1,27 @@
+{
+  "format": 1,
+  "kind": "water_regime",
+  "name": "spam2020_maize_irrigated_java_maize",
+  "written": "2026-11-09T13:17:49",
+  "description": "water regime from spam2020_V2r2_global_A_MAIZ_I.tif",
+  "source": "SPAM 2020 v2r2 (IFPRI, doi:10.7910/DVN/SWPENT), CC BY 4.0: maize physical area, irrigated / all",
+  "made_by": "scripts/prepare_layers.py --kind water_regime",
+  "file": "inputs/water_regime/spam2020_maize_irrigated_java_maize/share.tif",
+  "band": 1,
+  "box": [
+    111.4,
+    -8.0,
+    112.4,
+    -7.0
+  ],
+  "from_files": [
+    "{inputs}/spam2020/spam2020_V2r2_global_A_MAIZ_I.tif",
+    "{inputs}/spam2020/spam2020_V2r2_global_A_MAIZ_A.tif"
+  ],
+  "values": "share",
+  "crs": "EPSG:4326",
+  "pixel": [
+    0.0833333332727273,
+    0.0833333332727273
+  ]
+}

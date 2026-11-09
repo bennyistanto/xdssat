@@ -1,0 +1,26 @@
+{
+  "format": 1,
+  "kind": "soil",
+  "name": "soilgrids_java_rice",
+  "written": "2026-11-09T14:21:14",
+  "description": "one profile per weather cell with crop, java_rice, from SoilGrids 2.0",
+  "source": "SoilGrids 2.0 (ISRIC), CC-BY 4.0",
+  "made_by": "scripts/prepare_soils.py --aoi java_rice --weather agera5_java_rice --crop-mask rice_spam2020_java_rice",
+  "method": "soilgrids",
+  "soc_scale": {
+    "0-5cm": 0.7,
+    "5-15cm": 0.7,
+    "15-30cm": 0.7,
+    "30-60cm": 0.63,
+    "60-100cm": 0.63,
+    "100-200cm": 0.47
+  },
+  "file": "inputs/soil/soilgrids_java_rice/soil.SOL",
+  "map": "inputs/soil/soilgrids_java_rice/soil_map.csv",
+  "weather": "agera5_java_rice",
+  "crop_mask": "rice_spam2020_java_rice",
+  "cell_id": "XS{iy:04d}{ix:04d}",
+  "profiles": 92,
+  "cells": 92,
+  "sub_points": 10
+}

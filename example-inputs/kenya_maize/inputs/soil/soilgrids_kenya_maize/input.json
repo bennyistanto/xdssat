@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "kind": "soil",
+  "name": "soilgrids_kenya_maize",
+  "written": "2026-11-09T13:48:51",
+  "description": "one profile per weather cell with crop, kenya_maize, from SoilGrids 2.0",
+  "source": "SoilGrids 2.0 (ISRIC), CC-BY 4.0",
+  "made_by": "scripts/prepare_soils.py --aoi kenya_maize --weather agera5_kenya_maize --crop-mask maize_spam2020_kenya_maize",
+  "method": "soilgrids",
+  "soc_scale": null,
+  "file": "inputs/soil/soilgrids_kenya_maize/soil.SOL",
+  "map": "inputs/soil/soilgrids_kenya_maize/soil_map.csv",
+  "weather": "agera5_kenya_maize",
+  "crop_mask": "maize_spam2020_kenya_maize",
+  "cell_id": "XS{iy:04d}{ix:04d}",
+  "profiles": 139,
+  "cells": 139,
+  "sub_points": 10
+}
