@@ -31,14 +31,17 @@ concurrency:
   group: "pages"
   cancel-in-progress: true
 
+# Action versions: the current major releases, all on Node.js 24 (Node.js 20 is
+# deprecated on the runners). The runner image is pinned so that the move of
+# ubuntu-latest to Ubuntu 26 does not change the build unannounced.
 jobs:
   build:
     name: Build site
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Quarto
         uses: quarto-dev/quarto-actions/setup@v2
@@ -52,16 +55,17 @@ jobs:
         with:
           path: docs
 
-      # output-dir in docs/_quarto.yml is _site, relative to docs/
+      # output-dir in docs/_quarto.yml is _site, relative to docs/. v5 leaves out
+      # hidden files by default; the site has none that Pages needs.
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs/_site
 
   deploy:
     name: Deploy to GitHub Pages
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     environment:
       name: github-pages
@@ -70,4 +74,9 @@ jobs:
     steps:
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
+        with:
+          # Pages copies the artifact to its servers ("syncing_files") before it goes
+          # live; usually seconds, but it can take longer when Pages is slow. The
+          # default of 10 minutes cancelled the deployment of 2026-11-09.
+          timeout: 1200000
