@@ -369,7 +369,7 @@ def prepare_polygons(p: dict, out_path: Path, workers: int = 16, log=print) -> d
 def prepare(exp, overwrite: bool = False, workers: int = 16, log=print) -> Path:
     """Make the crop mask of ``prepare > crop_mask``; write the file and its manifest."""
     p = plan(exp)
-    cache = exp.path("cache")
+    cache = exp.datasets()
     out_dir = inputs.root(cache) / "crop_mask" / p["name"]
     out_path = out_dir / "crop_area.tif"
     if out_path.exists() and not overwrite:

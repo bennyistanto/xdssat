@@ -69,6 +69,12 @@ FACTOR_SECTION = {
 # Factors whose dates we do not shift yet; templates must leave them at 0.
 UNSUPPORTED = ("SA", "MC", "MT")
 
+# MANAGEMENT column of *SIMULATION CONTROLS -> the factor whose dates it governs. With code D
+# the dates of that factor are days after planting, not calendar dates, and the engine does not
+# convert them (IPMAN.for:119-122 irrigation, 554-557 fertilizer, 376-378 residues, 710-718
+# harvest), so they must not move with the planting date either.
+MANAGEMENT_FACTOR = {"IRRIG": "MI", "FERTI": "MF", "RESID": "MR", "HARVS": "MH"}
+
 # Header names that hold dates (YYDDD or YYYYDDD).
 DATE_COLUMNS = {"PDATE", "EDATE", "IDATE", "FDATE", "RDATE", "ICDAT", "SDATE",
                 "PFRST", "PLAST", "HFRST", "HLAST", "HDATE", "TDATE", "CDATE", "ODATE"}
@@ -217,6 +223,10 @@ class FileX:
         sec = self.section(FACTOR_SECTION[factor])
         return level_blocks(sec.body) if sec else OrderedDict()
 
+    def crop_code(self) -> str:
+        """The 2-letter crop code of the experiment code in the title (``UFGA8201MZ`` -> ``MZ``)."""
+        return self.title.split()[1][8:10] if len(self.title.split()) > 1 else ""
+
     def planting_date(self, level: int) -> dt.date | None:
         for hdr, row in _rows_with_header(self.blocks("MP").get(level, [])):
             cols = {c.name: c for c in parse_header(hdr)}
@@ -228,6 +238,19 @@ class FileX:
 # ----------------------------------------------------------------------------
 # row editing
 # ----------------------------------------------------------------------------
+def management_codes(template: "FileX", sm_level: int) -> dict[str, str]:
+    """``{factor: code}`` from the MANAGEMENT row of a simulation-control level, e.g.
+    ``{"MI": "R", "MF": "D"}``; empty for level 0 (the engine's defaults are all R)."""
+    out = {}
+    for hdr, row in _rows_with_header(template.blocks("SM").get(sm_level, [])):
+        if hdr and hdr.split()[:2] == ["@N", "MANAGEMENT"]:
+            cols = {c.name: c for c in parse_header(hdr)}
+            for name, f in MANAGEMENT_FACTOR.items():
+                if name in cols:
+                    out[f] = _span(row, cols[name]).strip().upper()
+    return out
+
+
 def _rows_with_header(block: list[str]):
     hdr = None
     for ln in block:
@@ -278,7 +301,7 @@ def _shift_row(hdr: str, row: str, days: int) -> str:
     return row
 
 
-def _override_row(hdr: str, row: str, overrides: dict) -> str:
+def _override_row(hdr: str, row: str, overrides: dict, left_text: bool = True) -> str:
     if not overrides or hdr is None:
         return row
     cols = parse_header(hdr)
@@ -287,11 +310,15 @@ def _override_row(hdr: str, row: str, overrides: dict) -> str:
             continue
         v = overrides[c.name]
         is_last = i == len(cols) - 1
-        if isinstance(v, str):
-            # Text: left-aligned from the start of the span (CNAME, INGENO ...)
+        if isinstance(v, str) and (left_text or is_last):
+            # Text: left-aligned from the start of the span (CNAME, INGENO, SMODEL ...)
             start = c.start
             end = max(c.end, start + len(v) - 1) if is_last else c.end
             row = _put(row, start, end, v, left=True)
+        elif isinstance(v, str):
+            # Codes (simulation switches, PLME ...): right-aligned under the end of the name,
+            # where the engine's fixed formats read them (e.g. WATER at column 20, IPSIM.for)
+            row = _put(row, c.start, c.end, v)
         else:
             txt = _fmt_num(v, c.width)
             row = _put(row, c.start, c.end, txt)
@@ -311,7 +338,7 @@ def _fmt_num(v, width: int) -> str:
 
 
 def remap_block(block: list[str], new_level: int, days: int = 0,
-                overrides: dict | None = None) -> list[str]:
+                overrides: dict | None = None, left_text: bool = True) -> list[str]:
     """Copy one level's lines with a new level number, shifted dates and overrides."""
     out = []
     hdr = None
@@ -322,7 +349,7 @@ def remap_block(block: list[str], new_level: int, days: int = 0,
             continue
         row = _set_level(ln, new_level)
         row = _shift_row(hdr, row, days)
-        row = _override_row(hdr, row, overrides or {})
+        row = _override_row(hdr, row, overrides or {}, left_text)
         out.append(row)
     return out
 
@@ -447,6 +474,8 @@ def build_filex(template: FileX, units: pd.DataFrame, exp_code: str = "XDSS0001"
         pdate     planting (or transplanting) date of this season
         lat, lon, elev   optional, written to the field coordinates
         trno_template    optional, template treatment to copy (default 1)
+        shift_days       optional, days to move every date by (default: pdate minus the
+                         template's planting date); for treatments without a planting date
         "<F>.<COL>"      optional overrides, e.g. "MP.PPOP", "CU.INGENO"
 
     ``soils`` and ``ic_water``
@@ -477,6 +506,7 @@ def build_filex(template: FileX, units: pd.DataFrame, exp_code: str = "XDSS0001"
     new_blocks: dict[str, list[list[str]]] = {f: [] for f in FACTORS}
     treatment_rows = []
 
+    codes_of: dict[int, dict] = {}         # SM level -> management codes
     for i, u in units.iterrows():
         t = int(u["trno_template"])
         if t not in trt.index:
@@ -486,11 +516,17 @@ def build_filex(template: FileX, units: pd.DataFrame, exp_code: str = "XDSS0001"
             if trow[f] != 0:
                 raise NotImplementedError(
                     f"template treatment {t} uses factor {f}; only 0 is supported so far")
-        anchor = template.planting_date(int(trow["MP"])) if trow["MP"] else None
-        if anchor is None:
-            raise ValueError(f"template treatment {t} has no planting date to anchor on")
         pdate = pd.Timestamp(u["pdate"]).date()
-        days = (pdate - anchor).days
+        if "shift_days" in u and u["shift_days"] == u["shift_days"]:
+            days = int(u["shift_days"])          # given: e.g. every crop of a sequence moves alike
+        else:
+            anchor = template.planting_date(int(trow["MP"])) if trow["MP"] else None
+            if anchor is None:
+                raise ValueError(f"template treatment {t} has no planting date to anchor on")
+            days = (pdate - anchor).days
+        sm = int(trow["SM"])
+        if sm not in codes_of:
+            codes_of[sm] = management_codes(template, sm) if sm else {}
 
         levels = {}
         for f in FACTORS:
@@ -498,6 +534,8 @@ def build_filex(template: FileX, units: pd.DataFrame, exp_code: str = "XDSS0001"
             if tl == 0 or f in UNSUPPORTED:
                 levels[f] = 0
                 continue
+            # days after planting (code D) stay as they are; calendar dates move
+            fdays = 0 if codes_of[sm].get(f) == "D" else days
             ov = {k.split(".", 1)[1]: v for k, v in u.items()
                   if isinstance(k, str) and k.startswith(f + ".") and v == v}
             if f == "FL":
@@ -505,11 +543,11 @@ def build_filex(template: FileX, units: pd.DataFrame, exp_code: str = "XDSS0001"
             elif f == "CU":
                 key = (tl, tuple(sorted(ov.items())))
             elif f == "IC" and soils is not None and ic_water is not None and u["soil_id"] in soils:
-                key = (tl, days, u["soil_id"])
+                key = (tl, days, u["soil_id"], tuple(sorted(ov.items())))
             elif f == "SM":
                 key = (tl, days)
             else:
-                key = (tl, days, tuple(sorted(ov.items())))
+                key = (tl, fdays, tuple(sorted(ov.items())))
             if key not in level_keys[f]:
                 n = len(level_keys[f]) + 1
                 if n > MAX_LEVELS:
@@ -527,12 +565,12 @@ def build_filex(template: FileX, units: pd.DataFrame, exp_code: str = "XDSS0001"
                         _opt(u, "lat"), _opt(u, "lon"), _opt(u, "elev"))))
                 elif f == "CU":
                     new_blocks[f].append(remap_block(block, n, 0, ov))
-                elif len(key) == 3 and f == "IC" and key[2] == u["soil_id"]:
-                    new_blocks[f].append(_ic_from_soil(block, n, days, soils[u["soil_id"]], ic_water))
+                elif len(key) == 4 and f == "IC" and key[2] == u["soil_id"]:
+                    new_blocks[f].append(_ic_from_soil(block, n, days, soils[u["soil_id"]], ic_water, ov))
                 elif f == "SM":
-                    new_blocks[f].append(remap_block(block, n, days, sim_over))
+                    new_blocks[f].append(remap_block(block, n, days, sim_over, left_text=False))
                 else:
-                    new_blocks[f].append(remap_block(block, n, days, ov))
+                    new_blocks[f].append(remap_block(block, n, fdays, ov, left_text=False))
             levels[f] = level_keys[f][key]
 
         name = str(u["name"]) if "name" in u and u["name"] == u["name"] else f"{u['cell']} {pdate:%Y%m%d}"
@@ -551,7 +589,8 @@ def _opt(u, k):
     return None if v is None or v != v else float(v)
 
 
-def _ic_from_soil(block: list[str], level: int, days: int, soil, frac: float) -> list[str]:
+def _ic_from_soil(block: list[str], level: int, days: int, soil, frac: float,
+                  overrides: dict | None = None) -> list[str]:
     """Initial conditions on the soil's own layers.
 
     The surface line (crop, residue, ICDAT ...) comes from the template; the
@@ -563,7 +602,7 @@ def _ic_from_soil(block: list[str], level: int, days: int, soil, frac: float) ->
     """
     split = next((i for i, ln in enumerate(block) if _is_header(ln) and "ICBL" in ln), None)
     if split is None:
-        return remap_block(block, level, days)
+        return remap_block(block, level, days, overrides, left_text=False)
     layer_hdr = block[split]
     cols = {c.name: c for c in parse_header(layer_hdr)}
     tmpl = []                                   # (bottom cm, NH4 text, NO3 text) per template layer
@@ -573,7 +612,7 @@ def _ic_from_soil(block: list[str], level: int, days: int, soil, frac: float) ->
         tmpl.append((float(_span(ln, cols["ICBL"])),
                      _span(ln, cols["SNH4"]).strip() if "SNH4" in cols else "",
                      _span(ln, cols["SNO3"]).strip() if "SNO3" in cols else ""))
-    out = remap_block(block[:split], level, days)
+    out = remap_block(block[:split], level, days, overrides, left_text=False)
     out.append(layer_hdr)
     top = 0.0
     for _, r in soil.layers.iterrows():
@@ -598,7 +637,7 @@ def _assemble(template: FileX, exp_code: str, crop_code: str | None, title: str,
               treatment_rows: list[str], new_blocks: dict) -> str:
     if len(exp_code) != 8:
         raise ValueError("exp_code must be 8 characters, e.g. XDSS0001")
-    crop = crop_code or (template.title.split()[1][8:10] if template.title else "")
+    crop = crop_code or template.crop_code()
     lines = [f"*EXP.DETAILS: {exp_code}{crop} {title}".rstrip(), ""]
     section_factor = {v: k for k, v in FACTOR_SECTION.items()}
     for sec in template.sections:

@@ -77,14 +77,15 @@ def write_control(run_dir: Path, outputs: str = "summary", engine_dir: Path | No
 
 
 def run_engine(run_dir: Path, filex_name: str, outputs: str = "summary",
-               engine_dir: Path | None = None, timeout: float | None = 3600) -> RunResult:
-    """Run ``dscsm048 A <filex> DSCSM048.CTR`` in ``run_dir``."""
+               engine_dir: Path | None = None, timeout: float | None = 3600, mode: str = "A") -> RunResult:
+    """Run ``dscsm048 <mode> <file> DSCSM048.CTR`` in ``run_dir``: mode A runs every treatment of
+    a FileX, mode Q a sequence batch file (src/sequence.py)."""
     run_dir = config.check_short_path(Path(run_dir))
     exe = config.engine_exe(engine_dir)
     write_control(run_dir, outputs, engine_dir)
     t0 = time.perf_counter()
     proc = subprocess.run(
-        [str(exe), "A", filex_name, "DSCSM048.CTR"],
+        [str(exe), mode, filex_name, "DSCSM048.CTR"],
         cwd=run_dir, stdin=subprocess.DEVNULL, capture_output=True, text=True,
         encoding="latin-1", timeout=timeout,
     )
@@ -141,7 +142,7 @@ def run_chunk(chunk_id: int, units: pd.DataFrame, template: FileX,
               write_inputs: Callable[[Path, pd.DataFrame], None],
               work_root: Path | None = None, outputs: str = "summary",
               engine_dir: Path | None = None, keep: bool = False,
-              max_retries: int | None = None, **build_kw) -> ChunkResult:
+              max_retries: int | None = None, daily_groups=None, **build_kw) -> ChunkResult:
     """Run one chunk of units, skipping and recording units that crash.
 
     ``write_inputs(run_dir, units)`` must write the ``<wsta>.WTH`` files and
@@ -175,9 +176,13 @@ def run_chunk(chunk_id: int, units: pd.DataFrame, template: FileX,
                                 suffixes=("", "_unit"))
             done.append(merged)
         if outputs == "daily":
+            keys = ["TRNO"] + [c for c in ("cell", "stratum", "water", "season", "season_year", "pdate")
+                               if c in built.units]
             for name, df in read_daily_csv(run_dir).items():
+                if daily_groups is not None and name not in daily_groups:
+                    continue
                 if "TRNO" in df:
-                    df = df.merge(built.units[["TRNO", "cell", "pdate"]], on="TRNO", how="inner")
+                    df = df.merge(built.units[keys], on="TRNO", how="inner")
                 daily.setdefault(name, []).append(df)
         missing = [t for t in built.units["TRNO"] if t not in got]
         if not missing:

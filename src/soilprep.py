@@ -179,7 +179,7 @@ def assign(cells: pd.DataFrame, wlat, wlon) -> pd.DataFrame:
 def prepare_sol(exp, p: dict, weather_name: str, crop_name: str, overwrite: bool = False, log=print) -> Path:
     """Profiles from ``p['file']`` assigned per weather cell; writes the soil input ``p['name']``."""
     from sol import read_sol, write_sol
-    cache = exp.path("cache")
+    cache = exp.datasets()
     weather = inputs.open_dataset("weather", weather_name, cache)
     crop = inputs.open_dataset("crop_mask", crop_name, cache)
     out_dir = inputs.root(cache) / "soil" / p["name"]

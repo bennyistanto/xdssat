@@ -9,15 +9,22 @@ AgERA5 grid:
           lat, lon (bounding box of the run's cells, AgERA5 order: lat north to south)
 
 Each ``system`` is one (season, water_regime) pair, e.g. wet/irrigated, so no
-slab is empty by construction (rainfed rice has no dry season).
+slab is empty by construction (in the Java rice case, rainfed rice has no dry season).
 
 Per-season values are the DSSAT seasonal summary (summary.csv) of the
 stratum: yield (HWAH), biomass, dates, water and nitrogen. Area variables make
 regional totals a plain sum:
 
-    rice_area        static rice field area of the stratum (ha, 100 m pixels)
-    harvested_area   rice_area where the season was simulated and has a yield
+    crop_area        static crop area of the stratum (ha, from the crop mask)
+    harvested_area   crop_area where the season was simulated and has a yield
     production       yield x harvested_area (t)
+
+Rice runs also carry ``rice_area`` and ``rice_area_total``, copies of
+``crop_area`` and ``crop_area_total`` under the names files had before other
+crops (kept for scripts that read them).
+
+The crop comes from the run folder's run_info.json (``crop``: code, name,
+model); folders written before it existed are rice (``genotype.RICE``).
 
 So the area-weighted mean yield of any region and year is
 ``production.sum() / harvested_area.sum() * 1000`` (kg/ha), the same weighting
@@ -42,6 +49,7 @@ from pyproj import CRS
 import agera5
 import rasters
 import management as mg
+from genotype import RICE
 
 FILL = np.float32(1.0e20)
 SYSTEM_ORDER = [("wet", "irrigated"), ("wet", "rainfed"), ("dry", "irrigated"), ("dry", "rainfed")]
@@ -61,6 +69,16 @@ SEASON_VARS = {
     "evapotranspiration": ("ETCM", "mm", "evapotranspiration from simulation start to harvest",
                            {"cell_methods": "time: sum"}),
     "n_uptake": ("NUCM", "kg ha-1", "crop nitrogen uptake during the season", {}),
+    "n_fertilizer": ("NICM", "kg ha-1", "inorganic N applied during the season", {}),
+    "n_leached": ("NLCM", "kg ha-1", "N leached during the season", {}),
+    "n_mineralized": ("NMINC", "kg ha-1", "cumulative net N mineralisation during the season", {}),
+    "n2o_emitted": ("N2OEM", "kg ha-1", "cumulative N2O emissions at maturity, as N", {}),
+    "n_fixed": ("NFXM", "kg ha-1", "N fixed during the season (legumes)", {}),
+    "runoff": ("ROCM", "mm", "surface runoff during the season", {"cell_methods": "time: sum"}),
+    "drainage": ("DRCM", "mm", "water drained below the profile during the season", {"cell_methods": "time: sum"}),
+    "soil_evaporation": ("ESCM", "mm", "soil evaporation during the season", {"cell_methods": "time: sum"}),
+    "transpiration": ("EPCM", "mm", "transpiration during the season", {"cell_methods": "time: sum"}),
+    "water_at_maturity": ("SWXM", "mm", "plant-extractable soil water at maturity", {}),
 }
 DATE_VARS = {
     "planting_date": ("PDAT", "planting (transplanting) date"),
@@ -69,7 +87,8 @@ DATE_VARS = {
 }
 SEASONAL = ("accumulated over the simulated growing season (simulation start to harvest), "
             "not over the whole agricultural year that time_bnds spans")
-for _k in ("lai_max", "rain", "irrigation", "evapotranspiration", "n_uptake"):
+for _k in ("lai_max", "rain", "irrigation", "evapotranspiration", "n_uptake", "n_fertilizer", "n_leached",
+           "n_mineralized", "runoff", "drainage", "soil_evaporation", "transpiration"):
     SEASON_VARS[_k][3]["comment"] = SEASONAL.replace("accumulated", "maximum") if _k == "lai_max" else SEASONAL
 TIME_UNITS = "days since 1970-01-01"
 CALENDAR = "proleptic_gregorian"
@@ -95,14 +114,17 @@ def systems(summary: pd.DataFrame) -> list[tuple[str, str]]:
 
 
 def seasonal_dataset(summary: pd.DataFrame, strata: pd.DataFrame, lat: np.ndarray, lon: np.ndarray,
-                     years=None, attrs: dict | None = None) -> xr.Dataset:
+                     years=None, attrs: dict | None = None, crop: dict | None = None) -> xr.Dataset:
     """Grid the seasonal summary of a run.
 
     ``summary`` is run_aoi's summary.csv (DSSAT columns plus the unit columns
     ``season``, ``season_year``, ``iy``, ``ix``, ``water``, ``ha``); ``strata``
     its strata.csv; ``lat``/``lon`` the full AgERA5 region grid that ``iy``/``ix``
     index (``agera5.grid``). ``years`` defaults to every season_year in summary.
+    ``crop`` (``genotype.crop_info``) names the crop in the attributes; default rice.
     """
+    crop = crop or RICE
+    cname = crop["name"]
     sy = systems(summary)
     years = list(range(int(summary.season_year.min()), int(summary.season_year.max()) + 1)) \
         if years is None else list(years)
@@ -132,6 +154,8 @@ def seasonal_dataset(summary: pd.DataFrame, strata: pd.DataFrame, lat: np.ndarra
 
     hwah = _value(sm.HWAH)
     for name, (col, units, long_name, extra) in SEASON_VARS.items():
+        if col not in sm:                 # e.g. summaries of runs made before the column was kept
+            continue
         data[name] = (dims, grid(_value(sm[col]).to_numpy()),
                       {"long_name": long_name, "units": units, "dssat_variable": col, **extra})
     dates = {}
@@ -145,29 +169,36 @@ def seasonal_dataset(summary: pd.DataFrame, strata: pd.DataFrame, lat: np.ndarra
                              {"long_name": "days from planting to physiological maturity", "units": "d"})
     harvested = sm.ha.where(hwah.notna())
     data["harvested_area"] = (dims, grid(harvested.to_numpy()),
-                              {"long_name": "rice area of the stratum where the season has a simulated yield",
+                              {"long_name": f"{cname} area of the stratum where the season has a simulated yield",
                                "units": "ha", "cell_methods": "area: sum"})
     data["production"] = (dims, grid((hwah * harvested / 1000.0).to_numpy()),
                           {"long_name": "simulated grain production, yield x harvested_area, dry matter",
                            "units": "t", "cell_methods": "area: sum"})
 
-    # static rice area per system (the area of the system's water regime)
+    # static crop area per system (the area of the system's water regime)
     ra = np.full((len(sy), len(glat), len(glon)), np.nan, dtype=np.float32)
     for k, (season, water) in enumerate(sy):
         st = strata[strata.water == water]
         ra[k, st.iy.to_numpy() - iy0, st.ix.to_numpy() - ix0] = st.ha.to_numpy()
-    data["rice_area"] = (("system", "lat", "lon"), ra,
-                         {"long_name": "rice field area of the water regime in the cell "
-                                       "(100 m equal-area pixels, 1 pixel = 1 ha)",
+    data["crop_area"] = (("system", "lat", "lon"), ra,
+                         {"long_name": f"{cname} area of the water regime in the cell, from the crop mask",
                           "units": "ha", "cell_methods": "area: sum",
-                          "comment": "static; the irrigated area appears under both wet_irrigated and "
-                                     "dry_irrigated, so do not sum over system (use rice_area_total)"})
+                          "comment": "static; a regime planted in two seasons appears under both systems "
+                                     "(e.g. wet_irrigated and dry_irrigated), so do not sum over system "
+                                     "(use crop_area_total)"})
     tot = np.full((len(glat), len(glon)), np.nan, dtype=np.float32)
     cells = strata.groupby(["iy", "ix"]).ha.sum()
     tot[cells.index.get_level_values(0) - iy0, cells.index.get_level_values(1) - ix0] = cells.to_numpy()
-    data["rice_area_total"] = (("lat", "lon"), tot,
-                               {"long_name": "rice field area in the cell, all water regimes",
+    data["crop_area_total"] = (("lat", "lon"), tot,
+                               {"long_name": f"{cname} area in the cell, all water regimes",
                                 "units": "ha", "cell_methods": "area: sum"})
+    if crop["code"] == "RI":            # the names of files written before other crops
+        data["rice_area"] = (data["crop_area"][0], ra,
+                             {**data["crop_area"][2], "comment": data["crop_area"][2]["comment"]
+                              + "; same values as crop_area, kept under its older name"})
+        data["rice_area_total"] = (data["crop_area_total"][0], tot,
+                                   {**data["crop_area_total"][2],
+                                    "comment": "same values as crop_area_total, kept under its older name"})
 
     t0 = [mg.anchor_date(y) for y in years]
     t1 = [mg.anchor_date(y + 1) for y in years]
@@ -176,9 +207,10 @@ def seasonal_dataset(summary: pd.DataFrame, strata: pd.DataFrame, lat: np.ndarra
         "system": ("system", np.array([f"{a}_{b}" for a, b in sy], dtype=object),
                    {"long_name": "cropping system: season and water regime"}),
         "season": ("system", np.array([a for a, _ in sy], dtype=object),
-                   {"long_name": "season (wet: first season of the agricultural year, dry: second)"}),
+                   {"long_name": "season of the agricultural year (seasons > calendar of experiment.yml)"}),
         "water_regime": ("system", np.array([b for _, b in sy], dtype=object),
-                         {"long_name": "water regime (irrigated: constant flood; rainfed: bunded, rain only)"}),
+                         {"long_name": "water regime (treatments > water_regimes of experiment.yml: the "
+                                       "template irrigation level it ran with)"}),
         "time": ("time", pd.DatetimeIndex(t0).to_numpy(),
                  {"standard_name": "time", "long_name": "start of the agricultural year (1 Aug)",
                   "axis": "T", "bounds": "time_bnds"}),
@@ -258,35 +290,47 @@ def _name(v) -> str:
 
 def run_attrs(run_dir: Path, info: dict) -> dict:
     args = info.get("args", {})
+    crop = info.get("crop") or RICE
+    rice = crop["code"] == "RI"
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     clean = {**info, "template": _name(info.get("template")), "engine": _name(info.get("engine"))}
     clean["args"] = {k: (_name(v) if k == "zone_table" else v) for k, v in args.items() if k != "out"}
-    return {
+    ins = info.get("inputs")
+    if ins:                             # the sources of the prepared inputs of this run
+        data = "; ".join(f"{k.replace('_', ' ')} {d.get('source') or d.get('name')}" for k, d in ins.items())
+    else:                               # run folders written before input datasets existed
+        data = ("weather AgERA5 (https://doi.org/10.24381/cds.6c68c9bb); soil SoilGrids 2.0 with "
+                "Saxton-Rawls (2006) hydraulics; rice area ATR/BPN 2024; irrigation class Ministry of Agriculture")
+    cultivar = args.get("cultivar", "IR 58" if rice else "?")
+    out = {
         "Conventions": "CF-1.10",
-        "title": f"xdssat rice simulation, {args.get('aoi', '?')}, {args.get('mode', '?')} calendar",
-        "summary": ("Seasonal DSSAT-CSM rice results on the AgERA5 0.1 degree grid, one simulation per "
-                    "weather cell and water regime, with rice area for area-weighted totals."),
-        "source": (f"DSSAT-CSM 4.8 CERES-Rice (RICER048), engine {clean['engine']}; "
-                   f"template {clean['template']}; weather AgERA5 "
-                   "(https://doi.org/10.24381/cds.6c68c9bb); soil SoilGrids 2.0 with Saxton-Rawls (2006) "
-                   "hydraulics; rice area ATR/BPN 2024; irrigation class Ministry of Agriculture"),
+        "title": f"xdssat {crop['name']} simulation, {args.get('aoi', '?')}, {args.get('mode', '?')} calendar",
+        "summary": (f"Seasonal DSSAT-CSM {crop['name']} results on the weather grid, one simulation per "
+                    f"weather cell and water regime, with {crop['name']} area for area-weighted totals."),
+        "source": (f"DSSAT-CSM 4.8 {crop['model_name']} ({crop['model']}), engine {clean['engine']}; "
+                   f"template {clean['template']}; {data}"),
         "date_created": now,
         "history": f"{now} written by xdssat outputs.py from {Path(run_dir).name}/summary.csv",
         "references": "https://doi.org/10.24381/cds.6c68c9bb; https://doi.org/10.5194/soil-7-217-2021",
-        "comment": (f"Uncalibrated: one cultivar ({args.get('cultivar', 'IR 58')}), {args.get('n', 140)} kg N "
-                    "as urea, no pests or diseases; not comparable with farm statistics until calibrated."),
-        "crop_model": "RICER048",
-        "cultivar": f"{args.get('cultivar', 'IR 58')} (template XDRI8601.RIX)",
-        "nitrogen_kg_ha": str(args.get("n", 140)),
+        "comment": (f"Uncalibrated: one cultivar ({cultivar}), {args.get('n', 140 if rice else '?')} kg N, "
+                    "no pests or diseases; not comparable with farm statistics until calibrated."),
+        "crop": crop["name"],
+        "crop_model": crop["model"],
+        "cultivar": f"{cultivar} (template {clean['template'] if info.get('template') else 'XDRI8601.RIX'})",
+        "nitrogen_kg_ha": str(args.get("n", 140 if rice else "?")),
         "soil_fertility_factor_SLPF": str(args.get("slpf", 1.0)),
         "soil_fertility_factor_SLPF_rainfed": str(args.get("slpf_rainfed", "None")).replace("None", "same as SLPF"),
         "soil_fertility_factor_SLPF_table": Path(str(args.get("slpf_table", "None"))).name.replace("None", "none"),
-        "cold_sterility_threshold_TCLDF": str(args.get("tcldf", "None")).replace("None", "cultivar file value"),
+    }
+    if rice:
+        out["cold_sterility_threshold_TCLDF"] = str(args.get("tcldf", "None")).replace("None", "cultivar file value")
+    out.update({
         "xdssat_version": _git_version(),
         "xdssat_aoi": str(args.get("aoi", "")),
         "xdssat_mode": str(args.get("mode", "")),
         "xdssat_run": json.dumps(clean),
-    }
+    })
+    return out
 
 
 def write_run(run_dir: Path, region: str = "idn", path: Path | None = None, lat_lon=None) -> Path:
@@ -309,7 +353,8 @@ def write_run(run_dir: Path, region: str = "idn", path: Path | None = None, lat_
         import inputs
         exp = config.load(run_dir / "experiment.yml")
         if "inputs" in config.read_yaml(run_dir / "experiment.yml")[0]:
-            lat_lon = inputs.open_dataset("weather", exp.data["inputs"]["weather"], exp.path("cache")).grid()[:2]
+            lat_lon = inputs.open_dataset("weather", exp.data["inputs"]["weather"], exp.datasets()).grid()[:2]
     lat, lon = lat_lon if lat_lon is not None else agera5.grid(region)[:2]
-    ds = seasonal_dataset(summary, strata, lat, lon, years=years, attrs=run_attrs(run_dir, info))
+    ds = seasonal_dataset(summary, strata, lat, lon, years=years, attrs=run_attrs(run_dir, info),
+                          crop=info.get("crop"))
     return write(ds, path or run_dir / f"{run_dir.name}.nc")

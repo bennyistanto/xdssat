@@ -79,7 +79,7 @@ class InputError(config.ConfigError):
 # manifests
 # ----------------------------------------------------------------------------
 def root(cache: Path | None = None) -> Path:
-    return Path(cache or config.CACHE_DIR) / "inputs"
+    return Path(cache or config.DATASETS_DIR) / "inputs"
 
 
 def manifest_path(kind: str, name: str, cache: Path | None = None) -> Path:
@@ -111,12 +111,12 @@ def open_dataset(kind: str, name: str, cache: Path | None = None):
         raise InputError([_missing_message(kind, name, have, cache)])
     meta = json.loads(p.read_text(encoding="utf-8"))
     cls = {"weather": Weather, "crop_mask": CropMask, "soil": Soil}.get(kind, ClassLayer)
-    return cls(kind, name, meta, Path(cache or config.CACHE_DIR))
+    return cls(kind, name, meta, Path(cache or config.DATASETS_DIR))
 
 
 def open_all(exp) -> dict:
     """Every input the experiment names, by kind (None for an optional kind set to null)."""
-    cache = exp.path("cache")
+    cache = exp.datasets()
     return {k: (open_dataset(k, n, cache) if n else None) for k, n in exp.data["inputs"].items()}
 
 
@@ -281,6 +281,14 @@ class Weather(Dataset):
             raise ValueError(f"daily series has gaps between {start:%Y-%m-%d} and {end:%Y-%m-%d}")
         return dates, out
 
+    def first_common_date(self, variables=None) -> pd.Timestamp:
+        """First day that every variable has."""
+        starts = []
+        for var in variables or self.variables:
+            with netCDF4.Dataset(self.path(var, self.years(var)[0])) as f:
+                starts.append(_dates(f["time"])[0])
+        return max(starts)
+
     def last_common_date(self, variables=None) -> pd.Timestamp:
         """Last day that every variable has (the newest year is often partial)."""
         ends = []
@@ -392,7 +400,7 @@ class Soil(Dataset):
 # ----------------------------------------------------------------------------
 def check(exp, years=None) -> list[str]:
     """Plain-language problems with the inputs the experiment names (empty when all is well)."""
-    if not exp.has_path("cache"):
+    if not exp.has_datasets():
         return []                       # config.check_files already says the cache is not set
     out = []
 
@@ -406,7 +414,7 @@ def check(exp, years=None) -> list[str]:
         if not name:
             continue
         try:
-            ds[kind] = open_dataset(kind, name, exp.path("cache"))
+            ds[kind] = open_dataset(kind, name, exp.datasets())
         except InputError as e:
             out.append(e.problems[0])
             continue

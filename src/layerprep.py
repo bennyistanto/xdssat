@@ -214,7 +214,7 @@ def prepare_classes(p: dict, out_path: Path, workers: int = 16, log=print) -> di
 
 def prepare(exp, kind: str, overwrite: bool = False, workers: int = 16, log=print) -> Path:
     p = plan(exp, kind)
-    cache = exp.path("cache")
+    cache = exp.datasets()
     out_dir = inputs.root(cache) / kind / p["name"]
     out_path = out_dir / ("share.tif" if p["values"] in SHARE_VALUES else "classes.tif")
     if out_path.exists() and not overwrite:

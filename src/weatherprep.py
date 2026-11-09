@@ -459,13 +459,13 @@ def plan(exp) -> dict:
             "wind_height_m": spec.get("wind_height_m"),
             "station_code": spec.get("station_code", "XDWX"),
             "temperature_height_m": float(spec.get("temperature_height_m", 2.0)),
-            "description": spec.get("description", "")}
+            "description": spec.get("description", ""), "source": spec.get("source") or ""}
 
 
 def prepare(exp, overwrite: bool = False, log=print) -> Path:
     """Read, convert and regrid every weather variable; write the dataset and its manifest."""
     p = plan(exp)
-    cache = exp.path("cache")
+    cache = exp.datasets()
     out_dir = inputs.root(cache) / "weather" / p["name"]
     if p["points"]:
         return prepare_points(exp, p, out_dir, overwrite=overwrite, log=log)
@@ -511,7 +511,8 @@ def prepare(exp, overwrite: bool = False, log=print) -> Path:
     wind = p["variables"].get("WIND") or {}
 
     meta = {"description": p["description"] or f"daily weather prepared for {exp.aoi}",
-            "source": "; ".join(f"{v}: {s}" for v, s in sources.items()) or "see the files",
+            "source": "; ".join(([p["source"]] if p.get("source") else [])
+                                + [f"{v}: {s}" for v, s in sources.items()]) or "see the files",
             "made_by": "scripts/prepare_weather.py", "made": dt.date.today().isoformat(),
             "files": f"inputs/weather/{p['name']}/{{var}}/{p['name']}_{{var}}_{{year}}.nc",
             "variables": [v for v in inputs.WEATHER_UNITS if v in p["variables"]],
@@ -727,7 +728,7 @@ def nearest_point(lat, lon, plat, plon) -> np.ndarray:
 
 def prepare_points(exp, p, out_dir: Path, overwrite: bool = False, log=print) -> Path:
     """Weather from point sources: every cell of the grid takes the series of its nearest point."""
-    cache = exp.path("cache")
+    cache = exp.datasets()
     if not p["grid_step"]:
         raise config.ConfigError(["setting 'prepare > weather > grid_step' is needed with points: the cell "
                                   "size of the weather grid, e.g. 0.1."], exp.file)

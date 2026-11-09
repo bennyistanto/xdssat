@@ -75,6 +75,8 @@ PATH_KEYS = {
     "inputs": ("XDSSAT_INPUTS", "INPUTS_DIR"),
     "cache": ("XDSSAT_CACHE", "CACHE_DIR"),
     "boundaries": ("XDSSAT_BOUNDARIES", "BOUNDARIES_DIR"),
+    # the folder holding inputs/<kind>/<name>/ (prepared datasets); null = the cache folder
+    "datasets": ("XDSSAT_DATASETS", "DATASETS_DIR"),
 }
 # Required by run_aoi.py; the others are needed only to prepare inputs.
 RUN_PATHS = ("engine", "work", "cache")
@@ -112,7 +114,7 @@ DEFAULTS: dict = {
             {"name": "wet", "date": "11-15", "regimes": ["irrigated", "rainfed"]},
             {"name": "dry", "date": "04-01", "regimes": ["irrigated"]},
         ],
-        "onset": {"rain_mm": 50, "dasarian": 3, "transplant_after_days": 20,
+        "onset": {"rain_mm": 50, "dasarian": 3, "planting_after_days": 20,
                   "next_season_after_days": 120, "years": None},
         "zone_table": None,
         "zone_column": "aez",
@@ -120,7 +122,7 @@ DEFAULTS: dict = {
     "scenarios": [{"name": "baseline"}],
     "years": [1991, 2020],
     "run": {"workers": 32, "chunk_size": 200, "years_per_batch": 5, "sample": None,
-            "seed": 1, "season_days": 220, "output_folder": None},
+            "seed": 1, "season_days": 220, "output_folder": None, "daily": None},
 }
 
 SECTIONS = ("paths", "aoi", "inputs", "prepare", "template", "treatments", "seasons", "run")   # key by key
@@ -132,8 +134,36 @@ ENVIRONMENT = {"daylength": "EDAY", "radiation": "ERAD", "tmax": "EMAX", "tmin":
                "rain": "ERAIN", "co2": "ECO2", "dewpoint": "EDEW", "wind": "EWIND"}
 # how to change it -> engine code (Weather/WTHMOD.for WTHSET: A add, S subtract, M multiply, R replace)
 CHANGE = {"add": "A", "subtract": "S", "multiply": "M", "replace": "R"}
+# run > daily: the engine's daily CSV groups (Data/OUTPUT.CDE, daily csv format files)
+DAILY_GROUPS = ("plantgro", "plantn", "plantc", "plantgr2", "plantgrf", "soilwat", "soiltemp", "et",
+                "soilni", "weather", "soilorg", "etphot", "mulch", "plantp", "soilpi", "n2o")
 SCENARIO_KEYS = ("name", "description", "environment", "cultivar_coefficients",
-                 "slpf", "slpf_rainfed", "slpf_table")
+                 "slpf", "slpf_rainfed", "slpf_table", "simulation", "management",
+                 "planting_offset_days")
+# scenario > simulation: a column of the template's *SIMULATION CONTROLS -> its allowed codes
+# (None: a number). Codes from the engine's reader (IPSIM.for) and Data/SIMULATION.CDE.
+# Left out on purpose: WTHER W/S/G (need .CLI/.WTG files xdssat does not make), DISES (needs
+# pest files), management code D (the template's dates would then be read as days after
+# planting), and the dates, years and outputs xdssat sets itself.
+SIMULATION_FIELDS = {
+    # OPTIONS
+    "WATER": "YN", "NITRO": "YN", "SYMBI": "YNU", "PHOSP": "YN", "POTAS": "YN", "CHEM": "YN",
+    "TILL": "YN", "CO2": "WMD",
+    # METHODS
+    "EVAPO": "FRSTZ", "INFIL": "RSN", "PHOTO": "CRL", "MESOM": "GP", "MESEV": "RS", "MESOL": "123",
+    "METMP": "DRE", "MEGHG": "01", "NSWIT": None,
+    # MANAGEMENT
+    "PLANT": "AFR", "IRRIG": "ANRFPW", "FERTI": "NR", "RESID": "NR", "HARVS": "AMR",
+    # AUTOMATIC MANAGEMENT: planting, irrigation, harvest
+    "PH2OL": None, "PH2OU": None, "PH2OD": None, "PSTMX": None, "PSTMN": None,
+    "IMDEP": None, "ITHRL": None, "ITHRU": None, "IRAMT": None, "IREFF": None,
+    "HPCNP": None, "HPCNR": None,
+}
+# scenario > management: single-row fields of a factor level, as "<factor>.<column>"
+MANAGEMENT_FIELDS = {
+    "MP": ("PPOP", "PPOE", "PLME", "PLDS", "PLRS", "PLRD", "PLDP", "PLWT", "PAGE", "PENV", "PLPH", "SPRL"),
+    "IC": ("ICRT", "ICND", "ICRN", "ICRE", "ICWD", "ICRES", "ICREN", "ICREP", "ICRIP", "ICRID"),
+}
 
 
 class ConfigError(ValueError):
@@ -171,6 +201,13 @@ class Experiment:
 
     def has_path(self, key: str) -> bool:
         return self.data["paths"][key] is not None
+
+    def datasets(self) -> Path:
+        """The folder that holds ``inputs/<kind>/<name>/``: ``paths > datasets``, else the cache."""
+        return self.path("datasets") if self.has_path("datasets") else self.path("cache")
+
+    def has_datasets(self) -> bool:
+        return self.has_path("datasets") or self.has_path("cache")
 
     @property
     def template_file(self) -> Path:
@@ -251,6 +288,9 @@ def load(path=None, overrides: dict | None = None, env=None, only=None) -> Exper
     env = os.environ if env is None else env
     file = _abs(path) if path else default_file()
     raw, lines = ({}, {}) if file is None else read_yaml(file)
+    _rename_old(raw, lines, file)
+    if overrides:
+        _rename_old(overrides, {}, None)
     if only:
         raw = {k: v for k, v in raw.items() if k in only}
         lines = {k: v for k, v in lines.items() if k.split(".")[0] in only}
@@ -282,6 +322,28 @@ def load(path=None, overrides: dict | None = None, env=None, only=None) -> Exper
     for k in _keys(DEFAULTS):
         sources.setdefault(k, "built-in default" + ("" if file is None else f" (not set in {file.name})"))
     return Experiment(data, file, lines, sources)
+
+
+# Keys renamed when xdssat went beyond rice: old name -> new name. Files and run folders
+# written with the old name still load; giving both names is an error.
+RENAMED = {"seasons.onset.transplant_after_days": "seasons.onset.planting_after_days"}
+
+
+def _rename_old(raw: dict, lines: dict, file) -> None:
+    """Move settings written under an old key name to the new name (in place)."""
+    for old, new in RENAMED.items():
+        *parents, o = old.split(".")
+        n = new.split(".")[-1]
+        d = raw
+        for k in parents:
+            d = d.get(k) if isinstance(d, dict) else None
+        if not isinstance(d, dict) or o not in d:
+            continue
+        if n in d:
+            raise ConfigError([f"{new} and its old name {o} are both set; keep only {n}."], file)
+        d[n] = d.pop(o)
+        if old in lines:
+            lines[new] = lines.pop(old)
 
 
 def read_yaml(file: Path) -> tuple[dict, dict]:
@@ -328,6 +390,8 @@ def use(exp: Experiment) -> Experiment:
             g[attr] = exp.path(key)
         else:
             g.pop(attr, None)           # reading it then goes to __getattr__: PathNotSet
+    if not exp.has_path("datasets") and exp.has_path("cache"):
+        g["DATASETS_DIR"] = exp.path("cache")
     SETTINGS = {attr: (var, exp.path(key) if exp.has_path(key) else None)
                 for key, (var, attr) in PATH_KEYS.items()}
     return exp
@@ -603,7 +667,7 @@ def validate(raw: dict, file=None, lines: dict | None = None) -> list[str]:
                 if "template_level" not in w or "irrigation_classes" not in w:
                     c.bad(key, "needs both template_level and irrigation_classes.", ex)
                     continue
-                c.number(f"{key}.template_level", w["template_level"], 1, 99, integer=True, example=ex)
+                c.number(f"{key}.template_level", w["template_level"], 0, 99, integer=True, example=ex)
                 cls = w["irrigation_classes"]
                 if not isinstance(cls, list) or not all(isinstance(x, int) and not isinstance(x, bool)
                                                         for x in cls):
@@ -674,9 +738,9 @@ def validate(raw: dict, file=None, lines: dict | None = None) -> list[str]:
         c.number("seasons.onset.rain_mm", on["rain_mm"], 0, 1000, example="rain_mm: 50", open_lo=True)
     if "dasarian" in on:
         c.number("seasons.onset.dasarian", on["dasarian"], 1, 36, integer=True, example="dasarian: 3")
-    if "transplant_after_days" in on:
-        c.number("seasons.onset.transplant_after_days", on["transplant_after_days"], 0, 120,
-                 integer=True, example="transplant_after_days: 20")
+    if "planting_after_days" in on:
+        c.number("seasons.onset.planting_after_days", on["planting_after_days"], 0, 120,
+                 integer=True, example="planting_after_days: 20")
     if "next_season_after_days" in on:
         c.number("seasons.onset.next_season_after_days", on["next_season_after_days"], 0, 300,
                  integer=True, example="next_season_after_days: 120")
@@ -731,10 +795,16 @@ def validate(raw: dict, file=None, lines: dict | None = None) -> list[str]:
         c.number("run.season_days", rn["season_days"], 60, 400, integer=True, example="season_days: 220")
     if rn.get("output_folder") is not None:
         c.text("run.output_folder", rn["output_folder"], "output_folder: <cache>/runs", what="a folder")
+    if rn.get("daily") is not None:
+        exd = "daily: [plantgro, soilwat]"
+        dg = rn["daily"]
+        if not isinstance(dg, list) or not dg or any(g not in DAILY_GROUPS for g in dg):
+            c.bad("run.daily", f"{dg!r} should be a list of daily output groups: "
+                               f"{', '.join(DAILY_GROUPS)}; or null for none.", exd)
     return c.problems
 
 
-PREPARE_WEATHER_KEYS = ("name", "description", "box", "grid_step", "years", "station_code",
+PREPARE_WEATHER_KEYS = ("name", "description", "source", "box", "grid_step", "years", "station_code",
                         "temperature_height_m", "variables", "points", "utc_offset_hours", "wind_height_m")
 SOURCE_KEYS = ("files", "variable", "units", "regrid", "height_m", "daily")
 POINT_KEYS = ("file", "lat", "lon", "columns", "units", "missing", "date_format")
@@ -1105,6 +1175,48 @@ def _check_scenario(c: _Checker, i: int, s, names: list):
                                        "slpf_rainfed; set only one of them.", "slpf_table: slpf_table.csv")
     if "description" in s and not isinstance(s["description"], str):
         c.bad(f"{key}.description", "should be text.", 'description: "CO2 at 550 ppm"')
+    sim = s.get("simulation")
+    if sim is not None:
+        exs = "simulation: {WATER: N, NITRO: N}"
+        if not isinstance(sim, dict) or not sim:
+            c.bad(f"{key}.simulation", "should map a simulation-control column to its value.", exs)
+        else:
+            for name, v in sim.items():
+                k = f"{key}.simulation.{name}"
+                if name not in SIMULATION_FIELDS:
+                    c.bad(k, f"'{name}' is not a simulation setting xdssat can change; use one of "
+                             f"{', '.join(SIMULATION_FIELDS)}.", exs)
+                    continue
+                codes = SIMULATION_FIELDS[name]
+                if codes is None:
+                    c.number(k, v, example=f"{name}: 50")
+                elif not (isinstance(v, (str, bool, int)) and str(_code(v)) in codes and len(str(_code(v))) == 1):
+                    c.bad(k, f"{v!r} should be one of {', '.join(codes)}.", f"{name}: {codes[0]}")
+    man = s.get("management")
+    if man is not None:
+        exm = "management: {MP.PPOP: 5.5}"
+        if not isinstance(man, dict) or not man:
+            c.bad(f"{key}.management", "should map '<factor>.<column>' to a value.", exm)
+        else:
+            for name, v in man.items():
+                f, _, col = str(name).partition(".")
+                if col not in MANAGEMENT_FIELDS.get(f, ()):
+                    c.bad(f"{key}.management", f"'{name}' is not a field xdssat can change; use "
+                          + "; ".join(f"{g}.{x}" for g, cols in MANAGEMENT_FIELDS.items() for x in cols[:3])
+                          + " ... (planting details MP, initial conditions IC).", exm)
+                elif not isinstance(v, (int, float, str)) or isinstance(v, bool):
+                    c.bad(f"{key}.management.{name}", f"{v!r} should be a number or a code.", exm)
+    if s.get("planting_offset_days") is not None:
+        c.number(f"{key}.planting_offset_days", s["planting_offset_days"], -180, 180, integer=True,
+                 example="planting_offset_days: 14")
+
+
+def _code(v):
+    """A YAML value as a one-letter code (YAML reads Y / N / yes / no as booleans)."""
+    if isinstance(v, bool):
+        return "Y" if v else "N"
+    t = str(v).strip().upper()
+    return {"YES": "Y", "TRUE": "Y", "NO": "N", "FALSE": "N"}.get(t, t)
 
 
 def check_files(exp: Experiment) -> list[str]:
@@ -1117,28 +1229,37 @@ def check_files(exp: Experiment) -> list[str]:
               "file: templates/XDRI8601.RIX")
         return c.problems
     t = filex.FileX.read(tf)
-    trt = t.treatments()
-    mf, mi = set(t.blocks("MF")) | {0}, set(t.blocks("MI"))
-    for kg, lv in exp.data["treatments"]["nitrogen_levels"].items():
-        if lv not in mf:
-            c.bad(f"treatments.nitrogen_levels.{kg}", f"the template has no fertilizer level {lv} "
-                  f"(it has {', '.join(map(str, sorted(mf)))}; 0 means no fertilizer).")
-    for name, w in exp.data["treatments"]["water_regimes"].items():
-        if w["template_level"] not in mi:
-            c.bad(f"treatments.water_regimes.{name}.template_level",
-                  f"the template has no irrigation level {w['template_level']} "
-                  f"(it has {', '.join(map(str, sorted(mi)))}).")
-    if not c.problems:
-        for name in exp.data["treatments"]["water_regimes"]:
-            for kg in exp.data["treatments"]["nitrogen_kg"]:
-                sel = trt[(trt.MI == exp.water_level(name)) & (trt.MF == exp.n_level(kg))]
-                if sel.empty:
-                    c.bad("treatments.nitrogen_kg", f"the template has no treatment with irrigation level "
-                          f"{exp.water_level(name)} ({name}) and fertilizer level {exp.n_level(kg)} "
-                          f"({kg} kg N); add one to {tf.name}.")
-    if any(s.get("environment") for s in exp.data["scenarios"]) and (trt.ME != 0).any():
-        c.bad("scenarios", f"{tf.name} already has ENVIRONMENT MODIFICATIONS in its treatments; "
-                           "a scenario cannot add its own. Remove them from the template.")
+    if tf.suffix.upper() == ".SQX":       # a crop sequence: water regimes name sequence treatments
+        import sequence
+        have = set(sequence.sequence_table(t).N)
+        for name, w in exp.data["treatments"]["water_regimes"].items():
+            if w["template_level"] not in have:
+                c.bad(f"treatments.water_regimes.{name}.template_level",
+                      f"the sequence template has no sequence treatment {w['template_level']} "
+                      f"(it has {', '.join(map(str, sorted(have)))}).")
+    else:
+        trt = t.treatments()
+        mf, mi = set(t.blocks("MF")) | {0}, set(t.blocks("MI")) | {0}
+        for kg, lv in exp.data["treatments"]["nitrogen_levels"].items():
+            if lv not in mf:
+                c.bad(f"treatments.nitrogen_levels.{kg}", f"the template has no fertilizer level {lv} "
+                      f"(it has {', '.join(map(str, sorted(mf)))}; 0 means no fertilizer).")
+        for name, w in exp.data["treatments"]["water_regimes"].items():
+            if w["template_level"] not in mi:
+                c.bad(f"treatments.water_regimes.{name}.template_level",
+                      f"the template has no irrigation level {w['template_level']} "
+                      f"(it has {', '.join(map(str, sorted(mi)))}; 0 means no irrigation).")
+        if not c.problems:
+            for name in exp.data["treatments"]["water_regimes"]:
+                for kg in exp.data["treatments"]["nitrogen_kg"]:
+                    sel = trt[(trt.MI == exp.water_level(name)) & (trt.MF == exp.n_level(kg))]
+                    if sel.empty:
+                        c.bad("treatments.nitrogen_kg", f"the template has no treatment with irrigation "
+                              f"level {exp.water_level(name)} ({name}) and fertilizer level "
+                              f"{exp.n_level(kg)} ({kg} kg N); add one to {tf.name}.")
+        if any(s.get("environment") for s in exp.data["scenarios"]) and (trt.ME != 0).any():
+            c.bad("scenarios", f"{tf.name} already has ENVIRONMENT MODIFICATIONS in its treatments; "
+                               "a scenario cannot add its own. Remove them from the template.")
     for key in RUN_PATHS:
         if not exp.has_path(key):
             c.bad(f"paths.{key}", path_not_set_message(exp, key).split("\n")[0].replace(

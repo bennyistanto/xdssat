@@ -385,7 +385,7 @@ def crop_pixels(crop_path, layers: dict, wlat: np.ndarray, wlon: np.ndarray,
         if r.size == 0:
             return None
         d = {"share": share[r, c],
-             "rice_class": src.read(class_band, window=w)[r, c] if class_band else np.zeros(r.size, "uint8")}
+             "crop_class": src.read(class_band, window=w)[r, c] if class_band else np.zeros(r.size, "uint8")}
     rows, cols = r + win.row_off, c + win.col_off
     x = grid.left + (cols + 0.5) * grid.res
     y = grid.top - (rows + 0.5) * grid.ry
@@ -397,7 +397,7 @@ def crop_pixels(crop_path, layers: dict, wlat: np.ndarray, wlon: np.ndarray,
         y = (y[:, None] - dy[None, :] * grid.ry).ravel()
         rows, cols = np.repeat(rows, n), np.repeat(cols, n)
         d = {"share": np.repeat(d["share"].astype("float64") / n, n),
-             "rice_class": np.repeat(d["rice_class"], n)}
+             "crop_class": np.repeat(d["crop_class"], n)}
         r = c = None
     for k, p in layers.items():
         d[k] = _layer_values(p, grid, win, r, c, x, y)
@@ -461,8 +461,8 @@ def aggregate(rice_path, layers: dict, wlat: np.ndarray, wlon: np.ndarray,
     at the pixel centres. ``wlat``, ``wlon``, ``wvalid`` describe the weather grid.
     Band 1 of ``rice_path`` is the crop area, ``units_per_ha`` units per hectare
     (100 for the rice share in percent of a 1 ha pixel, 1 for ha per pixel);
-    ``class_band`` its crop class (the rice field type), or None. The crop class
-    column keeps its old name, ``rice_class``.
+    ``class_band`` its crop class (for the Java rice map the rice field type), or None,
+    in the column ``crop_class`` (``rice_class`` before crop masks other than rice).
 
     ``weights`` maps a name to a share layer (values 0-1, e.g. the irrigated share
     of each pixel; NaN or negative = no value). Instead of grouping by it, the
@@ -472,7 +472,7 @@ def aggregate(rice_path, layers: dict, wlat: np.ndarray, wlon: np.ndarray,
     ``sub``: sub-points per side of each crop pixel (``subdivision``), 1 = centres only.
     """
     weights = weights or {}
-    keys = ["iy", "ix", "rice_class", *layers]
+    keys = ["iy", "ix", "crop_class", *layers]
     wcols = [c for w in weights for c in (f"{w}_ha", f"{w}_known_ha")]
     parts = []
     for win in grid.tiles(tile):
@@ -497,7 +497,7 @@ def aggregate(rice_path, layers: dict, wlat: np.ndarray, wlon: np.ndarray,
     out["iy"], out["ix"], out["moved_cells"] = iy, ix, moved
     out["lat"] = np.where(iy >= 0, wlat[np.clip(iy, 0, None)], np.nan)
     out["lon"] = np.where(ix >= 0, wlon[np.clip(ix, 0, None)], np.nan)
-    keys = ["iy", "ix", "lat", "lon", "rice_class", *layers]
+    keys = ["iy", "ix", "lat", "lon", "crop_class", *layers]
     out = (out.groupby(keys, as_index=False, dropna=False)
               .agg(ha=("ha", "sum"), pixels=("pixels", "sum"),
                    moved_cells=("moved_cells", "max"), **{c: (c, "sum") for c in wcols}))
