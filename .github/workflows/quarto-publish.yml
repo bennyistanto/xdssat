@@ -74,9 +74,8 @@ jobs:
     steps:
       - name: Deploy
         id: deployment
+        # Waits up to 10 minutes (the action's maximum) while Pages copies the artifact
+        # to its servers ("syncing_files"); usually seconds. When it times out, the
+        # cancel takes a few minutes to complete on Pages: a re-run started before that
+        # fails with "in progress deployment", so wait a little before re-running.
         uses: actions/deploy-pages@v5
-        with:
-          # Pages copies the artifact to its servers ("syncing_files") before it goes
-          # live; usually seconds, but it can take longer when Pages is slow. The
-          # default of 10 minutes cancelled the deployment of 2026-11-09.
-          timeout: 1200000
