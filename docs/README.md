@@ -6,12 +6,13 @@ folder is a project document (not rendered); the getting-started guide is `xdssa
 | Section | Files |
 |---|---|
 | Home: xdssat as a bridge between DSSAT and Python | `index.qmd` |
-| Guide | `xdssat/index.qmd`, `xdssat/gridding.qmd`, `xdssat/implementation.qmd`, `xdssat/getting-started.md`, `xdssat/examples.qmd`, `xdssat/data.qmd` (input data), `xdssat/another-crop.qmd` |
+| Guide | `xdssat/index.qmd`, `xdssat/gridding.qmd`, `xdssat/implementation.qmd`, `xdssat/coverage.qmd` (what xdssat covers), `xdssat/getting-started.md`, `xdssat/examples.qmd`, `xdssat/data.qmd` (input data), `xdssat/another-crop.qmd` |
 | Main case study: rice in Java | `java/index.qmd` (story), `java/data.qmd`, `java/alternatives.qmd` (alternative input data), `java/science.qmd`; their data in `java/data/` |
 | Further case studies | `cases/java-maize.qmd`, `cases/niger.qmd`, `cases/kenya.qmd`, `cases/mekong.qmd`, `cases/luzon.qmd`; their data in `cases/data/<case>/`, written by `scripts/export_cases.py` (results) and `scripts/export_boundaries.py` (location maps) |
 | DSSAT training (6 modules, adapted from the 2018 International Training Program on DSSAT) | `learn/index.qmd` (from the case studies to DSSAT itself), `learn/module1.qmd` ... `module6.qmd`; their data in `learn/data/moduleN/` |
 | Notebooks | `notebooks/index.qmd`, `notebooks/module1.ipynb` ... `module6.ipynb`; helpers `notebooks/learnlib.py` and `notebooks/glue.py` (GLUE port); the course's data files in `notebooks/course-data/` |
 | About (navbar, right) | `about/faq.qmd`, `about/acknowledgements.qmd` (not an official DSSAT product; how to cite DSSAT and xdssat), `about/rebuild.qmd` |
+| Page not found | `404.qmd`; GitHub Pages serves it at any address without a page. `scripts/fix-404.ts` (post-render, run by Quarto) prefixes its links with `/xdssat/` so they work at any depth |
 
 | Folder | Holds |
 |---|---|
@@ -45,6 +46,7 @@ From the repository root:
 conda run --no-capture-output -n climate python docs/scripts/export_data.py   # refresh java/data/ and assets/java/
 quarto render docs                                                           # write docs/_site/
 python -m http.server 8765 --directory docs/_site                            # look at it
+python scripts/serve_pages.py                                                # or as GitHub Pages: under /xdssat/, with the 404 page
 conda run --no-capture-output -n climate python docs/scripts/save_charts.py   # with the server running: chart backups to assets/
 ```
 
