@@ -71,16 +71,18 @@ cmake and make), or point xdssat at an existing DSSAT 4.8 installation on Window
 ### Which crops can it simulate?
 
 The DSSAT engine covers many crops (48 crop codes in the files listed on the
-[training page](../learn/index.qmd)). xdssat builds every experiment file from a template experiment, and the
-repository ships one template, for rice (`templates/XDRI8601.RIX`). Another crop needs its own template
-experiment and crop model (`template` section of the experiment file); this is untested.
+[training page](../learn/index.qmd)). xdssat builds every experiment file from a template experiment. The
+repository ships templates for rice (CERES-Rice), maize (CERES-Maize) and pearl millet (CERES-Millet), and one
+rice-then-maize crop sequence, all written by `scripts/make_templates.py` from DSSAT's own experiments. Another
+crop needs its own template experiment and crop model (`template` section of the experiment file);
+[Another crop](../xdssat/another-crop.qmd) walks through one.
 
 ### Which regions can it run?
 
 Any region for which the inputs are prepared: weather, a crop mask and soil are required; a water regime map,
 a region map and zones are optional ([Input data](../xdssat/data.qmd)). The area is the `aoi` section of the
-experiment file (name and box). Runs in Lampung (Sumatra) and Central Luzon (Philippines) used global datasets
-only.
+experiment file (name and box). The case studies in East Java (maize), Niger, Kenya, the Mekong Delta and
+northern Luzon, and runs in Lampung (Sumatra), use global datasets only.
 
 ### Where do the weather and soil data come from?
 
@@ -103,14 +105,38 @@ One netCDF file per run, on the weather grid (0.1° in the case studies), with y
 the key dates for each water regime, season and cell. Its full structure is on
 [How xdssat differs from common DSSAT use](../xdssat/gridding.qmd).
 
-## About the Java case study
+## About the case studies
 
 ### Why do the simulated yields differ from the official statistics?
 
-A crop model simulates the yield its inputs allow: the weather, the soil, the cultivar and the management written
-into the experiment file. Official statistics reflect everything else that happens on real farms as well. The
-case study compares the two district by district and calibrates a soil fertility factor against the
-statistics. The [Scientific method](../java/science.qmd) page shows how close they get and what remains.
+A crop model simulates the yield its inputs allow. Official statistics record what farms harvested. In the case
+studies the two differ for reasons that come from the setup, from what the model leaves out, and from how they
+are compared:
+
+- **One crop map for every year.** Each case places its crop with one static map: MapSPAM 2020, or the 2024
+  ATR/BPN rice fields for Java rice. The statistics count the area actually harvested each year, on every field
+  where the crop grew.
+- **Seasons.** A case simulates the seasons it sets, on fixed dates. Annual statistics add up every planting of
+  the year.
+- **Fixed management.** The planting date, the nitrogen rate and the plant density are the same in every cell
+  and year. Farmers vary all three.
+- **Cultivars and calibration.** The cultivars come from DSSAT's cultivar files, with DSSAT's own coefficients.
+  Only the Java rice case is calibrated against statistics, through a soil fertility factor (SLPF); the other
+  cases are not calibrated.
+- **What the model leaves out.** In every template only water and nitrogen limit growth: phosphorus, potassium
+  and diseases are switched off, and there are no pests or weeds. The simulated yields are closer to attainable
+  yields than to farm yields.
+- **No change over time.** The cultivar and the management stay the same over 30 years. The statistics include
+  whatever changed on farms.
+- **Different areas and weights.** A case's box rarely matches the districts or the country of the statistics.
+  The model weights cells by the crop area of the map; the statistics weight by harvested area.
+- **Grain basis.** DSSAT reports grain yield as dry matter. Statistics report grain as harvested or at a
+  standard moisture, and the sources used here do not always say which.
+- **Gridded inputs.** Weather and soil at 0.1° average out local conditions.
+
+The case studies therefore compare the model with itself: one date against another, one regime, cultivar or year
+against another. Their kilograms are not forecasts of farm yields. To use the levels, calibrate against
+observations first, as the Java rice case does on its [Scientific method](../java/science.qmd) page.
 
 ### Does the website run DSSAT in my browser?
 
