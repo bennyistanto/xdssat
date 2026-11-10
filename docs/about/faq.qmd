@@ -115,7 +115,12 @@ are compared:
 
 - **One crop map for every year.** Each case places its crop with one static map: MapSPAM 2020, or the 2024
   ATR/BPN rice fields for Java rice. The statistics count the area actually harvested each year, on every field
-  where the crop grew.
+  where the crop grew. Another map moves the area and the production far more than the yield per hectare:
+  weighting the Java maize cells by LGRIP30 cropland instead of MapSPAM rice gives 2.5 times the area and
+  production, and area-weighted yields within 2%. Every case page has a "Crop map" switch that compares its
+  MapSPAM map with LGRIP30 cropland in the same way; in northern Luzon, LGRIP30 puts 2% of its cropland above
+  800 m against 30% for MapSPAM rice. The Java rice case measures the same for other maps on
+  [Alternative input data](../java/alternatives.qmd).
 - **Seasons.** A case simulates the seasons it sets, on fixed dates. Annual statistics add up every planting of
   the year.
 - **Fixed management.** The planting date, the nitrogen rate and the plant density are the same in every cell
