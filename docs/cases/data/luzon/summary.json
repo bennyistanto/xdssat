@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-09",
+ "generated": "2026-11-10",
  "cells": 91,
  "ha": 121730.1,
  "zone_ha": {
@@ -20,6 +20,13 @@
   2023
  ],
  "head_days": 14,
+ "lgrip30": {
+  "source": "GFSAD LGRIP30, nominal 2015, classes 2 (irrigated) and 3 (rainfed) cropland",
+  "box_ha_all": 180530.0,
+  "box_ha_irr": 118807.0,
+  "cells_ha_all": 169645.0,
+  "cells_ha_irr": 115046.0
+ },
  "coefficients": {
   "IR 64": {
    "THOT": 28.0,

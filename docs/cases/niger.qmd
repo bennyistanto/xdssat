@@ -4,7 +4,7 @@ subtitle: "Thirty-three rainy seasons around Niamey and Sadoré, eight sowing da
 ---
 
 ```{ojs}
-import {withDownload, cellFeatures, fmt, locatorMap, placeMarks, boxPolygon} from "../assets/js/dl.js"
+import {withDownload, cellFeatures, fmt, locatorMap, placeMarks, boxPolygon, maskTable, maskLabels} from "../assets/js/dl.js"
 S = FileAttachment("data/niger/summary.json").json()
 B = FileAttachment("data/niger/boundaries.json").json()
 countries = FileAttachment("data/niger/countries.geojson").json()
@@ -55,6 +55,16 @@ ${fmt.int(S.ha)} ha of it (MapSPAM 2020), in ${S.cells} of the 0.1° weather cel
 departments.`
 ```
 
+The model runs on the 0.1° weather cells and weights each cell by the crop area inside it, not by the area of
+the cell. The switch picks the map that gives that area: MapSPAM 2020 millet, the runs' own crop mask, or
+LGRIP30 cropland, all or irrigated only, for comparison. It changes the area map and the table below; the
+simulated cells, their yields and the other charts on this page stay as they are.
+
+```{ojs}
+viewof mask = Inputs.radio(new Map([["MapSPAM 2020 millet (the runs' crop mask)", "ha"], ["LGRIP30 cropland", "ha_lgrip_all"],
+  ["LGRIP30 irrigated cropland", "ha_lgrip_irr"]]), {value: "ha", label: "Crop map"})
+```
+
 ```{ojs}
 millet = bestCell.filter(d => d.n === 45)
 html`<div class="map-pair">
@@ -62,17 +72,38 @@ html`<div class="map-pair">
   ${withDownload(Plot.plot({
     width: 420, height: 420,
     projection: {type: "equirectangular", domain: boxPolygon([B.box[0] - 0.05, B.box[1] - 0.05, B.box[2] + 0.05, B.box[3] + 0.05])},
-    color: {scheme: "YlOrBr", legend: true, label: "Millet in the cell (ha, MapSPAM 2020)"},
+    color: {scheme: "YlOrBr", legend: true, label: `${maskLabels("MapSPAM 2020 millet")[mask]} in the cell (ha)`},
     marks: [
-      Plot.geo(cellFeatures(millet), {fill: d => d.properties.ha, stroke: "white", strokeWidth: 0.3}),
+      Plot.geo(cellFeatures(millet), {fill: d => d.properties[mask], stroke: "white", strokeWidth: 0.3}),
       ...placeMarks(Plot, adm1, adm2, {labels: "adm2"}),
       Plot.geo(boxPolygon(B.box), {stroke: "#d0021b", strokeWidth: 1.5, fill: "none"}),
       Plot.tip(millet, Plot.pointer({x: "lon", y: "lat",
-        title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E\nmillet ${fmt.int(d.ha)} ha`})),
+        title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E\nMapSPAM millet ${fmt.int(d.ha)} ha\n` +
+          `LGRIP30 cropland ${fmt.int(d.ha_lgrip_all)} ha, irrigated ${fmt.int(d.ha_lgrip_irr)} ha`})),
       Plot.frame({stroke: "#bbb"})
     ]
-  }), "niger_millet_area", "0.1° cells; bold: regions, thin: departments")}
+  }), `niger_area_${mask}`, "0.1° cells; bold: regions, thin: departments")}
 </div>`
+```
+
+```{ojs}
+mt = maskTable(millet, "MapSPAM 2020 millet", [
+  {label: "Yield at the best date (kg/ha)", value: d => d.mean},
+  {label: "Yield sown 1 June (kg/ha)", value: d => d.mean_jun01},
+  {label: "Gain from the date (kg/ha)", value: d => d.mean - d.mean_jun01},
+  {label: "Production at the best date (kt)", value: d => d.mean, sum: true, scale: 1e-6}], mask)
+Inputs.table(mt, {format: {"Area in the cells (ha)": fmt.int, "Correlation with MapSPAM, per cell": fmt.d2,
+  "Yield at the best date (kg/ha)": fmt.int, "Yield sown 1 June (kg/ha)": fmt.int, "Gain from the date (kg/ha)": fmt.int,
+  "Production at the best date (kt)": fmt.d1}, layout: "auto"})
+```
+
+```{ojs}
+md`LGRIP30 counts every cropland pixel, of any crop, so its area is
+${fmt.d1(mt[1]["Area in the cells (ha)"] / mt[0]["Area in the cells (ha)"])} times MapSPAM's millet area, and production follows;
+the area-weighted yields move by ${fmt.pct(Math.abs(mt[1]["Yield at the best date (kg/ha)"] / mt[0]["Yield at the best date (kg/ha)"] - 1))}.
+LGRIP30 calls only ${fmt.pct(mt[2]["Area in the cells (ha)"] / mt[1]["Area in the cells (ha)"])} of this cropland irrigated. Means over
+45 kg N and 33 seasons. A different map would also change the soil profiles, which xdssat samples under the crop
+pixels; LGRIP30 is a single year (nominal 2015), as static as MapSPAM.`
 ```
 
 ## Eight dates, one crop

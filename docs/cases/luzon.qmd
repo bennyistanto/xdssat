@@ -6,7 +6,7 @@ subtitle: "The same flooded rice, planted from the lowlands of northern Luzon up
 ---
 
 ```{ojs}
-import {withDownload, cellFeatures, fmt, locatorMap, placeMarks, boxPolygon} from "../assets/js/dl.js"
+import {withDownload, cellFeatures, fmt, locatorMap, placeMarks, boxPolygon, maskTable, maskLabels} from "../assets/js/dl.js"
 S = FileAttachment("data/luzon/summary.json").json()
 B = FileAttachment("data/luzon/boundaries.json").json()
 countries = FileAttachment("data/luzon/countries.geojson").json()
@@ -54,7 +54,9 @@ inside a mountain cell lie higher or lower than that.`
 ```
 
 ```{ojs}
-viewof whereMetric = Inputs.radio(new Map([["Height of the cell", "elev"], ["Rice in the cell", "ha"]]), {value: "elev", label: "Map"})
+viewof whereMetric = Inputs.radio(new Map([["Height of the cell", "elev"], ["Crop area in the cell", "area"]]), {value: "elev", label: "Map"})
+viewof mask = Inputs.radio(new Map([["MapSPAM 2020 rice (the runs' crop mask)", "ha"], ["LGRIP30 cropland", "ha_lgrip_all"],
+  ["LGRIP30 irrigated cropland", "ha_lgrip_irr"]]), {value: "ha", label: "Crop map"})
 ```
 
 ```{ojs}
@@ -65,17 +67,41 @@ html`<div class="map-pair">
     width: 420, height: 420,
     projection: {type: "equirectangular", domain: boxPolygon([B.box[0] - 0.05, B.box[1] - 0.05, B.box[2] + 0.05, B.box[3] + 0.05])},
     color: whereMetric === "elev" ? {scheme: "YlOrBr", domain: [0, d3.max(place, d => d.elev)], legend: true, label: "Mean height of the cell (m, ETOPO1)"}
-                                  : {scheme: "YlGn", legend: true, label: "Rice in the cell (ha, MapSPAM 2020)"},
+                                  : {scheme: "YlGn", legend: true, label: `${maskLabels("MapSPAM 2020 rice")[mask]} in the cell (ha)`},
     marks: [
-      Plot.geo(cellFeatures(place), {fill: d => d.properties[whereMetric], stroke: "white", strokeWidth: 0.3}),
+      Plot.geo(cellFeatures(place), {fill: d => d.properties[whereMetric === "elev" ? "elev" : mask], stroke: "white", strokeWidth: 0.3}),
       ...placeMarks(Plot, adm1, adm2, {labels: "adm2"}),
       Plot.geo(boxPolygon(B.box), {stroke: "#d0021b", strokeWidth: 1.5, fill: "none"}),
       Plot.tip(place, Plot.pointer({x: "lon", y: "lat",
-        title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E\nheight ${fmt.int(d.elev)} m\nrice ${fmt.int(d.ha)} ha`})),
+        title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E\nheight ${fmt.int(d.elev)} m\nMapSPAM rice ${fmt.int(d.ha)} ha\n` +
+          `LGRIP30 cropland ${fmt.int(d.ha_lgrip_all)} ha, irrigated ${fmt.int(d.ha_lgrip_irr)} ha`})),
       Plot.frame({stroke: "#bbb"})
     ]
-  }), "luzon_place", "0.1° cells; bold: regions, thin: provinces")}
+  }), `luzon_place_${whereMetric}_${mask}`, "0.1° cells; bold: regions, thin: provinces")}
 </div>`
+```
+
+```{ojs}
+dry64 = new Map(cells.filter(d => d.cultivar === "IR 64" && d.season === "dry").map(d => [`${d.iy}_${d.ix}`, d]))
+mt = maskTable(place.map(d => ({...d, dry: dry64.get(`${d.iy}_${d.ix}`)})), "MapSPAM 2020 rice", [
+  {label: "Area above 800 m (share)", value: d => d.elev > 800 ? 1 : 0},
+  {label: "IR 64 wet season (kg/ha)", value: d => d.hw},
+  {label: "IR 64 dry season (kg/ha)", value: d => d.dry?.hw},
+  {label: "Heat loss, wet, below 300 m (kg/ha)", value: d => d.elev < 300 ? d.heat_loss : NaN},
+  {label: "Cold loss, dry, above 1,200 m (kg/ha)", value: d => d.elev > 1200 ? d.dry?.cold_loss : NaN}], mask)
+Inputs.table(mt, {format: {"Area in the cells (ha)": fmt.int, "Correlation with MapSPAM, per cell": fmt.d2,
+  "Area above 800 m (share)": fmt.pct, "IR 64 wet season (kg/ha)": fmt.int, "IR 64 dry season (kg/ha)": fmt.int,
+  "Heat loss, wet, below 300 m (kg/ha)": fmt.int, "Cold loss, dry, above 1,200 m (kg/ha)": fmt.int}, layout: "auto"})
+```
+
+```{ojs}
+md`The "Crop map" switch sets the crop area behind the second map and the table: MapSPAM 2020 rice, the runs'
+own crop mask, or LGRIP30 cropland, all or irrigated only, for comparison. LGRIP30 counts every cropland pixel,
+of any crop, so its area is ${fmt.d1(mt[1]["Area in the cells (ha)"] / mt[0]["Area in the cells (ha)"])} times MapSPAM's rice area, and it
+puts ${fmt.pct(mt[1]["Area above 800 m (share)"])} of it above 800 m, against ${fmt.pct(mt[0]["Area above 800 m (share)"])} for MapSPAM. Every
+average weights each 0.1° cell by the crop area inside it, not by the area of the cell; the simulated cells,
+their yields and the other charts on this page keep the MapSPAM weights. A different map would also change the
+soil profiles, which xdssat samples under the crop pixels; LGRIP30 is a single year (nominal 2015).`
 ```
 
 ## Up the slope, the crop slows down

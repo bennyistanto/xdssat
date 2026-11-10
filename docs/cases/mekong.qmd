@@ -6,7 +6,7 @@ subtitle: "Two rice crops a year in the Mekong Delta, 33 years, four ways to man
 ---
 
 ```{ojs}
-import {withDownload, cellFeatures, fmt, locatorMap, placeMarks, boxPolygon} from "../assets/js/dl.js"
+import {withDownload, cellFeatures, fmt, locatorMap, placeMarks, boxPolygon, maskTable, maskLabels} from "../assets/js/dl.js"
 S = FileAttachment("data/mekong/summary.json").json()
 B = FileAttachment("data/mekong/boundaries.json").json()
 countries = FileAttachment("data/mekong/countries.geojson").json()
@@ -52,6 +52,16 @@ ${B.box_adm1.map((u, i) => `${u.name}${i === 0 ? " takes" : ""} ${fmt.pct(u.shar
 ${fmt.int(S.ha)} ha of it (MapSPAM 2020), in ${S.cells} of the 0.1° weather cells.`
 ```
 
+The model runs on the 0.1° weather cells and weights each cell by the crop area inside it, not by the area of
+the cell. The switch picks the map that gives that area: MapSPAM 2020 rice, the runs' own crop mask, or LGRIP30
+cropland, all or irrigated only, for comparison. It changes the area map, the table below and the water
+volumes of the next section; the simulated cells, their yields and the other charts stay as they are.
+
+```{ojs}
+viewof mask = Inputs.radio(new Map([["MapSPAM 2020 rice (the runs' crop mask)", "ha"], ["LGRIP30 cropland", "ha_lgrip_all"],
+  ["LGRIP30 irrigated cropland", "ha_lgrip_irr"]]), {value: "ha", label: "Crop map"})
+```
+
 ```{ojs}
 rice = cells.filter(d => d.regime === "irrigated" && d.season === "dong_xuan")
 html`<div class="map-pair">
@@ -59,17 +69,40 @@ html`<div class="map-pair">
   ${withDownload(Plot.plot({
     width: 420, height: 420,
     projection: {type: "equirectangular", domain: boxPolygon([B.box[0] - 0.05, B.box[1] - 0.05, B.box[2] + 0.05, B.box[3] + 0.05])},
-    color: {scheme: "YlGn", legend: true, label: "Rice in the cell (ha, MapSPAM 2020)"},
+    color: {scheme: "YlGn", legend: true, label: `${maskLabels("MapSPAM 2020 rice")[mask]} in the cell (ha)`},
     marks: [
-      Plot.geo(cellFeatures(rice), {fill: d => d.properties.ha, stroke: "white", strokeWidth: 0.3}),
+      Plot.geo(cellFeatures(rice), {fill: d => d.properties[mask], stroke: "white", strokeWidth: 0.3}),
       ...placeMarks(Plot, adm1, adm2, {labels: "adm1"}),
       Plot.geo(boxPolygon(B.box), {stroke: "#d0021b", strokeWidth: 1.5, fill: "none"}),
       Plot.tip(rice, Plot.pointer({x: "lon", y: "lat",
-        title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E\nrice ${fmt.int(d.ha)} ha`})),
+        title: d => `${d.lat.toFixed(2)} N, ${d.lon.toFixed(2)} E\nMapSPAM rice ${fmt.int(d.ha)} ha\n` +
+          `LGRIP30 cropland ${fmt.int(d.ha_lgrip_all)} ha, irrigated ${fmt.int(d.ha_lgrip_irr)} ha`})),
       Plot.frame({stroke: "#bbb"})
     ]
-  }), "mekong_rice_area", "0.1° cells; bold: provinces, thin: districts")}
+  }), `mekong_area_${mask}`, "0.1° cells; bold: provinces, thin: districts")}
 </div>`
+```
+
+```{ojs}
+rfDx = new Map(cells.filter(d => d.regime === "rainfed" && d.season === "dong_xuan").map(d => [`${d.iy}_${d.ix}`, d.yield]))
+mt = maskTable(rice.map(d => ({...d, rf: rfDx.get(`${d.iy}_${d.ix}`)})), "MapSPAM 2020 rice", [
+  {label: "Dong xuan irrigation (mm)", value: d => d.IRCM},
+  {label: "Flooded yield (kg/ha)", value: d => d.yield},
+  {label: "Rainfed yield (kg/ha)", value: d => d.rf},
+  {label: "Dry-season irrigation (million m³)", value: d => d.IRCM, sum: true, scale: 10 / 1e6}], mask)
+Inputs.table(mt, {format: {"Area in the cells (ha)": fmt.int, "Correlation with MapSPAM, per cell": fmt.d2,
+  "Dong xuan irrigation (mm)": fmt.int, "Flooded yield (kg/ha)": fmt.int, "Rainfed yield (kg/ha)": fmt.int,
+  "Dry-season irrigation (million m³)": fmt.int}, layout: "auto"})
+```
+
+```{ojs}
+md`LGRIP30 counts every cropland pixel, of any crop, so its area is
+${fmt.d1(mt[1]["Area in the cells (ha)"] / mt[0]["Area in the cells (ha)"])} times MapSPAM's rice area; the water volume follows it,
+while the irrigation per hectare moves by ${fmt.pct(Math.abs(mt[1]["Dong xuan irrigation (mm)"] / mt[0]["Dong xuan irrigation (mm)"] - 1))}.
+It calls ${fmt.pct(mt[2]["Area in the cells (ha)"] / mt[1]["Area in the cells (ha)"])} of this cropland irrigated (a cropland with at least one
+artificial irrigation in the growing period; [Input data](../xdssat/data.qmd)). Dong xuan, percolation 2 mm a
+day, means over 33 seasons. A different map would also change the soil profiles, which xdssat samples under
+the crop pixels; LGRIP30 is a single year (nominal 2015), as static as MapSPAM.`
 ```
 
 ## Two seasons, two bills
@@ -92,11 +125,11 @@ viewof perc = Inputs.radio(new Map([["1 mm a day", "irrigated_perc1"], ["2 mm a 
 dx = bySeason(seasons, perc, "dong_xuan")
 ht = bySeason(seasons, perc, "he_thu")
 boxCells = cells.filter(d => d.regime === perc)
-volume = s => d3.sum(boxCells.filter(d => d.season === s), d => d.IRCM * d.ha * 10) / 1e6
+volume = s => d3.sum(boxCells.filter(d => d.season === s), d => d.IRCM * d[mask] * 10) / 1e6
 md`A dong xuan crop, grown through the dry months, takes **${fmt.int(mean(dx, "IRCM"))} mm** of irrigation in an average
 year (${fmt.int(mean(dx, "IRCM") * 10)} m³ a hectare) and catches **${fmt.int(mean(dx, "PRCM"))} mm** of rain. A he thu
 crop, sown as the rains begin, takes **${fmt.int(mean(ht, "IRCM"))} mm** and catches **${fmt.int(mean(ht, "PRCM"))} mm**.
-If every rice hectare of the box grew both crops, the box would draw about **${fmt.int(volume("dong_xuan"))} million m³** of
+If every ${mask === "ha" ? "rice" : "cropland"} hectare of the box (${maskLabels("MapSPAM 2020 rice")[mask]}) grew both crops, the box would draw about **${fmt.int(volume("dong_xuan"))} million m³** of
 irrigation water in the dry season and **${fmt.int(volume("he_thu"))} million m³** in the wet one, every year.`
 ```
 

@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-09",
+ "generated": "2026-11-10",
  "cells": 139,
  "ha": 350557.4989296496,
  "seasons_per_run": 4587,
@@ -11,6 +11,13 @@
   1991,
   2023
  ],
+ "lgrip30": {
+  "source": "GFSAD LGRIP30, nominal 2015, classes 2 (irrigated) and 3 (rainfed) cropland",
+  "box_ha_all": 1153471.0,
+  "box_ha_irr": 1111889.0,
+  "cells_ha_all": 1146883.0,
+  "cells_ha_irr": 1105434.0
+ },
  "moisture": 0.14,
  "maize_price_ksh_kg": {
   "low (p10)": 33.38,

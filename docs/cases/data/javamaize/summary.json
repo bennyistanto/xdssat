@@ -25,6 +25,13 @@
    "maize_rainfed": -0.31
   }
  },
+ "lgrip30": {
+  "source": "GFSAD LGRIP30, nominal 2015, classes 2 (irrigated) and 3 (rainfed) cropland",
+  "box_ha_all": 906030.0,
+  "box_ha_irr": 622576.0,
+  "cells_ha_all": 866227.0,
+  "cells_ha_irr": 592002.0
+ },
  "crop_seasons_total": 19249,
  "sequences": {
   "irrigated": {

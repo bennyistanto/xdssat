@@ -15,12 +15,16 @@ adm2 = FileAttachment("data/javamaize/adm2.geojson").json()
 years = FileAttachment("data/javamaize/years.csv").csv({typed: true})
 cells = FileAttachment("data/javamaize/cells.csv").csv({typed: true})
 seasons = FileAttachment("data/javamaize/seasons.csv").csv({typed: true})
-wmean = (rows, k) => { const r = rows.filter(d => d[k] != null && !Number.isNaN(d[k])); return d3.sum(r, d => d[k] * d.ha) / d3.sum(r, d => d.ha) }
+MASKS = ({spam: {label: "MapSPAM 2020 rice", col: "ha", what: "rice"},
+          lg_all: {label: "LGRIP30 cropland", col: "ha_lgrip_all", what: "cropland"},
+          lg_irr: {label: "LGRIP30 irrigated cropland", col: "ha_lgrip_irr", what: "irrigated cropland"}})
+num = v => v != null && !Number.isNaN(v)
 ```
 
 | Setup | |
 |---|---|
 | Area | 111.4-112.4 E, 8.0-7.0 S, East Java, on the rice fields of MapSPAM 2020 [@spam2020] |
+| Crop map, for comparison | GFSAD [LGRIP30](https://doi.org/10.5067/Community/LGRIP/LGRIP30.001) cropland (30 m, nominal 2015), all or irrigated only: the same simulated cells, weighted by its cropland instead (the switch under the map) |
 | Weather, soil | AgERA5 1990-2024 [@agera5]; SoilGrids 2.0 [@poggio2021], one profile per 0.1° cell |
 | The sequence | one DSSAT crop sequence per cell (mode Q, template `XDRM8601.SQX`): IR 58 rice, 140 kg N/ha, transplanted on 15 November, then McCurdy 84aa maize, 120 kg N/ha, rainfed, sown on 15 March; the soil's water, nitrogen and organic matter pass from crop to crop. Two sequences: flooded rice, or rainfed rice behind a bund |
 | The comparison | the same maize alone (template `XDMZ8201.MZX`), on the same cells and dates, each season starting from the soil profile at half its plant-available water |
@@ -47,24 +51,62 @@ Rice grows on ${fmt.int(S.ha)} ha of it (MapSPAM 2020), in ${S.cells} of the 0.1
 maize crop can follow the rice.`
 ```
 
+The model runs on the 0.1° weather cells; every average and total on this page weights each cell by the
+crop area inside it, not by the area of the cell. Which map gives that area is a choice. The switch below sets it
+for every chart that weights by area: the rice fields of MapSPAM 2020 (the runs' own crop mask), or the
+cropland of LGRIP30, all or irrigated only, for comparison. The simulated cells and their yields stay the same.
+
 ```{ojs}
+viewof mask = Inputs.radio(new Map([["MapSPAM 2020 rice (the runs' crop mask)", "spam"], ["LGRIP30 cropland", "lg_all"],
+  ["LGRIP30 irrigated cropland", "lg_irr"]]), {value: "spam", label: "Crop map"})
+```
+
+```{ojs}
+wcol = MASKS[mask].col
+wmean = (rows, k) => { const r = rows.filter(d => num(d[k]) && d[wcol] > 0); return d3.sum(r, d => d[k] * d[wcol]) / d3.sum(r, d => d[wcol]) }
 place = cells
 html`<div class="map-pair">
   ${withDownload(locatorMap(Plot, countries, B, {width: 280, height: 280}), "javamaize_locator", "red: the study box")}
   ${withDownload(Plot.plot({
     width: 420, height: 420,
     projection: {type: "equirectangular", domain: boxPolygon([B.box[0] - 0.05, B.box[1] - 0.05, B.box[2] + 0.05, B.box[3] + 0.05])},
-    color: {scheme: "YlGn", legend: true, label: "Rice in the cell (ha, MapSPAM 2020)"},
+    color: {scheme: "YlGn", legend: true, label: `${MASKS[mask].label} in the cell (ha)`},
     marks: [
-      Plot.geo(cellFeatures(place), {fill: d => d.properties.ha, stroke: "white", strokeWidth: 0.3}),
+      Plot.geo(cellFeatures(place), {fill: d => d.properties[wcol], stroke: "white", strokeWidth: 0.3}),
       ...placeMarks(Plot, adm1, adm2, {labels: "adm2"}),
       Plot.geo(boxPolygon(B.box), {stroke: "#d0021b", strokeWidth: 1.5, fill: "none"}),
       Plot.tip(place, Plot.pointer({x: "lon", y: "lat",
-        title: d => `${Math.abs(d.lat).toFixed(2)} S, ${d.lon.toFixed(2)} E\nrice ${fmt.int(d.ha)} ha`})),
+        title: d => `${Math.abs(d.lat).toFixed(2)} S, ${d.lon.toFixed(2)} E\nMapSPAM rice ${fmt.int(d.ha)} ha\n` +
+          `LGRIP30 cropland ${fmt.int(d.ha_lgrip_all)} ha, irrigated ${fmt.int(d.ha_lgrip_irr)} ha`})),
       Plot.frame({stroke: "#bbb"})
     ]
-  }), "javamaize_rice_area", "0.1° cells; bold: provinces, thin: districts")}
+  }), `javamaize_area_${mask}`, "0.1° cells; bold: provinces, thin: districts")}
 </div>`
+```
+
+```{ojs}
+maskTable = Object.entries(MASKS).map(([k, m]) => {
+  const w = cells.filter(d => d[m.col] > 0)
+  const wm = c => { const r = w.filter(d => num(d[c])); return d3.sum(r, d => d[c] * d[m.col]) / d3.sum(r, d => d[m.col]) }
+  return {"Crop map": m.label + (k === mask ? " (selected)" : ""), "Area in the cells (ha)": d3.sum(cells, d => d[m.col]),
+          "Correlation with MapSPAM, per cell": pearson(cells.map(d => d.ha), cells.map(d => d[m.col])),
+          "Maize alone (kg/ha)": wm("maize_alone"), "Maize after flooded rice (kg/ha)": wm("maize_flooded"),
+          "Gain (kg/ha)": wm("gain_flooded"),
+          "Production, maize after flooded rice (Mt)": d3.sum(w.filter(d => num(d.maize_flooded)), d => d.maize_flooded * d[m.col]) / 1e9}
+})
+Inputs.table(maskTable, {format: {"Area in the cells (ha)": fmt.int, "Correlation with MapSPAM, per cell": fmt.d2,
+  "Maize alone (kg/ha)": fmt.int, "Maize after flooded rice (kg/ha)": fmt.int, "Gain (kg/ha)": fmt.int,
+  "Production, maize after flooded rice (Mt)": fmt.d1}, layout: "auto"})
+```
+
+```{ojs}
+md`The map changes how much area there is far more than how much grows on it. LGRIP30 counts every cropland
+pixel, of any crop, so its area is ${fmt.d1(maskTable[1]["Area in the cells (ha)"] / maskTable[0]["Area in the cells (ha)"])} times MapSPAM's
+rice area (irrigated only: ${fmt.d1(maskTable[2]["Area in the cells (ha)"] / maskTable[0]["Area in the cells (ha)"])} times), and production follows. The
+area-weighted yields move by ${fmt.pct(Math.abs(maskTable[1]["Maize alone (kg/ha)"] / maskTable[0]["Maize alone (kg/ha)"] - 1))} or less, because
+each cell's yield comes from its weather and soil, and the map only decides how much each cell counts. Two
+things the switch leaves out: a different map would also change the soil profiles (xdssat samples SoilGrids
+under the crop pixels), and LGRIP30 is a single year (nominal 2015), as static as MapSPAM.`
 ```
 
 ## Two crops, one field
@@ -97,7 +139,13 @@ viewof dry = Inputs.range([250, 700], {value: 350, step: 10, label: "A dry maize
 ```
 
 ```{ojs}
-yr = years.map(d => ({...d, gain: d[`gain_${seq}`], after: d[`maize_${seq}`], dryYear: d.rain < dry}))
+weightOf = new Map(cells.map(d => [`${d.iy}_${d.ix}`, d[wcol]]))
+yr = d3.groups(seasons, d => d.season_year).map(([y, rows]) => {
+  const r = rows.map(d => ({...d, w: weightOf.get(`${d.iy}_${d.ix}`) || 0, after: d[`maize_${seq}`]}))
+    .map(d => ({...d, gain: num(d.after) && num(d.maize_alone) ? d.after - d.maize_alone : NaN}))
+  const wm = c => { const v = r.filter(d => num(d[c]) && d.w > 0); return d3.sum(v, d => d[c] * d.w) / d3.sum(v, d => d.w) }
+  return {season_year: y, rain: wm("rain"), maize_alone: wm("maize_alone"), after: wm("after"), gain: wm("gain")}
+}).sort((a, b) => a.season_year - b.season_year).map(d => ({...d, dryYear: d.rain < dry}))
 dryRows = yr.filter(d => d.dryYear)
 wetRows = yr.filter(d => !d.dryYear)
 md`The gain is not spread evenly. In the **${dryRows.length}** seasons with less than ${dry} mm of rain between maize
@@ -123,7 +171,7 @@ withDownload(Plot.plot({
         `alone ${fmt.int(d.maize_alone)}, after rice ${fmt.int(d.after)} kg/ha\ngain ${fmt.int(d.gain)} kg/ha`}),
     Plot.text(yr.filter(d => d.gain > 1500), {x: "rain", y: "gain", text: d => String(d.season_year + 1), dx: 18, fontSize: 10})
   ]
-}), `javamaize_gain_vs_rain_${seq}`, "one dot per maize season, area-weighted over the box")
+}), `javamaize_gain_vs_rain_${seq}_${mask}`, `one dot per maize season, weighted by ${MASKS[mask].label}`)
 ```
 
 ```{ojs}
@@ -140,7 +188,7 @@ withDownload(Plot.plot({
       title: d => `${d.year}, ${d.kind}\n${fmt.int(d.kg)} kg/ha\nmaize-season rain ${fmt.int(d.rain)} mm`}),
     Plot.ruleY([0])
   ]
-}), `javamaize_maize_by_year_${seq}`, "maize sown on 15 March of each year; area-weighted over the box")
+}), `javamaize_maize_by_year_${seq}_${mask}`, `maize sown on 15 March of each year; weighted by ${MASKS[mask].label}`)
 ```
 
 ## What the sequence remembers
@@ -172,7 +220,7 @@ withDownload(Plot.plot({
     Plot.line(soilRows, {x: "year", y: "v", stroke: "what", strokeWidth: 2}),
     Plot.dot(soilRows, {x: "year", y: "v", fill: "what", r: 2.5, tip: true, title: d => `${d.year}\n${d.what.split(" (")[0]}: ${d.raw}`})
   ]
-}), `javamaize_soil_memory_${seq}`, "at rice harvest, area-weighted over the box")
+}), `javamaize_soil_memory_${seq}`, "at rice harvest, weighted by MapSPAM 2020 rice (the crop map switch does not apply)")
 ```
 
 ## Cell by cell
@@ -248,7 +296,7 @@ withDownload(Plot.plot({
       title: d => `${d.year}\n${d.kind}: ${fmt.int(d.kg)} kg/ha`}),
     Plot.ruleY([0])
   ]
-}), `javamaize_observed_${seq}`, "statistics: total production over total harvested area of the districts; model: rice-area-weighted over their cells")
+}), `javamaize_observed_${seq}`, "statistics: total production over total harvested area of the districts; model: weighted by MapSPAM 2020 rice over their cells (the crop map switch does not apply)")
 ```
 
 ## What this does not say

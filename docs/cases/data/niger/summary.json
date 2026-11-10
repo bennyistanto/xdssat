@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-09",
+ "generated": "2026-11-10",
  "cells": 132,
  "ha": 180362.1995010376,
  "seasons_per_run": 4356,
@@ -12,6 +12,13 @@
   2023
  ],
  "poor_kg_ha": 300.0,
+ "lgrip30": {
+  "source": "GFSAD LGRIP30, nominal 2015, classes 2 (irrigated) and 3 (rainfed) cropland",
+  "box_ha_all": 284427.0,
+  "box_ha_irr": 4428.0,
+  "cells_ha_all": 284427.0,
+  "cells_ha_irr": 4428.0
+ },
  "faostat_niger_millet_t_ha": {
   "2018": 0.548,
   "2019": 0.479,

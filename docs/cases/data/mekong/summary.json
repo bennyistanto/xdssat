@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-09",
+ "generated": "2026-11-10",
  "cells": 121,
  "ha": 920502.6,
  "seasons_per_run": 7986,
@@ -11,6 +11,13 @@
   1991,
   2023
  ],
+ "lgrip30": {
+  "source": "GFSAD LGRIP30, nominal 2015, classes 2 (irrigated) and 3 (rainfed) cropland",
+  "box_ha_all": 1287274.0,
+  "box_ha_irr": 1170594.0,
+  "cells_ha_all": 1287274.0,
+  "cells_ha_irr": 1170594.0
+ },
  "percolation_mm_d": {
   "irrigated": 2,
   "irrigated_perc1": 1,
