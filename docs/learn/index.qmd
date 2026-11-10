@@ -46,6 +46,35 @@ here every step is code that can be read, rerun and changed:
 | ATCreate (observed data files) | `learnlib.write_observed` (module 4) |
 | Seasonal and Sequence analysis | multi-season runs, the engine's sequence mode and pandas (modules 5 and 6) |
 
+### The syllabus, topic by topic
+
+Every topic of the course's six days, and where these modules cover it. "Differently" marks the topics taught
+another way here, for the reasons above.
+
+| Day | Course topic | Where | Here |
+|---|---|---|---|
+| 1 | History and overview of DSSAT | [Module 1](module1.qmd), section 0 | covered |
+| 1 | Running a crop model | Module 1, sections 1 and 2 | covered |
+| 1 | Phenological development | Module 1, section 3 | covered |
+| 1 | Potential production, creating the experiment file | Module 1, section 4 | covered |
+| 1 | Sensitivity analysis | Module 1, section 5 | differently: one experiment file with a treatment per value |
+| 2 | Basic growth processes | [Module 2](module2.qmd), section 1 | covered |
+| 2 | Weather data and utilities, weather generators | Module 2, section 2 | differently: code in place of WeatherMan |
+| 2 | Minimum data set, the DSSAT file system | Module 2, section 3 | covered |
+| 2 | Species, ecotype and cultivar coefficients; cultivar sensitivity | Module 2, section 4 | covered |
+| 2-3 | Estimating cultivar coefficients: concepts, GLUE, in-season data | [Module 3](module3.qmd), section 1 | differently: a Python port of GLUE |
+| 3 | Soil data and utilities | Module 3, section 2 | differently: code in place of SBuild |
+| 3 | Water-limited production, soil and paddy flood water | Module 3, section 3 | covered |
+| 4 | Experimental data collection and files, model evaluation | [Module 4](module4.qmd), section 1 | differently: code in place of ATCreate |
+| 4 | Nitrogen-limited production: soil and plant, N fixation | Module 4, section 2 | covered |
+| 5 | Spatial decision support (MWCropDSS demonstration) | "From one field to a grid: xdssat", modules 1, 2, 3 and 5 | differently: xdssat in place of MWCropDSS |
+| 5 | Uncertainty and risk, seasonal analysis, environmental outcomes | [Module 5](module5.qmd) | covered |
+| 6 | Crop rotations, creating a sequence experiment | [Module 6](module6.qmd), sections 1 to 4 | differently: DSSAT's own sequence examples (no course material) |
+| 6 | Applications and needs | Module 6, section 5 | covered |
+
+What the DSSAT engine can do beyond the course, and which of it xdssat runs on a grid, is on
+[What xdssat covers](../xdssat/coverage.qmd).
+
 ## Modules
 
 ```{ojs}
