@@ -1,0 +1,22 @@
+---
+title: "Page not found"
+toc: false
+page-navigation: false
+repo-actions: false
+# GitHub Pages serves this page at any wrong address; scripts/fix-404.ts (post-render) makes its
+# links start from /xdssat/.
+---
+
+There is no page at this address. It may have been mistyped, or the page may have moved.
+
+[Back to home](index.qmd){.btn .btn-primary role="button"}
+
+Or start from one of the sections:
+
+- [Guide](xdssat/index.qmd): what xdssat is and how to run it
+- [Case studies](java/index.qmd): rice in Java and five further cases
+- [DSSAT training](learn/index.qmd): six modules adapted from a DSSAT course
+- [FAQ](about/faq.qmd)
+
+If a link on this site brought you here, please report it in the
+[issue tracker](https://github.com/bennyistanto/xdssat/issues).

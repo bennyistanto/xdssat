@@ -3,6 +3,8 @@ project:
   # Render output stays in a gitignored folder; it churns on every build, so it
   # also churns OneDrive sync (see README.md).
   output-dir: _site
+  # 404.html is served at any wrong address: this prefixes its root links with /xdssat/
+  post-render: scripts/fix-404.ts
   render:
     - index.qmd
     - xdssat/index.qmd
@@ -39,6 +41,7 @@ project:
     - about/rebuild.qmd
     - about/faq.qmd
     - about/acknowledgements.qmd
+    - 404.qmd
   resources:
     - java/data/
     - assets/
