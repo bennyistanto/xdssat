@@ -70,7 +70,9 @@ def niger(runs: Path, out: Path, poor: float = 300.0) -> dict:
     top = c.loc[c.groupby(["n", "iy", "ix"])["mean"].idxmax()]
     first = c[c.sow_day == 0].set_index(["n", "iy", "ix"])["mean"]
     top = top.assign(mean_jun01=first.reindex(pd.MultiIndex.from_frame(top[["n", "iy", "ix"]])).to_numpy())
-    top[["n", "iy", "ix", "lat", "lon", "ha", "sow", "sow_day", "mean", "mean_jun01"]].round(3) \
+    top, lg = _with_lgrip(top, (2.0, 13.0, 3.0, 14.0))
+    top[["n", "iy", "ix", "lat", "lon", "ha", "sow", "sow_day", "mean", "mean_jun01"]
+        + [c for c in ("ha_lgrip_all", "ha_lgrip_irr") if c in top]].round(3) \
         .to_csv(out / "best_date_per_cell.csv", index=False)
     any_run = next(iter(info.values()))
     summary = {"generated": date.today().isoformat(), "cells": any_run["cells"], "ha": any_run["ha"],
@@ -78,7 +80,7 @@ def niger(runs: Path, out: Path, poor: float = 300.0) -> dict:
                "seasons_total": int(sum(v["seasons"] for v in info.values())),
                "failed_total": int(sum(v["failed"] for v in info.values())),
                "minutes_total": round(max(v["minutes"] for v in info.values()), 1),   # one job: the last folder
-               "years": [int(years.year.min()), int(years.year.max())], "poor_kg_ha": poor,
+               "years": [int(years.year.min()), int(years.year.max())], "poor_kg_ha": poor, "lgrip30": lg,
                "faostat_niger_millet_t_ha": {"2018": 0.548, "2019": 0.479, "2020": 0.520},
                "inputs": any_run.get("inputs", {}), "template": Path(any_run["template"]).name}
     (out / "summary.json").write_text(json.dumps(summary, indent=1))
@@ -141,6 +143,7 @@ def kenya(runs: Path, out: Path, wfp: Path = Path("E:/temp/wfp/wfp_food_prices_k
         m = {n: maize["median"] * wide[n] / (1 - MOISTURE) - npr * n for n in (0, 60, 120, 180)}
         wide[f"best_n {np_name}"] = pd.DataFrame(m).idxmax(axis=1)
     wide.columns = [str(c) for c in wide.columns]
+    wide, lg = _with_lgrip(wide, (34.6, 0.1, 35.6, 1.1))
     wide.round(2).to_csv(out / "cells.csv", index=False)
     a = info[0]
     summary = {"generated": date.today().isoformat(), "cells": a["cells"], "ha": a["ha"],
@@ -149,7 +152,7 @@ def kenya(runs: Path, out: Path, wfp: Path = Path("E:/temp/wfp/wfp_food_prices_k
                "failed_total": int(sum(v["failed"] for v in info.values())),
                "minutes_total": round(max(v["minutes"] for v in info.values()), 1),
                "years": [int(yrs.season_year.min()), int(yrs.season_year.max())],
-               "moisture": MOISTURE, "maize_price_ksh_kg": {k: round(v, 2) for k, v in maize.items()},
+               "lgrip30": lg, "moisture": MOISTURE, "maize_price_ksh_kg": {k: round(v, 2) for k, v in maize.items()},
                "maize_price_months": len(p), "maize_price_period": [str(p.date.min()), str(p.date.max())],
                "n_price_ksh_kg_n": {k: round(v, 1) for k, v in N_PRICES.items()},
                "faostat_kenya_maize_t_ha": {"2018": 1.766, "2019": 1.560, "2020": 1.774}}
@@ -183,6 +186,7 @@ def mekong(runs: Path, out: Path) -> dict:
     yrs.rename(columns={"hw": "yield"}).round(1).to_csv(out / "seasons.csv", index=False)
     cell = s.groupby(["regime", "season", "iy", "ix", "lat", "lon"]).agg(
         ha=("ha", "first"), **{c: (c, "mean") for c in cols}).reset_index()
+    cell, lg = _with_lgrip(cell, (105.2, 9.7, 106.2, 10.7))
     cell.rename(columns={"hw": "yield"}).round(1).to_csv(out / "cells.csv", index=False)
     a = info["irrigated"]
     ha = float(s[s.regime == "irrigated"].drop_duplicates(["iy", "ix"]).ha.sum())
@@ -192,7 +196,7 @@ def mekong(runs: Path, out: Path) -> dict:
                "failed_total": int(sum(v["failed"] for v in info.values())),
                "minutes_total": round(sum(v["minutes"] for v in info.values()), 1),
                "years": [int(yrs.season_year.min()), int(yrs.season_year.max())],
-               "percolation_mm_d": {"irrigated": 2, "irrigated_perc1": 1, "irrigated_perc4": 4, "rainfed": 2},
+               "lgrip30": lg, "percolation_mm_d": {"irrigated": 2, "irrigated_perc1": 1, "irrigated_perc4": 4, "rainfed": 2},
                "faostat_viet_nam_rice_t_ha": {"2018": 5.818, "2019": 5.837, "2020": 5.919},
                "template": Path(a["template"]).name}
     (out / "summary.json").write_text(json.dumps(summary, indent=1))
@@ -279,6 +283,7 @@ def luzon(runs: Path, out: Path) -> dict:
                              "cold_years": float((g.cold_loss > 0.1 * g.hw_no_cold).mean()),
                              "heat_years": float((g.heat_loss > 0.1 * g.hw_no_heat).mean())}),
         include_groups=False).reset_index()
+    cells, lg = _with_lgrip(cells, (120.5, 16.0, 121.5, 17.0))
     cells.round(3).to_csv(out / "cells.csv", index=False)
     s["band"] = (s.elev // 200 * 200).astype(int)
     bands = s.groupby(["cultivar", "season", "band"]).apply(wmean, include_groups=False).reset_index()
@@ -293,7 +298,7 @@ def luzon(runs: Path, out: Path) -> dict:
                "runs": len(info), "seasons_total": int(sum(v["seasons"] for v in info.values())),
                "failed_total": int(sum(v["failed"] for v in info.values())),
                "minutes_total": round(max(v["minutes"] for v in info.values()), 1),   # one job wrote all six
-               "years": [int(s.season_year.min()), int(s.season_year.max())], "head_days": HEAD_DAYS,
+               "years": [int(s.season_year.min()), int(s.season_year.max())], "head_days": HEAD_DAYS, "lgrip30": lg,
                "coefficients": {"IR 64": {"THOT": 28.0, "TCLDF": 15.0, "TCLDP": 15.0},
                                 "IR 58": {"THOT": 33.9, "TCLDF": 15.0, "TCLDP": 15.0}},
                # FAOSTAT QCL via Our World in Data, grapher/rice-yields (read 2026-11-09)
@@ -375,6 +380,9 @@ def javamaize(runs: Path, out: Path) -> dict:
     cells = s.groupby(["iy", "ix", "lat", "lon"]).agg(ha=("ha", "first"), **{c: (c, "mean") for c in cols},
                                                       share_gain=("gain_flooded", lambda v: float((v.dropna() > 0).mean()) if v.notna().any() else np.nan)
                                                       ).reset_index()
+    lg = _lgrip_cells(cells, (111.4, -8.0, 112.4, -7.0))
+    if lg is not None:
+        cells = cells.merge(lg["cells"], on=["iy", "ix"], how="left").fillna({"ha_lgrip_all": 0, "ha_lgrip_irr": 0})
     cells.round(2).to_csv(out / "cells.csv", index=False)
     # every cell-season, for the rain chart (rounded to keep it small)
     s[["season_year", "iy", "ix", "ha", "rain", "maize_alone", "maize_flooded", "maize_rainfed"]].round(0) \
@@ -383,6 +391,7 @@ def javamaize(runs: Path, out: Path) -> dict:
     summary = {"generated": date.today().isoformat(), "cells": int(s.drop_duplicates(["iy", "ix"]).shape[0]),
                "ha": round(float(s.drop_duplicates(["iy", "ix"]).ha.sum()), 1),
                "cycles": [int(s.season_year.min()), int(s.season_year.max())], "observed": obs,
+               "lgrip30": lg["summary"] if lg is not None else None,
                "crop_seasons_total": int(sum(v.get("seasons", 0) for v in info.values())),
                "sequences": {k: {"strata": v.get("strata"), "failed": v.get("failed")} for k, v in info.items()},
                "minutes_total": round(sum(v["minutes"] for v in info.values()), 1),
@@ -394,6 +403,77 @@ def javamaize(runs: Path, out: Path) -> dict:
 
 
 BDSP_MAIZE = "obs/bdsp_jagung/bdsp_jagung_adm2_long.csv"   # scripts/fetch_bdsp.py --komoditas JAGUNG --prov 33 35
+LGRIP30 = Path("E:/temp/lgrip30")                          # LGRIP30_2015_*.tif tiles (NASA LP DAAC)
+
+
+def _with_lgrip(df: pd.DataFrame, box) -> tuple[pd.DataFrame, dict | None]:
+    """df (rows with iy, ix, lat, lon) with LGRIP30 cropland per cell added (ha_lgrip_all, ha_lgrip_irr),
+    and the summary of the comparison; df unchanged and None when the tiles are missing."""
+    lg = _lgrip_cells(df.drop_duplicates(["iy", "ix"])[["iy", "ix", "lat", "lon"]].reset_index(drop=True), box)
+    if lg is None:
+        return df, None
+    out = df.merge(lg["cells"], on=["iy", "ix"], how="left").fillna({"ha_lgrip_all": 0, "ha_lgrip_irr": 0})
+    return out, lg["summary"]
+
+
+def _lgrip_cells(cells: pd.DataFrame, box) -> dict | None:
+    """LGRIP30 cropland per 0.1-degree cell (ha): all cropland (classes 2 irrigated + 3 rainfed) and
+    irrigated only, from the 30 m tiles covering the box, for comparing the crop mask with MapSPAM.
+    Cells are matched on their centres (AgERA5 grid, multiples of 0.1 degree)."""
+    import rasterio
+    from rasterio.windows import from_bounds
+    w, s, e, n = box[0] - 0.05, box[1] - 0.05, box[2] + 0.05, box[3] + 0.05
+    # a box only partly covered by tiles would undercount the cropland: refuse, naming the tile
+    files = sorted(LGRIP30.glob("LGRIP30_2015_*.tif"))
+    bounds = []
+    for f in files:
+        with rasterio.open(f) as r:
+            bounds.append(r.bounds)
+    missing = set()
+    for la in np.arange(s, n + 1e-9, 0.05):
+        for lo_ in np.arange(w, e + 1e-9, 0.05):
+            if not any(b.left <= lo_ <= b.right and b.bottom <= la <= b.top for b in bounds):
+                y, x = int(np.floor(la / 10) * 10), int(np.floor(lo_ / 10) * 10)
+                # LP DAAC names tiles by their south-west corner, two-digit longitudes below 100
+                missing.add(f"{'N' if y >= 0 else 'S'}{abs(y):02d}{'E' if x >= 0 else 'W'}{abs(x):02d}")
+    if missing:
+        print(f"  LGRIP30 tiles missing in {LGRIP30} for this box: {', '.join(sorted(missing))}; "
+              "skipped the crop mask comparison")
+        return None
+    parts = []
+    for f in files:
+        with rasterio.open(f) as r:
+            b = r.bounds
+            lo = (max(w, b.left), max(s, b.bottom), min(e, b.right), min(n, b.top))
+            if lo[0] >= lo[2] or lo[1] >= lo[3]:
+                continue
+            win = from_bounds(*lo, r.transform).round_offsets().round_lengths()
+            a = r.read(1, window=win)
+            t = r.window_transform(win)
+        lat = t.f + t.e * (np.arange(a.shape[0]) + 0.5)
+        lon = t.c + t.a * (np.arange(a.shape[1]) + 0.5)
+        px = (abs(t.e) * 111320.0) * (abs(t.a) * 111320.0 * np.cos(np.radians(lat))) / 1e4   # ha per pixel row
+        ci, cj = np.meshgrid(np.round(lat / 0.1).astype(int), np.round(lon / 0.1).astype(int), indexing="ij")
+        d = pd.DataFrame({"ci": ci.ravel(), "cj": cj.ravel(), "cls": a.ravel(),
+                          "ha": np.repeat(px, a.shape[1])})
+        d = d[d.cls.isin([2, 3])]
+        parts.append(d.assign(irr=(d.cls == 2) * d.ha).groupby(["ci", "cj"])
+                     .agg(ha_lgrip_all=("ha", "sum"), ha_lgrip_irr=("irr", "sum")).reset_index())
+    if not parts:
+        print(f"  no LGRIP30 tiles over the box in {LGRIP30}: skipped the crop mask comparison")
+        return None
+    g = pd.concat(parts).groupby(["ci", "cj"]).sum().reset_index()
+    key = cells[["iy", "ix", "lat", "lon"]].assign(ci=np.round(cells.lat / 0.1).astype(int),
+                                                   cj=np.round(cells.lon / 0.1).astype(int))
+    m = key.merge(g, on=["ci", "cj"], how="left")[["iy", "ix", "ha_lgrip_all", "ha_lgrip_irr"]]
+    inbox = g[(g.ci >= round(box[1] / 0.1)) & (g.ci <= round(box[3] / 0.1)) &
+              (g.cj >= round(box[0] / 0.1)) & (g.cj <= round(box[2] / 0.1))]
+    summary = {"source": "GFSAD LGRIP30, nominal 2015, classes 2 (irrigated) and 3 (rainfed) cropland",
+               "box_ha_all": round(float(inbox.ha_lgrip_all.sum()), 0),
+               "box_ha_irr": round(float(inbox.ha_lgrip_irr.sum()), 0),
+               "cells_ha_all": round(float(m.ha_lgrip_all.sum()), 0),
+               "cells_ha_irr": round(float(m.ha_lgrip_irr.sum()), 0)}
+    return {"cells": m, "summary": summary}
 
 
 def _maize_statistics(s: pd.DataFrame, out: Path) -> dict:
