@@ -100,7 +100,7 @@ quarto render docs
 On Windows, stop any local server that is serving `docs/_site/` before rendering: Quarto replaces the
 folder and fails with "being used by another process" (os error 32) while a file in it is open.
 
-Quarto 1.8 renders the pages into `docs/_site/` (gitignored). The pages run Observable JS in the
+Quarto 1.11.9 renders the pages into `docs/_site/` (gitignored). The pages run Observable JS in the
 browser, notebooks are shown with their stored outputs, and `freeze: auto` is set, so nothing is computed
 at render time and neither Python nor the DSSAT engine is needed for this step. To look at it locally,
 serve the folder over HTTP (the browser will not load the data files from `file://`):
@@ -108,6 +108,10 @@ serve the folder over HTTP (the browser will not load the data files from `file:
 ```bash
 python -m http.server 4317 --directory docs/_site
 ```
+
+That serves the site at the root and shows no page for a wrong address. To see it as GitHub Pages does,
+under `/xdssat/` and with the "Page not found" page for any address without a page, use
+`python scripts/serve_pages.py` and open `http://localhost:8766/xdssat/`.
 
 ## OneDrive
 
