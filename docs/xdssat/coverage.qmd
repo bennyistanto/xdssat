@@ -1,0 +1,119 @@
+---
+title: "What xdssat covers"
+subtitle: "What the DSSAT engine can do, which of it xdssat runs on a grid, and what the rest would take"
+---
+
+xdssat drives the unmodified DSSAT-CSM 4.8 engine. The engine can do more than xdssat sets up on a grid.
+Everything the engine can do stays available by running it on single experiments, as the
+[training notebooks](../learn/index.qmd) do. This page lists the engine's capabilities, says for each how
+xdssat handles it, and, for what it does not support, what supporting it would take.
+
+Engine facts come from the DSSAT-CSM source (`dssat-csm-os`, version 4.8.6.4); file and line references are
+given where they matter. xdssat facts come from its code and settings.
+
+## How to read the status
+
+| Status | Meaning |
+|---|---|
+| **Grid** | Set in the experiment file or a prepared input; runs on every cell and season. |
+| **Template** | Works when the template experiment carries it. xdssat copies the section and moves its dates with planting, but no experiment-file setting changes it: edit the template. |
+| **Single field** | In the training notebooks (`docs/notebooks/learnlib.py`, `glue.py`) or a script for experiments, not in the gridded runner. |
+| **Not supported** | Refused or absent. The last section says what supporting it would take. |
+
+## Running the engine
+
+| Capability | DSSAT engine | xdssat | Status |
+|---|---|---|---|
+| Run the treatments of an experiment | mode A | one experiment file per chunk of cells, run in parallel (`src/runner.py`) | Grid |
+| Many seasons and years | years per treatment, or `NYERS` | one treatment per cell, season and year (`years`) | Grid |
+| Crop sequences, soil carried from crop to crop | mode Q with a batch file | `.SQX` template (`src/sequence.py`); crops labelled by sowing date | Grid |
+| Batch, spatial and seasonal batch modes | modes B, S, N | not used: xdssat chunks the cells itself | Grid, another way |
+| Yield forecast within a season | mode Y with a forecast date (`FODAT`) | none | Not supported |
+| Cultivar estimation with GenCalc | modes G and T | GLUE instead (see below) | Not supported |
+| Interactive and sensitivity modes | modes I and E, read from the keyboard | scenarios replace them | Not supported |
+
+## Inputs
+
+| Capability | DSSAT engine | xdssat | Status |
+|---|---|---|---|
+| Daily weather from files | `.WTH`, weather method M | gridded, hourly and point sources, NASA POWER ([Input data](data.qmd)) | Grid |
+| Weather generators WGEN and SIMMETEO | weather methods W and S with a `.CLI` file | none | Not supported |
+| Soil profiles | `.SOL` | SoilGrids with Saxton and Rawls, or your own profiles and soil map; `slpf`, `soc_scale` | Grid |
+| Soil analysis section | `*SOIL ANALYSIS` (`IPSLIN.for`) | refused (`filex.UNSUPPORTED`) | Not supported |
+| Initial soil water and nitrogen | `*INITIAL CONDITIONS` | `treatments > initial_soil_water`, nitrate and ammonium by depth from the template; `scenarios > management` for the IC fields | Grid |
+| Where the crop is, and its water regime | none: the engine runs one field | crop mask, water regime, region and zone maps | Grid |
+
+## Crops and cultivars
+
+| Capability | DSSAT engine | xdssat | Status |
+|---|---|---|---|
+| Rice, maize, pearl millet | CERES-Rice, CERES-Maize, CERES-Millet | templates `XDRI8601.RIX`, `XDRW8601.RIX`, `XDMZ8201.MZX`, `XDML8601.MLX` | Grid |
+| Any other crop the engine has | its crop models | a template experiment of your own ([Another crop](another-crop.qmd)) | Template |
+| Choice of model for a crop | `SMODEL` | the template's | Template |
+| Cultivar choice and coefficients | `.CUL` | `cultivars`; `scenarios > cultivar_coefficients` | Grid |
+| Ecotype and species coefficients | `.ECO`, `.SPE` | copied unchanged | Not supported |
+
+## Management
+
+| Capability | DSSAT engine | xdssat | Status |
+|---|---|---|---|
+| Planting dates and calendars | `PDATE` | uniform, by zone or by rain onset per cell; `scenarios > planting_offset_days` | Grid |
+| Plant population, row spacing, depth | `*PLANTING DETAILS` | `scenarios > management` (MP fields) | Grid |
+| Automatic planting window | `PLANT A` | `scenarios > simulation` (`PLANT`, `PH2OL` ... `PSTMN`); window dates move with planting | Grid |
+| Nitrogen rate | `*FERTILIZERS` | `treatments > nitrogen_kg` to the template's levels | Grid |
+| Fertilizer timing, source and depth | `*FERTILIZERS` | the template's | Template |
+| Irrigation, reported or automatic | `*IRRIGATION`, `IRRIG` | `treatments > water_regimes` to template levels; `scenarios > simulation` (`IRRIG`, `IMDEP`, `ITHRL`, `ITHRU`, `IRAMT`, `IREFF`) | Grid |
+| Rice flood, bunds, puddling, percolation | operations `IR006` to `IR011` | template levels (`XDRI8601`, `XDRW8601`) | Template |
+| Residues and organic fertilizer | `*RESIDUES` | the template's | Template |
+| Harvest | `*HARVEST`, `HARVS` | the template's; `scenarios > simulation` (`HARVS`, `HPCNP`, `HPCNR`) | Grid |
+| Dates in days after planting (code D) | read as days, not dates | kept as days, not moved | Grid |
+| Chemicals and tillage | `*CHEMICALS`, `*TILLAGE` | refused (`filex.UNSUPPORTED`) | Not supported |
+
+## Processes and switches
+
+| Capability | DSSAT engine | xdssat | Status |
+|---|---|---|---|
+| Water and nitrogen on or off: potential, water-limited, N-limited | `WATER`, `NITRO` | `scenarios > simulation` | Grid |
+| Nitrogen fixation | `SYMBI` (legumes) | `scenarios > simulation`; needs a legume template | Template |
+| Phosphorus and potassium | `PHOSP` (CROPGRO, CERES-Maize, CERES-Sorghum), `POTAS` (CERES-Maize, CERES-Rice); soil P and K needed | the switches pass, but the prepared soils carry no P or K | Not supported |
+| Pests and diseases | `DISES` with `.PST` coefficients and observed damage | none | Not supported |
+| CO2 and climate change | `CO2` option; `*ENVIRONMENT MODIFICATIONS` (8 variables) | `scenarios > simulation` (`CO2`); `scenarios > environment` | Grid |
+| Methods: evapotranspiration, infiltration, photosynthesis, soil organic matter, soil evaporation, layers, soil temperature, greenhouse gases | `*SIMULATION CONTROLS` methods | `scenarios > simulation` (`EVAPO`, `INFIL`, `PHOTO`, `MESOM`, `MESEV`, `MESOL`, `METMP`, `MEGHG`) | Grid |
+
+## Outputs
+
+| Capability | DSSAT engine | xdssat | Status |
+|---|---|---|---|
+| Seasonal summary | `Summary.OUT`, `summary.csv` | `summary.csv` and a CF netCDF per run: yield, biomass, LAI, water and nitrogen terms, dates, crop area | Grid |
+| Daily outputs | plant growth, soil water, nitrogen, carbon, temperature, weather ... | `run > daily` with 16 groups | Grid |
+| Rice flood water | `FloodW.OUT` (text only) | `learnlib.read_flood` | Single field |
+
+## Analysis, calibration and evaluation
+
+None of these are in the engine itself; DSSAT provides them as separate tools.
+
+| Capability | DSSAT | xdssat | Status |
+|---|---|---|---|
+| Seasonal and risk analysis: distributions, CDF, mean and variance | Seasonal Analysis tool | `src/seasonal.py`, `scripts/seasonal_summary.py` | Grid |
+| Economics: prices, costs, gross margin | Seasonal Analysis tool | `seasonal.Economics` | Grid |
+| Comparison with yield statistics by region | none | `scripts/compare_regions.py`; `compare_districts.py` for Java | Grid |
+| Yield-gap factor fitted to statistics | `SLPF` | `scripts/fit_slpf.py` | Grid |
+| Cultivar calibration with GLUE | GLUE tool | `src/glue.py`, `scripts/glue_calibrate.py` on experiments with measurements | Single field |
+| Evaluation against measurements | FileA, FileT, `Evaluate.OUT` | FileA and FileT read and write, RMSE, Willmott's d (`learnlib.py`) | Single field |
+
+## What the rest would take
+
+Each capability xdssat does not support, with what supporting it would need. The effort is an estimate of
+the work on xdssat's side.
+
+| Capability | Feasible | What it would take, or why not | Effort (estimate) |
+|---|---|---|---|
+| Soil analysis section | yes | Copy the section from the template like the others and move its date (`SADAT`) with planting. The engine reads it only when nitrogen is on (`IPSLIN.for:247-434`). | small |
+| Chemicals and tillage | yes | Copy both sections from the template and move their dates with planting. The engine always reads their dates as calendar dates (`IPCHEM.for:95`, `IPTILL.for:91`), so moving them is consistent. | small |
+| Ecotype and species coefficients | yes | Write the `.ECO` and `.SPE` files with overrides, as xdssat already does for `.CUL`. | small |
+| Yield forecast within a season | yes, with conditions | Run mode Y with a forecast date (`FODAT`, the eleventh row of the automatic management section) per cell. How the engine joins the season's weather to past years has to be checked in its source first. | moderate |
+| Weather generators | yes | A `.CLI` file per cell from the monthly statistics of the prepared weather, and weather method W or S. Useful for long synthetic series; observed gridded weather covers most runs. | moderate |
+| GenCalc | not pursued | Its modes G and T swap in their own cultivar files (`GENCALC2.CUL`, `ipexp.for:504-529`) and expect measured experiments per cultivar; cultivar calibration is done with GLUE. | - |
+| Phosphorus and potassium | limited by data | The engine supports them for a few crop models only, and needs soil P and K in the profiles; SoilGrids has no P and K pools in DSSAT's form. Feasible where you bring your own profiles with P and K. | moderate, once data exist |
+| Pests and diseases | no, on a grid | The engine needs pest coefficients (`.PST`) and observed damage over time for each field; gridded damage data do not exist. | - |
+| Interactive and sensitivity modes | no | They read from the keyboard (`CSM.for:577-584`); scenarios do the same work in a script. | - |
