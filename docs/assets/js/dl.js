@@ -268,6 +268,35 @@ export function placeMarks(Plot, adm1, adm2, {labels = "adm1", fontSize = 10} = 
   return marks;
 }
 
+// ---- Crop map comparison of the case pages -----------------------------------------------
+// Each cell row carries the crop area of the runs' own map (ha) and of LGRIP30 (ha_lgrip_all,
+// ha_lgrip_irr; docs/scripts/export_cases.py). The simulated cells and yields stay the same;
+// only the area weights change.
+export const MASK_COLS = ["ha", "ha_lgrip_all", "ha_lgrip_irr"];
+
+export function maskLabels(spamLabel) {
+  return {ha: spamLabel, ha_lgrip_all: "LGRIP30 cropland", ha_lgrip_irr: "LGRIP30 irrigated cropland"};
+}
+
+// One row per crop map for Inputs.table. metrics: [{label, value: d => number, sum: bool, scale}]:
+// sum false -> weighted mean of value over cells; sum true -> sum of value x area, times scale.
+export function maskTable(rows, spamLabel, metrics, selected) {
+  const labels = maskLabels(spamLabel);
+  const ok = v => v != null && Number.isFinite(v);
+  return MASK_COLS.map(col => {
+    const w = rows.filter(d => d[col] > 0);
+    const out = {"Crop map": labels[col] + (col === selected ? " (selected)" : ""),
+                 "Area in the cells (ha)": w.reduce((a, d) => a + d[col], 0),
+                 "Correlation with MapSPAM, per cell": pearson(rows.map(d => d.ha), rows.map(d => d[col]))};
+    for (const m of metrics) {
+      const v = w.filter(d => ok(m.value(d)));
+      const tot = v.reduce((a, d) => a + m.value(d) * d[col], 0);
+      out[m.label] = m.sum ? tot * (m.scale ?? 1) : tot / v.reduce((a, d) => a + d[col], 0);
+    }
+    return out;
+  });
+}
+
 // Number formatting used in the prose.
 export const fmt = {
   int: (v) => (v == null || !isFinite(v) ? "n/a" : Math.round(v).toLocaleString("en-US")),
