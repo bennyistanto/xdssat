@@ -8,6 +8,7 @@ project:
     - xdssat/index.qmd
     - xdssat/gridding.qmd
     - xdssat/implementation.qmd
+    - xdssat/coverage.qmd
     - xdssat/getting-started.md
     - xdssat/data.qmd
     - xdssat/another-crop.qmd
@@ -71,6 +72,8 @@ website:
             text: How xdssat differs from common DSSAT use
           - href: xdssat/implementation.qmd
             text: Implementation
+          - href: xdssat/coverage.qmd
+            text: What xdssat covers
           - text: "---"
           - href: xdssat/getting-started.md
             text: Getting started
@@ -160,6 +163,8 @@ website:
               text: How xdssat differs from common DSSAT use
             - href: xdssat/implementation.qmd
               text: Implementation
+            - href: xdssat/coverage.qmd
+              text: What xdssat covers
             - text: "---"
             - href: xdssat/getting-started.md
               text: Getting started
