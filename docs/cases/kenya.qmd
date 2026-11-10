@@ -293,6 +293,8 @@ withDownload(Plot.plot({
 
 ## What this does not say
 
+- **Simulated, not observed.** Why the simulated yields differ from official statistics, in every case study:
+  [FAQ](../about/faq.qmd#why-do-the-simulated-yields-differ-from-the-official-statistics).
 - **Uncalibrated.** H610 runs with DSSAT's own coefficients, in a field without weeds, pests, diseases or
   phosphorus shortage. Its kilograms are not a forecast of farm yields; the share slider is there for
   that reason.

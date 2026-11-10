@@ -238,6 +238,8 @@ withDownload(Plot.plot({
 
 ## What this does not say
 
+- **Simulated, not observed.** Why the simulated yields differ from official statistics, in every case study:
+  [FAQ](../about/faq.qmd#why-do-the-simulated-yields-differ-from-the-official-statistics).
 - **Uncalibrated.** IR 64 and IR 58 run with DSSAT's own coefficients, flooded and at 105 kg N everywhere,
   without pests, diseases or weeds. Their cold thresholds are DSSAT's defaults. Varieties grown in the
   mountains, and their real tolerance of cold, are not in this experiment.

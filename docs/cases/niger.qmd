@@ -282,6 +282,8 @@ withDownload(Plot.plot({
 
 ## What this does not say
 
+- **Simulated, not observed.** Why the simulated yields differ from official statistics, in every case study:
+  [FAQ](../about/faq.qmd#why-do-the-simulated-yields-differ-from-the-official-statistics).
 - **Uncalibrated.** CIVT is the cultivar of a 1986 experiment, at 3 plants/m² and without pests or
   weeds. The level is not a forecast of farm yields: at its best date the simulation gives about twice
   FAOSTAT's national millet yield for Niger, 0.48-0.55 t/ha in 2018-2020 [@faostat_qcl]. The ranking of the

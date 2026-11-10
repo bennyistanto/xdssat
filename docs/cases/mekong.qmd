@@ -238,6 +238,8 @@ withDownload(Plot.plot({
 
 ## What this does not say
 
+- **Simulated, not observed.** Why the simulated yields differ from official statistics, in every case study:
+  [FAQ](../about/faq.qmd#why-do-the-simulated-yields-differ-from-the-official-statistics).
 - **Uncalibrated.** IR 64 runs with DSSAT's own coefficients, at 105 kg N, without pests, diseases or weeds.
   The yields are above the national average; the comparisons between seasons and regimes are the result.
 - **Water at the field.** Irrigation is what the field receives. Canal and pumping losses on the way are not
