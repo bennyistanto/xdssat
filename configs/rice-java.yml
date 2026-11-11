@@ -62,7 +62,8 @@
 #
 # The engine and work folders must be SHORT paths (under about 40 characters) on a local disk,
 # OUTSIDE OneDrive or any synced folder. The engine keeps file paths in fixed 80 to 102
-# character text buffers (docs/feasibility-review.md, section 4): a long path breaks runs,
+# character text buffers (CSM_Main/CSM.for:96-97, Weather/IPWTH_alt.for:60-61 in the engine
+# source): a long path breaks runs,
 # often without a clear error, and a synced folder locks files while the engine writes them.
 #
 # The examples are the reference machine's folders, as a pattern to follow.
