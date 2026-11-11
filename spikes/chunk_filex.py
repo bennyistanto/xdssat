@@ -1,6 +1,6 @@
 """Prototype: N grid cells as N treatments in one FileX, one weather file per cell.
 
-Spike only (2026-11-05 feasibility review). Takes treatment 1 and field 1 of an
+Spike only (2026-11-05). Takes treatment 1 and field 1 of an
 existing FileX and clones them n times; each clone points at its own copy of the
 weather file, named GRnnnnnn.WTH. Not production code.
 
