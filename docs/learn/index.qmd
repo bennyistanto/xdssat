@@ -17,7 +17,8 @@ useful for exploring all of that. The modules below do it with the course materi
 module per training day, every exercise rebuilt in Python on top of xdssat's modules.
 
 ::: {.callout-note appearance="simple"}
-**Based on the DSSAT training in Chiang Mai, 2018.** The following material is based on the DSSAT
+**Based on the DSSAT training in Chiang Mai, 2018.**    
+The following material is based on the DSSAT
 training I attended in Chiang Mai, Thailand, in 2018. The trainers were
 [Prof. Gerrit Hoogenboom](https://scholar.google.com/citations?hl=en&user=6t7Zm4oAAAAJ) from the University
 of Florida, USA, and [Prof. Attachai Jintrawet](https://scholar.google.com/citations?hl=en&user=HHRpPm4AAAAJ)
