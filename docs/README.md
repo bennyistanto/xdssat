@@ -1,7 +1,7 @@
 # xdssat documentation site
 
-A Quarto website with Observable JS (Observable Plot) charts and maps. `feasibility-review.md` in this
-folder is a project document (not rendered); the getting-started guide is `xdssat/getting-started.md`.
+A Quarto website with Observable JS (Observable Plot) charts and maps. The getting-started guide is
+`xdssat/getting-started.md`.
 
 | Section | Files |
 |---|---|
