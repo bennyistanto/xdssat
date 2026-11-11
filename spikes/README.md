@@ -1,7 +1,7 @@
 # Spikes
 
-Throwaway experiments that back the numbers in
-[docs/feasibility-review.md](../docs/feasibility-review.md). Not production code.
+Small experiments behind numbers quoted in the documentation (engine build, speed of
+chunked experiment files, checks on Java cells). Not production code.
 
 All runs: 2026-11-05, Windows 11, 64 logical cores, DSSAT-CSM v4.8.6.4 built from
 `../dssat-csm-os` (commit `25c93b9a`), GNU Fortran 13.2.0 (Strawberry MinGW-w64), CMake 3.29.2.
