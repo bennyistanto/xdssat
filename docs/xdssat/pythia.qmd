@@ -1,0 +1,86 @@
+---
+title: "Comparison with pythia"
+subtitle: "Two ways of running the DSSAT engine over space, compared from their code"
+---
+
+[pythia](https://github.com/DSSAT/pythia) [@pythia] is the gridded modeling framework of the DSSAT
+organisation, described by @joshi2026. Like xdssat, it runs the unmodified DSSAT-CSM engine over a region
+from Python. It was a design reference when xdssat was planned; xdssat contains none of its code.
+
+This page compares the two. pythia facts come from its source code, version 2.3.2
+(commit [`fa9646e`](https://github.com/DSSAT/pythia/tree/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6)),
+linked to the lines that show them, and from the paper, cited by page. xdssat facts come from its code and
+the pages of this guide.
+
+## The difference in one paragraph
+
+pythia is a **point orchestrator**. It takes weather and soil files already in DSSAT's format, an
+experiment file written as a text template with gaps, and a JSON configuration. For every point it writes
+one experiment, runs the engine, and finally joins the points' `summary.csv` files into one CSV.
+xdssat is a **grid pipeline**. It writes the weather, soil and crop-area inputs itself from gridded
+datasets, runs the cells in chunks, and returns a CF netCDF file with the crop area of every cell, which
+its scripts aggregate by region, compare with statistics and use to fit a yield-gap factor.
+
+## Side by side
+
+### Where and what is simulated
+
+| | pythia 2.3.2 | xdssat |
+|---|---|---|
+| Unit of simulation | a **site**: a point from a vector file or a list of coordinates ([`functions.py:36-57`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/functions.py#L36-L57)). Every raster is read at the site at its own resolution ([`io.py:37-56`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/io.py#L37-L56)), which the paper calls a "periscope" [@joshi2026, p. 16] | a **weather grid cell** (0.1° in the case studies) and water regime. The crop map is aggregated to the cell as hectares of crop, the cell's weight ([How xdssat differs](gridding.qmd)) |
+| Which points run | a site is dropped when any of its rasters has no data or its harvested area is 0 ([`io.py:59-71`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/io.py#L59-L71)); an optional sample size limits the number of sites | cells with crop area in the crop map, inside the `aoi` box |
+| Weather | existing `.WTH` files; each site takes the nearest weather point of a vector file ([`functions.py:133-140`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/functions.py#L133-L140)), linked into the site's folder ([`peerless.py:51-70`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/peerless.py#L51-L70)) | written by xdssat from gridded, hourly or point sources, or NASA POWER, one file per cell ([Input data](data.qmd)) |
+| Soil | a raster of soil profile identifiers with an existing DSSAT soil database such as the Global High-Resolution soil profiles or the HC27 generic profiles ([`functions.py:125-131, 488`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/functions.py#L488)) | SoilGrids texture and organic carbon turned into profiles with the Saxton and Rawls equations, or your own profiles and soil map ([Input data](data.qmd)) |
+| Initial soil water and nitrogen | computed per layer from the soil profile and a fraction of available water ([`soil_handler.py:143`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/soil_handler.py#L143)) | from the template's levels or the experiment file's settings |
+| Management that varies in space | any experiment field from a raster; planting windows from a raster or from day-of-year points; fertilizer splits ([`functions.py:60-123, 551-647`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/functions.py#L551-L647)) | planting dates by zone or by rain onset per cell, water regime map, region and zone maps |
+
+### Writing and running the experiments
+
+| | pythia 2.3.2 | xdssat |
+|---|---|---|
+| Experiment file | a **text template** (Jinja2) that the user writes, with `{{ gaps }}` and loops [@joshi2026, fig. 6]. Values are padded from a hand-kept table of field widths ([`template.py:6-84`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/template.py#L6-L84)); fields not in the table are written as given | a **Python writer** (`src/filex.py`) that copies the sections of a template experiment, moves their dates with planting, writes each field to the width the engine reads, and refuses sections it cannot write ([What xdssat covers](coverage.qmd)) |
+| Configuration | JSON: shared settings, a list of runs that override them, output settings and plugins [@joshi2026, fig. 7 and tables 2-4] | a YAML experiment file: area, template, treatments, scenarios, run settings and paths ([Getting started](getting-started.md)) |
+| Engine calls | **one folder and one experiment per site and run** ([`peerless.py:19-20`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/peerless.py#L19-L20)); one engine call per site in a process pool ([`dssat.py:12-25, 104-113`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/dssat.py#L12-L25)); the years run inside the experiment | **one experiment per chunk** of up to 200 treatments (cell, season and year), in parallel processes (`src/runner.py`; [Implementation](implementation.qmd)) |
+| Other engine modes | any mode letter can be set; the batch modes (crop sequences, forecasts and others) need a batch file the user supplies, as pythia writes none ([`dssat.py:42-72`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/dssat.py#L42-L72)) | crop sequences built in, from a sequence template; the forecast mode is not supported ([What xdssat covers](coverage.qmd)) |
+| Failed runs | a site whose engine run writes an error is flagged and logged, not rerun ([`dssat.py:27-30`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/dssat.py#L27-L30)). As each site has its own experiment, a failure costs that site only | the failing treatment is read from the engine's error file, dropped, and the rest of its chunk rerun |
+| Engine version | any executable named in the configuration [@joshi2026, p. 16] | DSSAT-CSM 4.8 (built from 4.8.6.4), against whose source the file formats were checked |
+
+### Results and analysis
+
+| | pythia 2.3.2 | xdssat |
+|---|---|---|
+| Output | a CSV per run, or one for all: the rows of every site's `summary.csv` with latitude, longitude, run name and, when given, harvested area, season, management and population ([`analytics.py:160-248`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/analytics.py#L160-L248)). Columns can be filtered and new ones calculated by subtraction ([`analytic_functions.py`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/analytic_functions.py)). No netCDF | a CF netCDF per run with crop area, plus `summary.csv`; daily outputs in 16 groups on request |
+| Aggregation | not part of pythia: the harvested area is a column of the CSV. In the paper the national yield is a weighted average of the simulated yields by harvested area [@joshi2026, p. 14] | area-weighted yields by region, comparison with yield statistics, fitting a yield-gap factor to them ([Scientific method](../java/science.qmd)) |
+| Sensitivity analysis | a plugin that builds every combination of the values given for chosen variables ([`sensitivity_plugin`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/plugins/sensitivity_plugin/__init__.py)) | every cultivar, nitrogen rate and scenario listed in the experiment file |
+| In-season forecast | a plugin that copies the observed weather of the current season, up to a date, into the same days of every year of the weather file, so that each past year becomes one scenario for the rest of the season ([`weather_forecast_simple`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/plugins/weather_forecast_simple/__init__.py#L36-L79)). The engine's own forecast mode is not used | none |
+| Calibration | none; named as future work [@joshi2026, p. 16] | a yield-gap factor fitted to statistics; a Python port of GLUE for single experiments |
+| Seasonal and economic analysis | none | distributions, risk and gross margins (`src/seasonal.py`) |
+| Extending it | plugin hooks at every stage ([`plugin.py:6-23`](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/pythia/plugin.py#L6-L23)) | Python modules and scripts in the repository |
+
+### Using it
+
+| | pythia 2.3.2 | xdssat |
+|---|---|---|
+| Install | a Python package (wheel) for Windows, macOS and Linux; on Windows, Developer Mode is needed for the file links it makes ([README](https://github.com/DSSAT/pythia/blob/fa9646ec4d2e5a862810fa1ec80c2eea408ca9b6/README.md)) | a working folder, not a package; tested on Windows, with the engine built from source or taken from a DSSAT installation ([Getting started](getting-started.md)) |
+| Example | a Sri Lanka maize and rice data set, downloaded with each release | the Java rice case study and five further cases on this site, with their commands |
+| Licence | BSD-3-Clause | MPL-2.0 |
+
+## Two published runs
+
+Both have run on the order of 100,000 simulations in under an hour. The numbers below are not a speed
+comparison: the crops, engine versions and computers differ, and the paper does not define a "run".
+
+- **pythia, maize in Ghana** [@joshi2026, pp. 12-15]. DSSAT 4.7.5, 2,840 points at 5 arc-minutes, daily
+  weather from a global climate model at 0.5° for 1980-2014, harvested area from SPAM 2010, three
+  management classes (0, 20 and 100 kg N/ha) and planting windows for three agro-ecological zones. More
+  than 236,000 simulation runs took 39 min 57 s on 24 cores of a computing cluster. Against FAO national
+  yields, the mean absolute error was 143 kg/ha and Willmott's index of agreement 0.63.
+- **xdssat, rice in Java** ([the case study](../java/index.qmd)). 84,870 cell-seasons in 1,187 cells of
+  0.1° for 1991-2020, in 15.5 minutes with 32 engine processes, none failed.
+
+## Which to use
+
+The choice follows what you already have. With DSSAT-format weather files and a DSSAT soil database at
+hand, or points rather than a grid, pythia uses them as they are and runs at any point. Starting from
+gridded datasets and wanting area-weighted results, comparison with statistics or netCDF for xarray,
+xdssat prepares and returns those.

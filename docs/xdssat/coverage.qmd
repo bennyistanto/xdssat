@@ -9,7 +9,8 @@ Everything the engine can do stays available by running it on single experiments
 xdssat handles it, and, for what it does not support, what supporting it would take.
 
 Engine facts come from the DSSAT-CSM source (`dssat-csm-os`, version 4.8.6.4); file and line references are
-given where they matter. xdssat facts come from its code and settings.
+given where they matter. xdssat facts come from its code and settings. How xdssat compares with pythia,
+the gridded framework of the DSSAT organisation, is on [Comparison with pythia](pythia.qmd).
 
 ## How to read the status
 

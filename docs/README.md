@@ -6,7 +6,7 @@ folder is a project document (not rendered); the getting-started guide is `xdssa
 | Section | Files |
 |---|---|
 | Home: xdssat as a bridge between DSSAT and Python | `index.qmd` |
-| Guide | `xdssat/index.qmd`, `xdssat/gridding.qmd`, `xdssat/implementation.qmd`, `xdssat/coverage.qmd` (what xdssat covers), `xdssat/getting-started.md`, `xdssat/examples.qmd`, `xdssat/data.qmd` (input data), `xdssat/another-crop.qmd` |
+| Guide | `xdssat/index.qmd`, `xdssat/gridding.qmd`, `xdssat/implementation.qmd`, `xdssat/coverage.qmd` (what xdssat covers), `xdssat/pythia.qmd` (comparison with pythia), `xdssat/getting-started.md`, `xdssat/examples.qmd`, `xdssat/data.qmd` (input data), `xdssat/another-crop.qmd` |
 | Main case study: rice in Java | `java/index.qmd` (story), `java/data.qmd`, `java/alternatives.qmd` (alternative input data), `java/science.qmd`; their data in `java/data/` |
 | Further case studies | `cases/java-maize.qmd`, `cases/niger.qmd`, `cases/kenya.qmd`, `cases/mekong.qmd`, `cases/luzon.qmd`; their data in `cases/data/<case>/`, written by `scripts/export_cases.py` (results) and `scripts/export_boundaries.py` (location maps) |
 | DSSAT training (6 modules, adapted from the 2018 International Training Program on DSSAT) | `learn/index.qmd` (from the case studies to DSSAT itself), `learn/module1.qmd` ... `module6.qmd`; their data in `learn/data/moduleN/` |

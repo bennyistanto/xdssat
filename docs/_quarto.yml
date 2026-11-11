@@ -11,6 +11,7 @@ project:
     - xdssat/gridding.qmd
     - xdssat/implementation.qmd
     - xdssat/coverage.qmd
+    - xdssat/pythia.qmd
     - xdssat/getting-started.md
     - xdssat/data.qmd
     - xdssat/another-crop.qmd
@@ -77,6 +78,8 @@ website:
             text: Implementation
           - href: xdssat/coverage.qmd
             text: What xdssat covers
+          - href: xdssat/pythia.qmd
+            text: Comparison with pythia
           - text: "---"
           - href: xdssat/getting-started.md
             text: Getting started
@@ -168,6 +171,8 @@ website:
               text: Implementation
             - href: xdssat/coverage.qmd
               text: What xdssat covers
+            - href: xdssat/pythia.qmd
+              text: Comparison with pythia
             - text: "---"
             - href: xdssat/getting-started.md
               text: Getting started
