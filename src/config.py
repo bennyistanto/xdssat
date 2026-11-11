@@ -29,8 +29,8 @@ says which line to edit. Relative paths are read from the project root.
 ``scripts/check_setup.py`` prints where each value came from.
 
 The engine folder and the work root must be short paths outside OneDrive: the
-engine keeps file paths in fixed ``CHARACTER*80`` to ``*102`` buffers (see
-docs/feasibility-review.md, section 4).
+engine keeps file paths in fixed ``CHARACTER*80`` to ``*102`` buffers
+(``CSM_Main/CSM.for:96-97`` and ``Weather/IPWTH_alt.for:60-61`` in the engine source).
 
 Module attributes
 -----------------
