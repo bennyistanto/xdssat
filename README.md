@@ -7,9 +7,9 @@
 
 # xdssat
 
-Gridded crop simulation with the DSSAT-CSM engine, driven from Python and xarray.
+Gridded crop simulation with the [DSSAT-CSM](https://github.com/DSSAT/dssat-csm-os) engine, driven from Python and xarray.
 
-xdssat is a bridge between DSSAT and Python. It does not reimplement DSSAT: it writes the engine's own input
+**xdssat** is a bridge between [DSSAT](https://github.com/DSSAT) and Python. It does not reimplement DSSAT: it writes the engine's own input
 files for every grid cell and season, runs the unmodified `dscsm048` engine in parallel, and collects the
 results into one CF netCDF file. The inputs (weather, crop mask, soil, water regime) come from your own data or
 from global datasets such as AgERA5, ERA5-Land, NASA POWER, SoilGrids, WorldCover and LGRIP30; see
