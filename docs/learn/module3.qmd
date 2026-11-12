@@ -44,7 +44,8 @@ vColors = ["#999999", "#2a7f62", "#d9822b"]
 ```
 
 ::: {.callout-note appearance="simple"}
-**How to use this module.** Read this page for the ideas; every chart comes from the
+**How to use this module.**    
+Read this page for the ideas; every chart comes from the
 [module 3 notebook](../notebooks/module3.ipynb) (${dlLinks}), which runs the DSSAT engine and writes the small
 data files the charts read. The runs on this build were made on ${runInfo[0].run_on}.
 :::

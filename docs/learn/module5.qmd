@@ -23,7 +23,8 @@ p1 = Object.fromEntries(prices.filter(d => d.TRNO === 1).map(d => [d.item, d]))
 ```
 
 ::: {.callout-note appearance="simple"}
-**How to use this module.** Read this page for the ideas; every chart comes from the
+**How to use this module.**    
+Read this page for the ideas; every chart comes from the
 [module 5 notebook](../notebooks/module5.ipynb) (${dlLinks}), which runs the DSSAT engine and writes the small
 data files the charts read. The runs on this build were made on ${runInfo[0].run_on}.
 :::

@@ -10,8 +10,9 @@ import {withDownload} from "../assets/js/dl.js"
 ## From the case studies to the whole model
 
 The case studies use a narrow slice of DSSAT. The [Java rice case study](../java/index.qmd), for one, runs one crop
-model, two water regimes, one cultivar and a calibration of a single soil fertility factor. DSSAT does far more: its engine carries cultivar
-files for 48 crop codes (59 files in the engine's `Genotype` folder), and it simulates phenology and growth, the water and nitrogen balance of the soil, the effect of management, and
+model, two water regimes, one cultivar and a calibration of a single soil fertility factor. DSSAT does far more: 
+its engine carries cultivar files for 48 crop codes (59 files in the engine's `Genotype` folder), and it simulates 
+phenology and growth, the water and nitrogen balance of the soil, the effect of management, and
 seasons, risks and rotations over many years. The bridge that xdssat builds between DSSAT and Python is just as
 useful for exploring all of that. The modules below do it with the course material of a DSSAT training, one
 module per training day, every exercise rebuilt in Python on top of xdssat's modules.
