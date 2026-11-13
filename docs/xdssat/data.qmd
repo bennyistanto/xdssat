@@ -136,7 +136,7 @@ a CSV table; every cell of the grid takes the series of its nearest point.
 | [W5E5 v2.0](https://doi.org/10.48364/ISIMIP.342217) | 0.5°, daily | 1979 to 2019 | WFDE5 over land merged with ERA5 over the ocean, the ISIMIP3 reference climate; all six variables; CC0 (DataCite record) |
 | [MSWEP v2.8](https://www.gloh2o.org/mswep/) | 0.1°, 3-hourly | 1979 to present | rain only, merged gauge, satellite and reanalysis; CC BY-NC 4.0 (stated by the [ICDC Hamburg mirror](https://www.cen.uni-hamburg.de/en/icdc/data/atmosphere/mswep-precipitation-amount.html), not checked at GloH2O); use `daily: sum` |
 | [NASA POWER](https://power.larc.nasa.gov/docs/services/api/temporal/daily/) | point or region | see the POWER documentation | daily; meteorology from MERRA-2 (0.5° x 0.625°), radiation from CERES; free download per point (CSV) |
-| [CHIRPS 2.0](https://doi.org/10.1038/sdata.2015.66) | 0.05°, daily | 1981 to present | rain only, 50°S-50°N; combine with temperature and radiation from another source |
+| [CHIRPS 3.0](https://doi.org/10.1038/s41597-026-07096-4) | 0.05°, daily | 1981 to present | rain only, 60°S-60°N; combine with temperature and radiation from another source |
 
 ### What the checks refuse
 
@@ -207,7 +207,7 @@ Java) is the best crop mask. Without one:
 | [ESA WorldCover 2021 v200](https://esa-worldcover.org) | 10 m | cropland (class 40) | `values: classes`, `classes: [40]`, `aggregate: 10` | CC BY 4.0 |
 | [GFSAD LGRIP30](https://doi.org/10.5067/Community/LGRIP/LGRIP30.001) | 30 m | irrigated (2) and rainfed (3) cropland, nominal 2015 | `classes: [2, 3]` | NASA LP DAAC, Earthdata login |
 | [MapSPAM 2020 v2r2](https://doi.org/10.7910/DVN/SWPENT) | 5 arc-min (about 9 km) | physical area of 46 crops, by technology | `values: ha`, file `..._A_RICE_A.tif` for rice | CC BY 4.0 (IFPRI terms of the Dataverse record) |
-| [C3S / ESA CCI land cover](https://doi.org/10.24381/cds.006f2c9a) | 300 m, yearly, 1992 to present | rainfed cropland (10, 11, 12), irrigated or post-flooding cropland (20), cropland mosaic (30) | `values: classes`, `classes: [10, 11, 12, 20]` | ESA CCI licence (1992-2015), VITO licence or CC BY by version (Climate Data Store record) |
+| [C3S / ESA CCI land cover](https://doi.org/10.24381/cds.006f2c9a) | 300 m, yearly, 1992 to 2025 | rainfed cropland (10, 11, 12), irrigated or post-flooding cropland (20), cropland mosaic (30) | `values: classes`, `classes: [10, 11, 12, 20]` | ESA CCI licence (1992-2015), VITO licence or CC BY by version (Climate Data Store record) |
 | [MODIS MCD12Q1 v061](https://lpdaac.usgs.gov/documents/1409/MCD12_User_Guide_V61.pdf) | 500 m | IGBP croplands (12), cropland mosaics (14) | `classes: [12, 14]` | NASA LP DAAC |
 
 A general cropland class does not say which crop grows there: with it, the crop
