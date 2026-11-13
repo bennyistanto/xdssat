@@ -131,7 +131,7 @@ From each run's `run_info.json`. Status labels: "current" is the run the site is
 runs made before a correction of the initial soil nitrogen, kept for comparison (`export_data.py`).
 :::
 
-## CF netCDF output
+## CF-compliant netCDF output
 
 Each run ends with one netCDF file on the weather grid, dimensions `(system, time, lat, lon)`. A *system* is a
 season and water regime that was simulated (`wet_irrigated`, `wet_rainfed`, `dry_irrigated`), so no slab is
