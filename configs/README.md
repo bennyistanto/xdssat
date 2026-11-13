@@ -10,7 +10,7 @@ planting calendar, scenarios and years. Nobody needs to edit Python.
 | [`rice-java-all-options.yml`](rice-java-all-options.yml) | The same case with every setting written out and every kind of option in use (cultivar not in the template, per_cell calendar, zone table, all eight weather variables, all four kinds of change, cultivar coefficients, SLPF, and an example of every `prepare` section). A menu to copy from. |
 | [`maize-example.yml`](maize-example.yml) | A maize run (CERES-Maize, `templates/XDMZ8201.MZX`) in East Java, the starting point for another crop. |
 | [`cases/`](cases/) | One file per case study of the documentation (Niger millet, Kenya maize, Mekong rice, Luzon rice, Java maize as a rice-then-maize sequence), each with the commands that prepared its inputs and ran it in its header. |
-| `xdssat.yml` | **Your own file**, read when no `--config` is given. Not committed (gitignored), so it can hold this computer's folders. Make it from `rice-java.yml`. |
+| `xdssat.yml` | **My own file**, read when no `--config` is given. Not committed (gitignored), so it can hold this computer's folders. Make it from `rice-java.yml`. |
 | `<study>.yml` | Any study you want to keep and share, e.g. `co2-java.yml`. Run it with `--config configs/<study>.yml`. |
 
 ## Start
