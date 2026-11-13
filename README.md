@@ -9,7 +9,7 @@
 
 Gridded crop simulation with the [DSSAT-CSM](https://github.com/DSSAT/dssat-csm-os) engine, driven from Python and xarray.
 
-**xdssat** is a bridge between [DSSAT](https://github.com/DSSAT) and Python. It does not reimplement DSSAT: it writes the engine's own input
+**xdssat** is a bridge between [DSSAT](https://dssat.net/) and Python. It does not reimplement DSSAT: it writes the engine's own input
 files for every grid cell and season, runs the unmodified `dscsm048` engine in parallel, and collects the
 results into one CF netCDF file. The inputs (weather, crop mask, soil, water regime) come from your own data or
 from global datasets such as AgERA5, ERA5-Land, NASA POWER, SoilGrids, WorldCover and LGRIP30; see
@@ -32,7 +32,7 @@ training with notebooks.
 |---|---|
 | `src/` | The Python modules: weather, soil and experiment files, the parallel runner, netCDF output, gridded inputs |
 | `scripts/` | Setup checks, building the engine, preparing inputs, running an area (`run_aoi.py`) |
-| `configs/` | Experiment files: `rice-java.yml` (the reference, every setting explained), `rice-java-all-options.yml` (every option in use), `maize-example.yml`, `cases/` (one per case study), and your own `xdssat.yml` (not committed). See [configs/README.md](configs/README.md) |
+| `configs/` | Experiment files: `rice-java.yml` (the reference, every setting explained), `rice-java-all-options.yml` (every option in use), `maize-example.yml`, `cases/` (one per case study). See [configs/README.md](configs/README.md) |
 | `templates/` | Template experiments, written by `scripts/make_templates.py` from DSSAT's own experiments: `XDRI8601.RIX` (rice, flooded and rainfed), `XDRW8601.RIX` (the same with two more percolation rates), `XDMZ8201.MZX` (maize), `XDML8601.MLX` (pearl millet), `XDRM8601.SQX` (rice then maize, a crop sequence) |
 | `example-inputs/` | Five small areas with their inputs already prepared from public data, each with a ready-to-run `experiment.yml` |
 | `tests/` | `pytest` suite; tests marked `engine` run the real engine |
